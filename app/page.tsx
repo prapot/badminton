@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import Navbar from "@/components/Navbar";
 
 interface User {
   id: number;
@@ -50,41 +50,11 @@ export default function HomePage() {
     if (stored) setUser(JSON.parse(stored));
   }, [router]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("jwt");
-    localStorage.removeItem("user");
-    router.push("/login");
-  };
-
   if (!user) return null;
 
   return (
     <div className="min-h-screen bg-[#0f1923] text-white">
-      {/* Navbar */}
-      <nav className="border-b border-white/10 bg-[#0f1923]/80 backdrop-blur-xl sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#2ecc71] to-[#27ae60] flex items-center justify-center text-lg">
-              🏸
-            </div>
-            <span className="font-bold text-white text-lg tracking-tight">Badminton Club</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-slate-400 hidden sm:block">
-              สวัสดี, <span className="text-white font-medium">{user.username}</span>
-            </span>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              ออกจากระบบ
-            </button>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
         {/* Hero Banner */}

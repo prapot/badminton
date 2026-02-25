@@ -8,12 +8,14 @@ interface User {
     id: number;
     username: string;
     email: string;
+    picture?: { url: string } | null;
 }
 
 const navLinks = [
     { href: "/", label: "หน้าหลัก", icon: "🏠" },
     { href: "/ranking", label: "อันดับ", icon: "🏆" },
     { href: "/tournament", label: "ตารางแข่ง", icon: "🎯" },
+    { href: "/profile", label: "โปรไฟล์", icon: "👤" },
 ];
 
 export default function Navbar() {
@@ -22,9 +24,15 @@ export default function Navbar() {
     const [user, setUser] = useState<User | null>(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
 
-    useEffect(() => {
+    const updateUserData = () => {
         const stored = localStorage.getItem("user");
         if (stored) setUser(JSON.parse(stored));
+    };
+
+    useEffect(() => {
+        updateUserData();
+        window.addEventListener("storage", updateUserData);
+        return () => window.removeEventListener("storage", updateUserData);
     }, []);
 
     // Close drawer on route change
@@ -94,12 +102,24 @@ export default function Navbar() {
                     </div>
 
                     {/* Right side */}
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
                         {user && (
-                            <span className="text-sm text-slate-400 hidden sm:block">
+                            <span className="text-sm text-slate-400 hidden sm:block mr-2">
                                 สวัสดี, <span className="text-white font-medium">{user.username}</span>
                             </span>
                         )}
+                        {/* Profile button */}
+                        <Link
+                            href="/profile"
+                            className="hidden sm:flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-[#2ecc71] to-[#27ae60] text-white font-bold text-sm hover:from-[#3de382] hover:to-[#2ecc71] transition-all shadow-md shadow-green-900/20 overflow-hidden border border-white/10"
+                            title="แก้ไขโปรไฟล์"
+                        >
+                            {user?.picture?.url ? (
+                                <img src={user.picture.url.startsWith("http") ? user.picture.url : `${process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337"}${user.picture.url}`} alt={user.username} className="w-full h-full object-cover" />
+                            ) : (
+                                user ? user.username.charAt(0).toUpperCase() : "?"
+                            )}
+                        </Link>
                         <button
                             onClick={handleLogout}
                             className="hidden sm:flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5"
@@ -151,8 +171,12 @@ export default function Navbar() {
                 {user && (
                     <div className="mx-4 mt-4 p-4 rounded-2xl bg-gradient-to-br from-green-500/10 to-emerald-500/5 border border-green-500/15 shrink-0">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2ecc71] to-[#27ae60] flex items-center justify-center text-white font-bold text-sm shrink-0">
-                                {user.username.charAt(0).toUpperCase()}
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2ecc71] to-[#27ae60] flex items-center justify-center text-white font-bold text-sm shrink-0 overflow-hidden border border-white/20">
+                                {user.picture?.url ? (
+                                    <img src={user.picture.url.startsWith("http") ? user.picture.url : `${process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337"}${user.picture.url}`} alt={user.username} className="w-full h-full object-cover" />
+                                ) : (
+                                    user.username.charAt(0).toUpperCase()
+                                )}
                             </div>
                             <div className="min-w-0">
                                 <p className="text-sm font-semibold text-white truncate">{user.username}</p>

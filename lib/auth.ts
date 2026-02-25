@@ -7,6 +7,8 @@ export interface LoginResponse {
     jwt: string;
     user: {
         id: number;
+        documentId: string;
+        picture: string;
         username: string;
         email: string;
     };
@@ -16,6 +18,8 @@ export interface RegisterResponse {
     jwt: string;
     user: {
         id: number;
+        documentId: string;
+        picture: string;
         username: string;
         email: string;
     };
@@ -36,7 +40,18 @@ export async function loginWithStrapi(
         throw new Error(err?.error?.message || "Invalid email or password");
     }
 
-    return res.json();
+    const data = await res.json();
+
+    // Fetch populated user data, specifically for the picture field
+    const userRes = await fetch(`${STRAPI_BASE_URL}/api/users/me?populate=picture`, {
+        headers: { Authorization: `Bearer ${data.jwt}` }
+    });
+
+    if (userRes.ok) {
+        data.user = await userRes.json();
+    }
+
+    return data;
 }
 
 export async function registerWithStrapi(
@@ -55,5 +70,16 @@ export async function registerWithStrapi(
         throw new Error(err?.error?.message || "Registration failed");
     }
 
-    return res.json();
+    const data = await res.json();
+
+    // Fetch populated user data, specifically for the picture field
+    const userRes = await fetch(`${STRAPI_BASE_URL}/api/users/me?populate=picture`, {
+        headers: { Authorization: `Bearer ${data.jwt}` }
+    });
+
+    if (userRes.ok) {
+        data.user = await userRes.json();
+    }
+
+    return data;
 }

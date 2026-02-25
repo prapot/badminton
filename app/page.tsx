@@ -1,20 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
-
-interface User {
-  id: number;
-  username: string;
-  email: string;
-}
+import { useAuth } from "@/lib/useAuth";
 
 const stats = [
   { label: "สนามทั้งหมด", value: "8", icon: "🏟️", color: "from-green-500/20 to-emerald-500/10", border: "border-green-500/20" },
   { label: "สมาชิก", value: "124", icon: "👥", color: "from-blue-500/20 to-cyan-500/10", border: "border-blue-500/20" },
   { label: "แมตช์วันนี้", value: "12", icon: "⚡", color: "from-yellow-500/20 to-amber-500/10", border: "border-yellow-500/20" },
-  { label: "แชมป์เปี้ยน", value: "6", icon: "🏆", color: "from-purple-500/20 to-violet-500/10", border: "border-purple-500/20" },
 ];
 
 const courts = [
@@ -37,18 +29,7 @@ const news = [
 ];
 
 export default function HomePage() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("user");
-    const jwt = localStorage.getItem("jwt");
-    if (!jwt) {
-      router.push("/login");
-      return;
-    }
-    if (stored) setUser(JSON.parse(stored));
-  }, [router]);
+  const { user } = useAuth();
 
   if (!user) return null;
 
@@ -96,7 +77,7 @@ export default function HomePage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           {stats.map((s) => (
             <div
               key={s.label}

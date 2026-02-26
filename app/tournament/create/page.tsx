@@ -16,6 +16,7 @@ interface FormData {
     name: string;
     type: PlayerType;
     format: Format;
+    startDate: string;
 }
 
 const typeOptions: { value: PlayerType; label: string; desc: string; icon: string }[] = [
@@ -40,6 +41,7 @@ export default function CreateTournamentPage() {
         name: "",
         type: "single",
         format: "round_robin",
+        startDate: new Date().toISOString().split('T')[0],
     });
 
     if (!user) return null;
@@ -62,6 +64,7 @@ export default function CreateTournamentPage() {
                         name: form.name.trim(),
                         type: form.type,
                         format: form.format,
+                        startDate: form.startDate,
                         tournament_status: "upcoming",
                     },
                 }),
@@ -141,6 +144,18 @@ export default function CreateTournamentPage() {
                                 value={form.name}
                                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                                 className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-green-500/50 focus:bg-white/8 transition-all"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1.5">
+                                วันที่เริ่มการแข่งขัน <span className="text-red-400">*</span>
+                            </label>
+                            <input
+                                type="date"
+                                value={form.startDate}
+                                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-green-500/50 focus:bg-white/8 transition-all [color-scheme:dark]"
                             />
                         </div>
 
@@ -239,6 +254,7 @@ export default function CreateTournamentPage() {
                             <div className="space-y-0">
                                 {[
                                     { label: "ชื่อทัวร์นาเมนต์", value: form.name },
+                                    { label: "วันที่แข่งขัน", value: new Date(form.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) },
                                     { label: "ประเภท", value: typeOptions.find((t) => t.value === form.type)?.label ?? "-" },
                                     { label: "รูปแบบ", value: formatOptions.find((f) => f.value === form.format)?.label ?? "-" },
                                     { label: "สถานะเริ่มต้น", value: "รอเริ่ม (upcoming)" },

@@ -20,15 +20,16 @@ interface Tournament {
     type: PlayerType;
     format: Format;
     tournament_status: Status;
+    startDate: string;
     createdAt: string;
     playerCount: number;   // จาก tournament_player populate
     isJoined: boolean;     // ตรวจว่า user นี้ join แล้วหรือยัง
 }
 
 const statusConfig: Record<Status, { label: string; cls: string }> = {
-    ongoing: { label: "● กำลังแข่ง", cls: "bg-green-500/20 text-green-400 border-green-500/25" },
-    upcoming: { label: "รอเริ่ม", cls: "bg-blue-500/20 text-blue-400 border-blue-500/25" },
-    completed: { label: "จบแล้ว", cls: "bg-white/8 text-slate-400 border-white/10" },
+    ongoing: { label: "● กำลังแข่ง", cls: "bg-green-500/10 text-green-400 border-green-500/20 animate-pulse" },
+    upcoming: { label: "รอเริ่ม", cls: "bg-blue-500/10 text-blue-400 border-blue-500/20" },
+    completed: { label: "จบแล้ว", cls: "bg-white/5 text-slate-400 border-white/10" },
 };
 
 const formatLabel: Record<Format, string> = {
@@ -75,6 +76,7 @@ export default function TournamentListPage() {
                 type?: PlayerType;
                 format?: Format;
                 tournament_status?: Status;
+                startDate?: string;
                 createdAt?: string;
                 tournament_players?: Array<{ user?: { id?: number } }> | null;
             }) => {
@@ -86,6 +88,7 @@ export default function TournamentListPage() {
                     type: item.type ?? "single",
                     format: item.format ?? "round_robin",
                     tournament_status: item.tournament_status ?? "upcoming",
+                    startDate: item.startDate ?? "",
                     createdAt: item.createdAt ?? "",
                     playerCount: players.length,
                     isJoined: players.some((p) => p.user?.id === user.id),
@@ -250,13 +253,14 @@ export default function TournamentListPage() {
                                                 </span>
                                             </div>
 
-                                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
+                                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400 items-center">
+                                                <span className="flex items-center gap-1.5 text-[#2ecc71] font-bold">
+                                                    📅 {t.startDate ? new Date(t.startDate).toLocaleDateString("th-TH", { day: 'numeric', month: 'long', year: 'numeric' }) : "ไม่ระบุวันที่"}
+                                                </span>
+                                                <span className="w-px h-3 bg-white/10 hidden sm:block" />
                                                 <span>{typeLabel[t.type]}</span>
                                                 <span>{formatLabel[t.format]}</span>
                                                 <span>👥 {t.playerCount} ผู้เล่น</span>
-                                                <span className="text-slate-600">
-                                                    📅 {new Date(t.createdAt).toLocaleDateString("th-TH", { dateStyle: "medium" })}
-                                                </span>
                                             </div>
                                         </div>
 

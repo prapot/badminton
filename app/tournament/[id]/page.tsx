@@ -10,6 +10,18 @@ import Swal from "sweetalert2";
 const STRAPI_BASE_URL =
     process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
 
+const GRADIENT_ANIMATION_STYLE = `
+  @keyframes gradient-x {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  .animate-gradient-x {
+    background-size: 200% auto;
+    animation: gradient-x 3s linear infinite;
+  }
+`;
+
+
 type TournamentStatus = "upcoming" | "ongoing" | "completed";
 
 interface RegisteredPlayer {
@@ -26,6 +38,7 @@ interface TournamentInfo {
     tournament_status: TournamentStatus;
     type: string;
     format: string;
+    startDate: string;
     players: RegisteredPlayer[];
 }
 
@@ -393,6 +406,7 @@ export default function TournamentDetailPage() {
                     tournament_status: data.tournament_status ?? "upcoming",
                     type: data.type ?? "single",
                     format: data.format ?? "round_robin",
+                    startDate: data.startDate ?? "",
                     players: tpArr
                         .filter((tp) => !!tp.user)
                         .map((tp) => ({ ...tp.user!, tpDocumentId: tp.documentId ?? "" })),
@@ -420,6 +434,7 @@ export default function TournamentDetailPage() {
                 const tpArr: Array<{ documentId?: string; user?: Omit<RegisteredPlayer, "tpDocumentId"> }> = data.tournament_players ?? [];
                 setTournamentInfo((prev) => prev ? {
                     ...prev,
+                    startDate: data.startDate ?? prev.startDate,
                     players: tpArr
                         .filter((tp) => !!tp.user)
                         .map((tp) => ({ ...tp.user!, tpDocumentId: tp.documentId ?? "" })),
@@ -830,108 +845,146 @@ export default function TournamentDetailPage() {
     const total = apiMatches.length;
 
     return (
-        <div className="min-h-screen bg-[#0f1923] text-white">
+        <div className="min-h-screen bg-[#0f1923] text-slate-100 font-sans selection:bg-[#2ecc71]/30">
+            <style dangerouslySetInnerHTML={{ __html: GRADIENT_ANIMATION_STYLE }} />
             <Navbar />
             {/* Score Editor Modal */}
             {scoreEditing && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setScoreEditing(null)} />
-                    <div className="relative z-10 w-full max-w-md bg-gradient-to-b from-[#1a2535] to-[#0f1923] border border-white/10 rounded-3xl p-6 shadow-[0_0_40px_rgba(0,0,0,0.8)] flex flex-col gap-6" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 z-[100] flex items-start sm:items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md">
+                    <div className="absolute inset-0" onClick={() => setScoreEditing(null)} />
+                    <div className="relative z-10 w-full max-w-2xl bg-gradient-to-b from-[#1a2535] to-[#0f1923] border border-white/10 rounded-[2.5rem] p-6 sm:p-10 my-auto shadow-[0_0_60px_rgba(0,0,0,0.9)] flex flex-col gap-8" onClick={e => e.stopPropagation()}>
 
                         {/* Header */}
-                        <div className="text-center space-y-1.5">
-                            <h3 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#2ecc71] to-[#3498db]">
-                                บันทึกคะแนน
+                        <div className="text-center space-y-3">
+                            <h3 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#2ecc71] via-[#3498db] to-[#2ecc71] animate-gradient-x p-1">
+                                บันทึกผลการแข่งขัน
                             </h3>
-                            <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1 rounded-full">
-                                <span className="text-xs font-bold text-[#3498db]">แมตซ์ #{scoreEditing.match_no}</span>
-                                <span className="text-[10px] text-slate-500">•</span>
-                                <span className="text-xs font-semibold text-slate-300">{scoreEditing.round}</span>
+                            <div className="inline-flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-1.5 rounded-full backdrop-blur-md">
+                                <span className="text-xs font-black tracking-widest text-[#3498db]">แมตซ์ #{scoreEditing.match_no}</span>
+                                {/* <span className="text-slate-700">•</span>
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-tighter">{scoreEditing.round}</span> */}
                             </div>
                         </div>
 
-                        {/* Score Inputs */}
-                        <div className="grid grid-cols-[1fr,auto,1fr] items-center gap-2 sm:gap-4 bg-black/30 p-4 sm:p-5 rounded-2xl border border-white/5">
+                        {/* Score Inputs Area */}
+                        <div className="flex flex-col sm:grid sm:grid-cols-[1fr,auto,1fr] items-stretch sm:items-center gap-6 sm:gap-10 bg-black/40 p-6 sm:p-10 rounded-[2rem] border border-white/5 relative overflow-hidden group">
+                            <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
                             {/* Team A */}
-                            <div className="flex-1 flex flex-col gap-4 min-w-0 items-center justify-start">
+                            <div className="flex-1 flex flex-col gap-6 items-center">
                                 <div className="flex flex-col gap-3 w-full">
-                                    {scoreEditing.team_a_id?.team_players.map((tp, idx) => {
+                                    {(scoreEditing.team_a_id?.team_players || []).map((tp, idx) => {
                                         const u = tp.user_id;
                                         if (!u) return null;
                                         const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
                                         return (
-                                            <div key={idx} className="flex flex-col items-center gap-1.5 bg-black/20 p-2 rounded-xl border border-white/5">
-                                                <div className="w-10 h-10 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 border-slate-700/50 flex items-center justify-center shadow-inner">
-                                                    {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-xs font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                            <div key={idx} className="flex items-center gap-3 bg-white/5 p-3 rounded-2xl border border-white/5 hover:border-white/10 transition-all">
+                                                <div className="w-12 h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 border-[#2ecc71]/30 flex items-center justify-center shadow-lg">
+                                                    {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                                 </div>
-                                                <p className="font-bold text-xs sm:text-sm text-slate-200 truncate w-full text-center">{u.username}</p>
+                                                <div className="min-w-0">
+                                                    <p className="font-bold text-sm text-white truncate">{u.username}</p>
+                                                    <p className="text-[10px] text-slate-500 font-medium">TEAM {scoreEditing.team_a_id?.team_no}</p>
+                                                </div>
                                             </div>
                                         );
                                     })}
                                     {(!scoreEditing.team_a_id || scoreEditing.team_a_id.team_players.length === 0) && (
-                                        <p className="text-xs font-bold text-slate-500 text-center">ทีม {scoreEditing.team_a_id?.team_no ?? "?"}</p>
+                                        <div className="h-14 flex items-center justify-center bg-white/5 border border-dashed border-white/10 rounded-2xl">
+                                            <p className="text-xs font-bold text-slate-500 italic">ทีม {scoreEditing.team_a_id?.team_no ?? "?"}</p>
+                                        </div>
                                     )}
                                 </div>
-                                <input type="number" min={0} value={scoreA} onChange={e => setScoreA(Math.max(0, +e.target.value))}
-                                    className="w-full text-center text-5xl font-black bg-[#141f2e] border-2 border-white/10 rounded-2xl py-4 text-white focus:outline-none focus:border-[#2ecc71] focus:shadow-[0_0_20px_rgba(46,204,113,0.2)] transition-all font-mono" />
-                                <div className="flex gap-2 justify-center w-full">
-                                    <button onClick={() => setScoreA(15)} className="flex-1 py-1.5 bg-white/5 hover:bg-white/15 border border-white/5 rounded-lg text-xs font-bold text-slate-300 transition-colors">15</button>
-                                    <button onClick={() => setScoreA(21)} className="flex-1 py-1.5 bg-white/5 hover:bg-white/15 border border-white/5 rounded-lg text-xs font-bold text-slate-300 transition-colors">21</button>
+
+                                <div className="w-full space-y-4">
+                                    <input type="number" min={0} value={scoreA} onChange={e => setScoreA(Math.max(0, +e.target.value))}
+                                        className="w-full text-center text-6xl font-black bg-[#0f1923] border-4 border-white/10 rounded-3xl py-6 text-white focus:outline-none focus:border-[#2ecc71] focus:ring-4 focus:ring-[#2ecc71]/10 transition-all font-mono shadow-inner" />
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button onClick={() => setScoreA(15)} className="py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-black text-slate-400 hover:text-[#2ecc71] transition-all">SCORE 15</button>
+                                        <button onClick={() => setScoreA(21)} className="py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-black text-slate-400 hover:text-[#2ecc71] transition-all">SCORE 21</button>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="flex flex-col items-center justify-center shrink-0 w-6">
-                                <span className="text-slate-600 font-black text-3xl mb-8">:</span>
-                            </div>
+                            {/* <div className="flex flex-col items-center justify-center shrink-0 w-8 sm:w-auto h-px sm:h-auto bg-white/10 sm:bg-transparent">
+                                <span className="hidden sm:block text-slate-700 font-black text-4xl mb-24 opacity-50">:</span>
+                            </div> */}
+                            <hr></hr>
 
                             {/* Team B */}
-                            <div className="flex-1 flex flex-col gap-4 min-w-0 items-center justify-start">
+                            <div className="flex-1 flex flex-col gap-6 items-center">
                                 <div className="flex flex-col gap-3 w-full">
-                                    {scoreEditing.team_b_id?.team_players.map((tp, idx) => {
+                                    {(scoreEditing.team_b_id?.team_players || []).map((tp, idx) => {
                                         const u = tp.user_id;
                                         if (!u) return null;
                                         const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
                                         return (
-                                            <div key={idx} className="flex flex-col items-center gap-1.5 bg-black/20 p-2 rounded-xl border border-white/5">
-                                                <div className="w-10 h-10 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 border-slate-700/50 flex items-center justify-center shadow-inner">
-                                                    {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-xs font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                            <div key={idx} className="flex items-center gap-3 bg-white/5 p-3 rounded-2xl border border-white/5 hover:border-white/10 transition-all">
+                                                <div className="w-12 h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 border-[#3498db]/30 flex items-center justify-center shadow-lg">
+                                                    {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                                 </div>
-                                                <p className="font-bold text-xs sm:text-sm text-slate-200 truncate w-full text-center">{u.username}</p>
+                                                <div className="min-w-0">
+                                                    <p className="font-bold text-sm text-white truncate">{u.username}</p>
+                                                    <p className="text-[10px] text-slate-500 font-medium">TEAM {scoreEditing.team_b_id?.team_no}</p>
+                                                </div>
                                             </div>
                                         );
                                     })}
                                     {(!scoreEditing.team_b_id) && (
-                                        <p className="text-xs font-bold text-slate-500 text-center">พักรอบ</p>
+                                        <div className="h-14 flex items-center justify-center bg-white/5 border border-dashed border-white/10 rounded-2xl">
+                                            <p className="text-xs font-bold text-slate-500 italic">พักรอบ</p>
+                                        </div>
                                     )}
                                 </div>
-                                <input type="number" min={0} value={scoreB} onChange={e => setScoreB(Math.max(0, +e.target.value))}
-                                    className="w-full text-center text-5xl font-black bg-[#141f2e] border-2 border-white/10 rounded-2xl py-4 text-white focus:outline-none focus:border-[#2ecc71] focus:shadow-[0_0_20px_rgba(46,204,113,0.2)] transition-all font-mono" />
-                                <div className="flex gap-2 justify-center w-full">
-                                    <button onClick={() => setScoreB(15)} className="flex-1 py-1.5 bg-white/5 hover:bg-white/15 border border-white/5 rounded-lg text-xs font-bold text-slate-300 transition-colors">15</button>
-                                    <button onClick={() => setScoreB(21)} className="flex-1 py-1.5 bg-white/5 hover:bg-white/15 border border-white/5 rounded-lg text-xs font-bold text-slate-300 transition-colors">21</button>
+
+                                <div className="w-full space-y-4">
+                                    <input type="number" min={0} value={scoreB} onChange={e => setScoreB(Math.max(0, +e.target.value))}
+                                        className="w-full text-center text-6xl font-black bg-[#0f1923] border-4 border-white/10 rounded-3xl py-6 text-white focus:outline-none focus:border-[#2ecc71] focus:ring-4 focus:ring-[#2ecc71]/10 transition-all font-mono shadow-inner" />
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button onClick={() => setScoreB(15)} className="py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-black text-slate-400 hover:text-[#3498db] transition-all">SCORE 15</button>
+                                        <button onClick={() => setScoreB(21)} className="py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-black text-slate-400 hover:text-[#3498db] transition-all">SCORE 21</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Actions */}
-                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2">
+                        <div className="flex flex-col sm:flex-row gap-4 pt-2">
                             <button onClick={() => setScoreEditing(null)}
-                                className="flex-1 py-3 sm:py-3.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-white font-bold transition-all text-xs sm:text-sm order-2 sm:order-1">
+                                className="flex-1 py-4 sm:py-5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 font-bold transition-all text-sm uppercase tracking-widest order-2 sm:order-1">
                                 ยกเลิก
                             </button>
                             <button
                                 onClick={() => {
                                     if (scoreA < 15 && scoreB < 15) {
-                                        alert("คะแนนผู้ชนะต้องถึง 15 แต้มเป็นอย่างน้อย ตามกติกา!");
+                                        Swal.fire({
+                                            title: 'คะแนนไม่ถูกต้อง',
+                                            text: 'คะแนนผู้ชนะต้องถึง 15 แต้มเป็นอย่างน้อย ตามกติกา!',
+                                            icon: 'warning',
+                                            confirmButtonColor: '#2ecc71',
+                                            background: '#1a2535',
+                                            color: '#fff'
+                                        });
+                                        return;
+                                    }
+                                    if (scoreA === scoreB) {
+                                        Swal.fire({
+                                            title: 'คะแนนไม่ถูกต้อง',
+                                            text: 'ผลการแข่งขันห้ามเสมอ! ต้องมีผู้ชนะเพียงฝั่งเดียว',
+                                            icon: 'warning',
+                                            confirmButtonColor: '#2ecc71',
+                                            background: '#1a2535',
+                                            color: '#fff'
+                                        });
                                         return;
                                     }
                                     handleSaveScore();
                                 }}
                                 disabled={savingScore}
-                                className="flex-[2] py-3 sm:py-3.5 rounded-xl bg-gradient-to-r from-[#2ecc71] to-[#27ae60] hover:from-[#3de382] hover:to-[#2ecc71] shadow-[0_4px_20px_rgba(46,204,113,0.3)] text-white font-bold transition-all disabled:opacity-50 text-xs sm:text-sm flex items-center justify-center gap-2 order-1 sm:order-2">
+                                className="flex-[2] py-4 sm:py-5 rounded-2xl bg-gradient-to-r from-[#2ecc71] to-[#27ae60] hover:scale-[1.02] active:scale-95 shadow-[0_10px_30px_rgba(46,204,113,0.3)] text-white font-black transition-all disabled:opacity-50 text-base uppercase tracking-widest flex items-center justify-center gap-3 order-1 sm:order-2">
                                 {savingScore ? (
-                                    <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>บันทึก...</>
-                                ) : "✅ ยืนยันคะแนน"}
+                                    <><svg className="animate-spin w-5 h-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg><span>กำลังบันทึก...</span></>
+                                ) : <><span>บันทึกผลการแข่ง</span><span className="text-xl">✅</span></>}
                             </button>
                         </div>
                     </div>
@@ -1009,6 +1062,9 @@ export default function TournamentDetailPage() {
                         {/* Detail chips */}
                         {tournamentInfo && (
                             <div className="flex flex-wrap gap-2 mt-2">
+                                <span className="text-xs px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-[#2ecc71] font-bold">
+                                    📅 {tournamentInfo.startDate ? new Date(tournamentInfo.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : "ไม่ระบุวันที่"}
+                                </span>
                                 <span className="text-xs px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300">
                                     {tournamentInfo.type === "single" ? "🏸 เดี่ยว" : "👥 คู่"}
                                 </span>
@@ -1038,7 +1094,7 @@ export default function TournamentDetailPage() {
                     </div>
 
                     {/* Delete button */}
-                    <button
+                    {/* <button
                         onClick={() => setConfirmDelete(true)}
                         className="mt-1 shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-xs font-semibold transition-all"
                         title="ลบทัวร์นาเมนต์"
@@ -1047,7 +1103,7 @@ export default function TournamentDetailPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                         ลบ
-                    </button>
+                    </button> */}
                 </div>
 
                 {/* ── UPCOMING: Players list + Draw Pairs ── */}
@@ -1252,7 +1308,7 @@ export default function TournamentDetailPage() {
                                         <div className="flex items-center gap-3">
                                             <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent flex-1" />
                                             <span className="px-3 text-xs font-bold text-slate-400 uppercase tracking-widest text-center">
-                                                {round}
+                                                แมตซ์ #{round}
                                             </span>
                                             <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent flex-1" />
                                         </div>

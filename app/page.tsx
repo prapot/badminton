@@ -85,7 +85,7 @@ export default function HomePage() {
 
       // 2. Today's Tournaments (Accordion)
       const todayTourneysRes = await fetch(
-        `${STRAPI_BASE_URL}/api/tournaments?filters[startDate]=${todayDateStr}&populate[matches][populate][team_a_id][populate][team_players][populate]=user_id&populate[matches][populate][team_b_id][populate][team_players][populate]=user_id&populate[tournament_players][count]=true`,
+        `${STRAPI_BASE_URL}/api/tournaments?filters[$or][0][startDate]=${todayDateStr}&filters[$or][1][tournament_status]=ongoing&populate[matches][populate][team_a_id][populate][team_players][populate]=user_id&populate[matches][populate][team_b_id][populate][team_players][populate]=user_id&populate[tournament_players][count]=true`,
         { headers: { Authorization: `Bearer ${jwt}` } }
       );
       const todayTourneysData = await todayTourneysRes.json();

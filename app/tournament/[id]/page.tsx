@@ -18,6 +18,7 @@ interface RegisteredPlayer {
     email: string;
     tpDocumentId: string;   // documentId ของ tournament_player row (ใช้ DELETE)
     picture?: { url: string } | null;
+    ranking?: ApiRanking | null;
 }
 
 interface TournamentInfo {
@@ -48,6 +49,11 @@ interface ApiTeam {
     team_no: string;
     team_players: Array<{ id: number; user_id: ApiPlayer | null }>;
 }
+interface ApiMatchHistory {
+    id: number;
+    mmr_change: number;
+    users: ApiPlayer[];
+}
 interface ApiMatch {
     id: number;
     documentId: string;
@@ -59,6 +65,7 @@ interface ApiMatch {
     team_winner: string | null;
     team_a_id: ApiTeam | null;
     team_b_id: ApiTeam | null;
+    match_histories?: ApiMatchHistory[];
 }
 
 type MatchStatus = "done" | "live" | "upcoming";
@@ -101,6 +108,28 @@ function calcStandings(players: string[], matches: TMatch[], round: string): Gro
         map[m.player2].sumFor += s2; map[m.player2].sumAgainst += s1;
     });
     return Object.values(map).sort((a, b) => b.pts - a.pts || (b.sumFor - b.sumAgainst) - (a.sumFor - a.sumAgainst));
+}
+
+function calculateExpectedMmrChange(teamAMmr: number | null, teamBMmr: number | null): { aWins: number, aLoses: number, bWins: number, bLoses: number } {
+    const defaultMmr = 1500;
+    const aMmr = teamAMmr ?? defaultMmr;
+    const bMmr = teamBMmr ?? defaultMmr;
+    const K = 32;
+
+    // Expected probabilities
+    const expectedAWins = 1 / (1 + Math.pow(10, (bMmr - aMmr) / 400));
+    const expectedBWins = 1 / (1 + Math.pow(10, (aMmr - bMmr) / 400));
+
+    // MoV multiplier for a hypothetical 21-20 score (diff of 1)
+    const movMultiplier = Math.log(2);
+
+    const aWinChange = Math.round(K * movMultiplier * (1 - expectedAWins));
+    const aLoseChange = Math.round(K * movMultiplier * (1 - expectedBWins)); // If A loses, it means B wins, so the change is based on B's expected win probability
+
+    const bWinChange = Math.round(K * movMultiplier * (1 - expectedBWins));
+    const bLoseChange = Math.round(K * movMultiplier * (1 - expectedAWins));
+
+    return { aWins: aWinChange, aLoses: aLoseChange, bWins: bWinChange, bLoses: bLoseChange };
 }
 
 /* ─── Score Modal ─── */
@@ -333,7 +362,7 @@ export default function TournamentDetailPage() {
     const fetchMatches = (token = jwt) => {
         if (!token || !id) return;
         fetch(
-            `${STRAPI_BASE_URL}/api/matches?filters[tournament_id][documentId][$eq]=${id}&populate[team_a_id][populate][team_players][populate][user_id][populate][0]=ranking&populate[team_a_id][populate][team_players][populate][user_id][populate][1]=picture&populate[team_b_id][populate][team_players][populate][user_id][populate][0]=ranking&populate[team_b_id][populate][team_players][populate][user_id][populate][1]=picture&sort=match_no:asc`,
+            `${STRAPI_BASE_URL}/api/matches?filters[tournament_id][documentId][$eq]=${id}&populate[team_a_id][populate][team_players][populate][user_id][populate][0]=ranking&populate[team_a_id][populate][team_players][populate][user_id][populate][1]=picture&populate[team_b_id][populate][team_players][populate][user_id][populate][0]=ranking&populate[team_b_id][populate][team_players][populate][user_id][populate][1]=picture&populate[match_histories][populate][users][fields]=*&sort=match_no:asc`,
             { headers: { Authorization: `Bearer ${token}` } }
         )
             .then((r) => r.json())
@@ -352,7 +381,7 @@ export default function TournamentDetailPage() {
     useEffect(() => {
         if (!jwt || !id) return;
         fetch(
-            `${STRAPI_BASE_URL}/api/tournaments/${id}?populate[tournament_players][populate][user][populate][0]=picture`,
+            `${STRAPI_BASE_URL}/api/tournaments/${id}?populate[tournament_players][populate][user][populate][0]=picture&populate[tournament_players][populate][user][populate][1]=ranking`,
             { headers: { Authorization: `Bearer ${jwt}` } }
         )
             .then((r) => r.json())
@@ -382,7 +411,7 @@ export default function TournamentDetailPage() {
     const refreshInfo = () => {
         if (!jwt || !id) return;
         fetch(
-            `${STRAPI_BASE_URL}/api/tournaments/${id}?populate[tournament_players][populate][user][populate][0]=picture`,
+            `${STRAPI_BASE_URL}/api/tournaments/${id}?populate[tournament_players][populate][user][populate][0]=picture&populate[tournament_players][populate][user][populate][1]=ranking`,
             { headers: { Authorization: `Bearer ${jwt}` } }
         )
             .then((r) => r.json())
@@ -734,6 +763,42 @@ export default function TournamentDetailPage() {
                 throw new Error(err?.error?.message || `HTTP ${res.status}`);
             }
 
+            // Record match for ranking update
+            try {
+                const isTeamAWinner = scoreA > scoreB;
+                const isTeamBWinner = scoreB > scoreA;
+
+                let winners: number[] = [];
+                let losers: number[] = [];
+
+                if (isTeamAWinner) {
+                    winners = scoreEditing.team_a_id?.team_players.map(tp => tp.user_id?.id).filter((id): id is number => id !== undefined) || [];
+                    losers = scoreEditing.team_b_id?.team_players.map(tp => tp.user_id?.id).filter((id): id is number => id !== undefined) || [];
+                } else if (isTeamBWinner) {
+                    winners = scoreEditing.team_b_id?.team_players.map(tp => tp.user_id?.id).filter((id): id is number => id !== undefined) || [];
+                    losers = scoreEditing.team_a_id?.team_players.map(tp => tp.user_id?.id).filter((id): id is number => id !== undefined) || [];
+                }
+
+                if (winners.length > 0 && losers.length > 0) {
+                    await fetch(`${STRAPI_BASE_URL}/api/rankings/record-match`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+                        body: JSON.stringify({
+                            data: {
+                                winners,
+                                losers,
+                                winner_score: isTeamAWinner ? scoreA : scoreB,
+                                loser_score: isTeamAWinner ? scoreB : scoreA,
+                                match_id: scoreEditing.documentId,
+                            }
+                        }),
+                    });
+                }
+            } catch (err) {
+                console.error("Failed to record match for ranking", err);
+                // We don't throw here to ensure the score saving flow completes even if ranking update fails
+            }
+
             // Check if all matches (including this one just updated) are done
             const isLastMatch = apiMatches.filter(m => m.match_status !== "done" && m.id !== scoreEditing.id).length === 0;
 
@@ -786,7 +851,7 @@ export default function TournamentDetailPage() {
                         </div>
 
                         {/* Score Inputs */}
-                        <div className="flex items-center justify-between gap-4 bg-black/30 p-5 rounded-2xl border border-white/5">
+                        <div className="grid grid-cols-[1fr,auto,1fr] items-center gap-2 sm:gap-4 bg-black/30 p-4 sm:p-5 rounded-2xl border border-white/5">
                             {/* Team A */}
                             <div className="flex-1 flex flex-col gap-4 min-w-0 items-center justify-start">
                                 <div className="flex flex-col gap-3 w-full">
@@ -849,9 +914,9 @@ export default function TournamentDetailPage() {
                         </div>
 
                         {/* Actions */}
-                        <div className="flex gap-3 pt-2">
+                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2">
                             <button onClick={() => setScoreEditing(null)}
-                                className="flex-1 py-3.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-white font-bold transition-all text-sm">
+                                className="flex-1 py-3 sm:py-3.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-white font-bold transition-all text-xs sm:text-sm order-2 sm:order-1">
                                 ยกเลิก
                             </button>
                             <button
@@ -863,7 +928,7 @@ export default function TournamentDetailPage() {
                                     handleSaveScore();
                                 }}
                                 disabled={savingScore}
-                                className="flex-[2] py-3.5 rounded-xl bg-gradient-to-r from-[#2ecc71] to-[#27ae60] hover:from-[#3de382] hover:to-[#2ecc71] shadow-[0_4px_20px_rgba(46,204,113,0.3)] text-white font-bold transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2">
+                                className="flex-[2] py-3 sm:py-3.5 rounded-xl bg-gradient-to-r from-[#2ecc71] to-[#27ae60] hover:from-[#3de382] hover:to-[#2ecc71] shadow-[0_4px_20px_rgba(46,204,113,0.3)] text-white font-bold transition-all disabled:opacity-50 text-xs sm:text-sm flex items-center justify-center gap-2 order-1 sm:order-2">
                                 {savingScore ? (
                                     <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>บันทึก...</>
                                 ) : "✅ ยืนยันคะแนน"}
@@ -922,8 +987,8 @@ export default function TournamentDetailPage() {
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                     </button>
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <h1 className="text-xl font-bold text-white">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                            <h1 className="text-lg sm:text-xl font-black text-white leading-tight">
                                 {tournamentInfo?.name || "โหลด..."}
                             </h1>
                             {tournamentInfo && (() => {
@@ -1029,9 +1094,19 @@ export default function TournamentDetailPage() {
                                                     {player.username.charAt(0).toUpperCase()}
                                                 </div>
                                             )}
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium text-white truncate">{player.username}</p>
-                                                <p className="text-xs text-slate-500 truncate">{player.email}</p>
+                                            <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-bold text-white truncate">{player.username}</p>
+                                                    <p className="text-[10px] text-slate-500 truncate">{player.email}</p>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] text-slate-400 font-medium bg-black/30 px-2 py-1 rounded-lg border border-white/5 w-fit">
+                                                    <span className="text-yellow-500 font-bold">MMR: {player.ranking?.mmr ?? 1500}</span>
+                                                    <span className="text-slate-600">|</span>
+                                                    <span className="text-green-400">W: {player.ranking?.win ?? "-"}</span>
+                                                    <span className="text-red-400">L: {player.ranking?.lose ?? "-"}</span>
+                                                    <span className="text-slate-600">|</span>
+                                                    <span className="text-orange-400 font-bold">🔥 {player.ranking?.win_streak ?? "-"}</span>
+                                                </div>
                                             </div>
                                             {player.id === user?.id && (
                                                 <button onClick={handleLeave} disabled={leaving}
@@ -1073,8 +1148,8 @@ export default function TournamentDetailPage() {
                                 ) : (
                                     <div className="divide-y divide-white/5">
                                         {drawnPairs.map((pair, idx) => (
-                                            <div key={idx} className="flex items-center px-5 py-4 gap-4">
-                                                <span className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">{idx + 1}</span>
+                                            <div key={idx} className="flex items-center px-4 sm:px-5 py-3 sm:py-4 gap-2 sm:gap-4">
+                                                <span className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[10px] sm:text-xs font-bold text-slate-400 shrink-0">{idx + 1}</span>
 
                                                 {/* Team A */}
                                                 <div className="flex flex-col gap-1.5 flex-1 min-w-0">
@@ -1082,28 +1157,28 @@ export default function TournamentDetailPage() {
                                                         const pUrl = p.picture?.url ? (p.picture.url.startsWith("http") ? p.picture.url : `${STRAPI_BASE_URL}${p.picture.url}`) : null;
                                                         return (
                                                             <div key={p.id} className="flex items-center gap-2 min-w-0">
-                                                                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold text-[10px] shrink-0 overflow-hidden border border-[#2ecc71]/40">
+                                                                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold text-[9px] sm:text-[10px] shrink-0 overflow-hidden border border-[#2ecc71]/40">
                                                                     {pUrl ? <img src={pUrl} alt={p.username} className="w-full h-full object-cover" /> : p.username.charAt(0).toUpperCase()}
                                                                 </div>
-                                                                <p className="text-sm font-semibold text-white truncate">{p.username}</p>
-                                                                {p.id === user?.id && <span className="text-[10px] text-green-400 shrink-0">คุณ</span>}
+                                                                <p className="text-xs sm:text-sm font-semibold text-white truncate">{p.username}</p>
+                                                                {p.id === user?.id && <span className="text-[9px] sm:text-[10px] text-green-400 shrink-0">คุณ</span>}
                                                             </div>
                                                         );
                                                     })}
                                                 </div>
 
-                                                <span className="px-2 py-0.5 rounded-md bg-white/5 text-[11px] font-bold text-slate-500 shrink-0">VS</span>
+                                                <span className="px-1.5 py-0.5 rounded-md bg-white/5 text-[9px] sm:text-[11px] font-bold text-slate-500 shrink-0 uppercase tracking-tighter sm:tracking-normal">VS</span>
 
                                                 {/* Team B */}
                                                 {pair.teamB ? (
-                                                    <div className="flex flex-col gap-1.5 flex-1 min-w-0 items-end">
+                                                    <div className="flex flex-col gap-1 sm:gap-1.5 flex-1 min-w-0 items-end">
                                                         {pair.teamB.map((p) => {
                                                             const pUrl = p.picture?.url ? (p.picture.url.startsWith("http") ? p.picture.url : `${STRAPI_BASE_URL}${p.picture.url}`) : null;
                                                             return (
                                                                 <div key={p.id} className="flex items-center gap-2 min-w-0">
-                                                                    {p.id === user?.id && <span className="text-[10px] text-green-400 shrink-0">คุณ</span>}
-                                                                    <p className="text-sm font-semibold text-white truncate text-right">{p.username}</p>
-                                                                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold text-[10px] shrink-0 overflow-hidden border border-[#3498db]/40">
+                                                                    {p.id === user?.id && <span className="text-[9px] sm:text-[10px] text-green-400 shrink-0">คุณ</span>}
+                                                                    <p className="text-xs sm:text-sm font-semibold text-white truncate text-right">{p.username}</p>
+                                                                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold text-[9px] sm:text-[10px] shrink-0 overflow-hidden border border-[#3498db]/40">
                                                                         {pUrl ? <img src={pUrl} alt={p.username} className="w-full h-full object-cover" /> : p.username.charAt(0).toUpperCase()}
                                                                     </div>
                                                                 </div>
@@ -1192,6 +1267,24 @@ export default function TournamentDetailPage() {
                                                 const winnerA = isCompleted && match.score_a > match.score_b;
                                                 const winnerB = isCompleted && match.score_b > match.score_a;
 
+                                                let predictedAChange = 0;
+                                                let predictedALose = 0;
+                                                let predictedBChange = 0;
+                                                let predictedBLose = 0;
+                                                if (!isCompleted && match.team_a_id && match.team_b_id) {
+                                                    const aMmrs = match.team_a_id.team_players.map(tp => tp.user_id?.ranking?.mmr ?? 1500);
+                                                    const bMmrs = match.team_b_id.team_players.map(tp => tp.user_id?.ranking?.mmr ?? 1500);
+                                                    const avgA = aMmrs.length ? aMmrs.reduce((a, b) => a + b, 0) / aMmrs.length : null;
+                                                    const avgB = bMmrs.length ? bMmrs.reduce((a, b) => a + b, 0) / bMmrs.length : null;
+                                                    if (avgA !== null && avgB !== null) {
+                                                        const predictions = calculateExpectedMmrChange(avgA, avgB);
+                                                        predictedAChange = predictions.aWins;
+                                                        predictedALose = predictions.aLoses;
+                                                        predictedBChange = predictions.bWins;
+                                                        predictedBLose = predictions.bLoses;
+                                                    }
+                                                }
+
                                                 return (
                                                     <div key={match.id}
                                                         className={`group relative overflow-hidden bg-black/20 border border-white/5 rounded-2xl p-4 transition-all duration-300 ${tournamentInfo.tournament_status === "ongoing" && !isCompleted ? "hover:bg-black/40 hover:border-white/10 hover:-translate-y-0.5 hover:shadow-xl cursor-pointer" : ""}`}
@@ -1222,7 +1315,7 @@ export default function TournamentDetailPage() {
                                                             ) : null}
                                                         </div>
 
-                                                        <div className="mt-6 flex items-center justify-between gap-4">
+                                                        <div className="mt-8 sm:mt-6 flex items-center justify-between gap-4">
                                                             {/* Team A */}
                                                             <div className={`flex-1 min-w-0 transition-colors ${winnerA ? "text-green-400" : isCompleted && !winnerA ? "text-slate-500" : "text-white"}`}>
                                                                 <div className="flex flex-col gap-3 justify-center h-full">
@@ -1231,16 +1324,17 @@ export default function TournamentDetailPage() {
                                                                         if (!u) return null;
                                                                         const rank = u.ranking;
                                                                         const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
+                                                                        const mmr_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.mmr_change;
                                                                         return (
-                                                                            <div key={idx} className="flex items-center justify-end gap-3">
+                                                                            <div key={idx} className="flex items-center justify-end gap-2 sm:gap-3 relative">
                                                                                 <div className="flex flex-col items-end min-w-0">
-                                                                                    <div className="flex items-center gap-1.5">
-                                                                                        {winnerA && idx === 0 && <span className="text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded-md">Winner</span>}
-                                                                                        <p className="font-bold text-sm sm:text-base truncate">{u.username}</p>
+                                                                                    <div className="flex items-center gap-1 sm:gap-1.5">
+                                                                                        {winnerA && idx === 0 && <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1 sm:px-1.5 py-0.5 rounded-md">Winner</span>}
+                                                                                        <p className="font-bold text-xs sm:text-base truncate">{u.username}</p>
                                                                                     </div>
                                                                                     {/* Stats */}
-                                                                                    <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] text-slate-400 mt-1 font-medium bg-black/20 px-2 py-0.5 rounded border border-white/5">
-                                                                                        <span className="text-yellow-500 font-bold">MMR: {rank ? rank.mmr : "-"}</span>
+                                                                                    <div className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] text-slate-400 mt-0.5 sm:mt-1 font-medium bg-black/20 px-1.5 sm:px-2 py-0.5 rounded border border-white/5">
+                                                                                        <span className="text-yellow-500 font-bold">MMR: {rank ? rank.mmr : 1500}</span>
                                                                                         <span className="text-slate-600">|</span>
                                                                                         <span className="text-green-400">W: {rank ? rank.win : "-"}</span>
                                                                                         <span className="text-red-400">L: {rank ? rank.lose : "-"}</span>
@@ -1248,8 +1342,21 @@ export default function TournamentDetailPage() {
                                                                                         <span className="text-orange-400 font-bold">🔥 {rank ? rank.win_streak : "-"}</span>
                                                                                     </div>
                                                                                 </div>
-                                                                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 border-slate-700/50 flex items-center justify-center shadow-inner">
-                                                                                    {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                                                                <div className="relative">
+                                                                                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 border-slate-700/50 flex items-center justify-center shadow-inner">
+                                                                                        {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                                                                    </div>
+                                                                                    {mmr_change !== undefined ? (
+                                                                                        <div className={`absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black border shadow-lg ${mmr_change > 0 ? "bg-[#0f2a1a] border-green-500 text-green-400 shadow-green-900/40" : "bg-[#2a0f0f] border-red-500 text-red-400 shadow-red-900/40"}`}>
+                                                                                            {mmr_change > 0 ? "+" : ""}{mmr_change}
+                                                                                        </div>
+                                                                                    ) : (!isCompleted && predictedAChange > 0) ? (
+                                                                                        <div title="คะแนน MMR คาดการณ์หากชนะ/แพ้ 21-20" className="absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2 py-[2px] sm:py-0.5 rounded-full text-[8px] sm:text-[9px] font-bold border shadow-lg backdrop-blur-md bg-slate-800/90 border-slate-600/50 shadow-black/50 whitespace-nowrap flex items-center gap-[2px] sm:gap-1 z-10">
+                                                                                            <span className="text-green-400 drop-shadow-[0_0_2px_rgba(74,222,128,0.3)]">+{predictedAChange}</span>
+                                                                                            <span className="text-slate-500 leading-none text-[7px] sm:text-[8px]">/</span>
+                                                                                            <span className="text-red-400 drop-shadow-[0_0_2px_rgba(248,113,113,0.3)]">-{predictedALose}</span>
+                                                                                        </div>
+                                                                                    ) : null}
                                                                                 </div>
                                                                             </div>
                                                                         );
@@ -1263,14 +1370,14 @@ export default function TournamentDetailPage() {
                                                             {/* Score / VS */}
                                                             <div className="shrink-0 group-hover:scale-105 transition-transform flex flex-col items-center justify-center self-stretch">
                                                                 {isCompleted ? (
-                                                                    <div className="flex items-center gap-3 bg-[#0f1923] px-4 py-3 rounded-2xl border border-white/10 shadow-inner">
-                                                                        <span className={`text-2xl sm:text-3xl font-black ${winnerA ? "text-green-400" : "text-white"}`}>{match.score_a}</span>
-                                                                        <span className="text-slate-600 font-bold text-xl">:</span>
-                                                                        <span className={`text-2xl sm:text-3xl font-black ${winnerB ? "text-green-400" : "text-white"}`}>{match.score_b}</span>
+                                                                    <div className="flex items-center gap-2 sm:gap-3 bg-[#0f1923] px-3 sm:px-4 py-2 sm:py-3 rounded-2xl border border-white/10 shadow-inner">
+                                                                        <span className={`text-xl sm:text-3xl font-black ${winnerA ? "text-green-400" : "text-white"}`}>{match.score_a}</span>
+                                                                        <span className="text-slate-600 font-bold text-lg sm:text-xl">:</span>
+                                                                        <span className={`text-xl sm:text-3xl font-black ${winnerB ? "text-green-400" : "text-white"}`}>{match.score_b}</span>
                                                                     </div>
                                                                 ) : (
-                                                                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-900/30 border-4 border-[#1a2535]">
-                                                                        <span className="text-white text-sm sm:text-base font-black italic">VS</span>
+                                                                    <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-900/30 border-4 border-[#1a2535]">
+                                                                        <span className="text-white text-xs sm:text-base font-black italic">VS</span>
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -1283,18 +1390,32 @@ export default function TournamentDetailPage() {
                                                                         if (!u) return null;
                                                                         const rank = u.ranking;
                                                                         const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
+                                                                        const mmr_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.mmr_change;
                                                                         return (
-                                                                            <div key={idx} className="flex items-center justify-start gap-3">
-                                                                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 border-slate-700/50 flex items-center justify-center shadow-inner">
-                                                                                    {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                                                            <div key={idx} className="flex items-center justify-start gap-3 relative">
+                                                                                <div className="relative">
+                                                                                    <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 border-slate-700/50 flex items-center justify-center shadow-inner">
+                                                                                        {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                                                                    </div>
+                                                                                    {mmr_change !== undefined ? (
+                                                                                        <div className={`absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black border shadow-lg ${mmr_change > 0 ? "bg-[#0f2a1a] border-green-500 text-green-400 shadow-green-900/40" : "bg-[#2a0f0f] border-red-500 text-red-400 shadow-red-900/40"}`}>
+                                                                                            {mmr_change > 0 ? "+" : ""}{mmr_change}
+                                                                                        </div>
+                                                                                    ) : (!isCompleted && predictedBChange > 0) ? (
+                                                                                        <div title="คะแนน MMR คาดการณ์หากชนะ/แพ้ 21-20" className="absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2 py-[2px] sm:py-0.5 rounded-full text-[8px] sm:text-[9px] font-bold border shadow-lg backdrop-blur-md bg-slate-800/90 border-slate-600/50 shadow-black/50 whitespace-nowrap flex items-center gap-[2px] sm:gap-1 z-10">
+                                                                                            <span className="text-green-400 drop-shadow-[0_0_2px_rgba(74,222,128,0.3)]">+{predictedBChange}</span>
+                                                                                            <span className="text-slate-500 leading-none text-[7px] sm:text-[8px]">/</span>
+                                                                                            <span className="text-red-400 drop-shadow-[0_0_2px_rgba(248,113,113,0.3)]">-{predictedBLose}</span>
+                                                                                        </div>
+                                                                                    ) : null}
                                                                                 </div>
                                                                                 <div className="flex flex-col items-start min-w-0">
-                                                                                    <div className="flex items-center gap-1.5">
-                                                                                        <p className="font-bold text-sm sm:text-base truncate">{u.username}</p>
-                                                                                        {winnerB && idx === 0 && <span className="text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded-md">Winner</span>}
+                                                                                    <div className="flex items-center gap-1 sm:gap-1.5">
+                                                                                        <p className="font-bold text-xs sm:text-base truncate">{u.username}</p>
+                                                                                        {winnerB && idx === 0 && <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1 sm:px-1.5 py-0.5 rounded-md">Winner</span>}
                                                                                     </div>
                                                                                     {/* Stats */}
-                                                                                    <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] text-slate-400 mt-1 font-medium bg-black/20 px-2 py-0.5 rounded border border-white/5">
+                                                                                    <div className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] text-slate-400 mt-0.5 sm:mt-1 font-medium bg-black/20 px-1.5 sm:px-2 py-0.5 rounded border border-white/5">
                                                                                         <span className="text-yellow-500 font-bold">MMR: {rank ? rank.mmr : "-"}</span>
                                                                                         <span className="text-slate-600">|</span>
                                                                                         <span className="text-green-400">W: {rank ? rank.win : "-"}</span>

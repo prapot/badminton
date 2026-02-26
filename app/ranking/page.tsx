@@ -61,7 +61,7 @@ const podiumColors = [
 ];
 
 export default function RankingPage() {
-    const { jwt } = useAuth();
+    const { jwt, user } = useAuth();
     const [search, setSearch] = useState("");
     const [rankings, setRankings] = useState<TRanking[]>([]);
     const [loading, setLoading] = useState(true);
@@ -254,7 +254,11 @@ export default function RankingPage() {
                                                     <div className="flex flex-col min-w-0">
                                                         <span className="text-sm sm:text-base font-bold text-white group-hover:text-green-400 transition-colors truncate">
                                                             {u?.username || "Unknown"}
-                                                            {r.id === 1 /* mock login identify logic if needed */ && <span className="ml-2 text-[8px] px-1.5 py-0.5 rounded-md bg-green-500/20 text-green-400 border border-green-500/30 uppercase tracking-tighter">You</span>}
+                                                            {u?.id === user?.id && (
+                                                                <span className="ml-2 text-[8px] px-1.5 py-0.5 rounded-md bg-green-500/20 text-green-400 border border-green-500/30 uppercase tracking-tighter">
+                                                                    ฉัน
+                                                                </span>
+                                                            )}
                                                         </span>
                                                         <span className="text-[10px] text-slate-500 truncate">{u?.email}</span>
                                                     </div>

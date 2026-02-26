@@ -27,25 +27,30 @@ export function useAuth() {
     const [jwt, setJwt] = useState<string | null>(null);
 
     useEffect(() => {
-        const storedJwt = localStorage.getItem("jwt");
-        const storedUser = localStorage.getItem("user");
+        const updateData = () => {
+            const storedJwt = localStorage.getItem("jwt");
+            const storedUser = localStorage.getItem("user");
 
-        if (!storedJwt) {
-            router.push("/login");
-            return;
-        }
-
-        setJwt(storedJwt);
-        if (storedUser) {
-            try {
-                setUser(JSON.parse(storedUser));
-            } catch {
-                // JSON เสีย → logout
-                localStorage.removeItem("user");
-                localStorage.removeItem("jwt");
+            if (!storedJwt) {
                 router.push("/login");
+                return;
             }
-        }
+
+            setJwt(storedJwt);
+            if (storedUser) {
+                try {
+                    setUser(JSON.parse(storedUser));
+                } catch {
+                    localStorage.removeItem("user");
+                    localStorage.removeItem("jwt");
+                    router.push("/login");
+                }
+            }
+        };
+
+        updateData();
+        window.addEventListener("storage", updateData);
+        return () => window.removeEventListener("storage", updateData);
     }, [router]);
 
     return { user, jwt };

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/lib/useAuth";
+import Swal from "sweetalert2";
 
 const STRAPI_BASE_URL =
     process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
@@ -67,36 +68,31 @@ export default function ProfilePage() {
         setSuccess(false);
 
         try {
-            let pictureId = user?.picture?.id;
-
             // Upload picture if a new file is selected
             if (file) {
                 const formData = new FormData();
                 formData.append("files", file);
-                const uploadRes = await fetch(`${STRAPI_BASE_URL}/api/upload`, {
+                const uploadRes = await fetch(`${STRAPI_BASE_URL}/api/profile/upload-picture`, {
                     method: "POST",
                     headers: { Authorization: `Bearer ${jwt}` },
                     body: formData,
                 });
                 if (!uploadRes.ok) throw new Error("อัปโหลดรูปภาพไม่สำเร็จ");
-                const uploadData = await uploadRes.json();
-                pictureId = uploadData[0].id;
             }
 
-            const body: Record<string, any> = {
+            const payload: Record<string, any> = {
                 username: form.username.trim(),
                 email: form.email.trim(),
             };
-            if (form.password) body.password = form.password;
-            if (pictureId !== undefined) body.picture = pictureId;
+            if (form.password) payload.password = form.password;
 
-            const res = await fetch(`${STRAPI_BASE_URL}/api/users/me`, {
+            const res = await fetch(`${STRAPI_BASE_URL}/api/profile/update`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${jwt}`,
                 },
-                body: JSON.stringify(body),
+                body: JSON.stringify({ data: payload }),
             });
 
             if (!res.ok) {
@@ -119,15 +115,27 @@ export default function ProfilePage() {
                 picture: updated.picture ?? stored.picture,
             }));
 
-            setSuccess(true);
-            setFile(null); // clear file input
+            Swal.fire({
+                title: "สำเร็จ!",
+                text: "บันทึกข้อมูลโปรไฟล์เรียบร้อยแล้ว",
+                icon: "success",
+                confirmButtonColor: "#2ecc71",
+                background: "#1a2535",
+                color: "#fff"
+            });
+            setFile(null);
             setForm((f) => ({ ...f, password: "", confirmPassword: "" }));
-
-            // Dispatch a custom event to notify Navbar of user change if applicable
             window.dispatchEvent(new Event("storage"));
 
         } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : "บันทึกไม่สำเร็จ");
+            Swal.fire({
+                title: "เกิดข้อผิดพลาด",
+                text: e instanceof Error ? e.message : "บันทึกไม่สำเร็จ",
+                icon: "error",
+                confirmButtonColor: "#e74c3c",
+                background: "#1a2535",
+                color: "#fff"
+            });
         } finally {
             setSaving(false);
         }
@@ -158,16 +166,19 @@ export default function ProfilePage() {
 
                 {/* Avatar card */}
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col sm:flex-row items-center sm:items-start gap-5">
-                    <div className="relative group cursor-pointer h-20 w-20 shrink-0">
-                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#2ecc71] to-[#27ae60] flex items-center justify-center text-white font-bold text-3xl shadow-lg shadow-green-900/30 overflow-hidden">
+                    <div className="relative group h-24 w-24 shrink-0">
+                        <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-[#2ecc71] to-[#27ae60] flex items-center justify-center text-white font-black text-4xl shadow-2xl shadow-green-900/40 overflow-hidden border-4 border-white/10 relative">
                             {previewObjUrl ? (
                                 <img src={previewObjUrl} alt="Profile" className="w-full h-full object-cover" />
                             ) : (
                                 initial
                             )}
                         </div>
-                        <label className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl cursor-pointer">
-                            <span className="text-white text-xs font-semibold">เปลี่ยนรูป</span>
+                        <label className="absolute -bottom-1 -right-1 w-10 h-10 bg-[#3498db] hover:bg-[#2980b9] text-white flex items-center justify-center rounded-2xl cursor-pointer shadow-xl border-4 border-[#0f1923] transition-all hover:scale-110 active:scale-95 group-hover:animate-bounce">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
                             <input type="file" className="hidden" accept="image/*" onChange={(e) => {
                                 const f = e.target.files?.[0];
                                 if (f) {

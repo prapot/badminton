@@ -71,7 +71,7 @@ export default function LoginPage() {
                         <span className="text-3xl">🏸</span>
                     </div>
                     <h1 className="text-2xl font-bold text-white tracking-tight">
-                        Badminton Club
+                        Badminton Club hello
                     </h1>
                     <p className="text-green-400/70 text-sm mt-1">
                         เข้าสู่ระบบเพื่อจัดการสนามและการแข่งขัน

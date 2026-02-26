@@ -38,6 +38,21 @@ interface TRanking {
     user_id: ApiUser | null;
 }
 
+// Merged: user + ranking (ranking may be null for new users)
+interface PlayerRow {
+    userId: number;
+    username: string;
+    email: string;
+    picture?: ApiPicture | null;
+    mmr: number;
+    win: number;
+    lose: number;
+    win_streak: number;
+    match_played: number;
+    hasRanking: boolean;
+    rankingId?: number;
+}
+
 const levelColors: Record<string, string> = {
     "A+": "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",
     "A": "bg-orange-500/20 text-orange-300 border-orange-500/30",
@@ -63,24 +78,62 @@ const podiumColors = [
 export default function RankingPage() {
     const { jwt, user } = useAuth();
     const [search, setSearch] = useState("");
-    const [rankings, setRankings] = useState<TRanking[]>([]);
+    const [players, setPlayers] = useState<PlayerRow[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (jwt) {
-            fetchRankings();
-        }
+        if (jwt) fetchRankings();
     }, [jwt]);
 
     const fetchRankings = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${STRAPI_BASE_URL}/api/rankings?populate=user_id.picture&sort[0]=mmr:desc`,
-                { headers: { Authorization: `Bearer ${jwt}` } }
-            );
-            if (!res.ok) throw new Error("Failed to fetch rankings");
-            const { data } = await res.json();
-            setRankings(data);
+            // Fetch users + rankings in parallel
+            const [usersRes, rankingsRes] = await Promise.all([
+                fetch(`${STRAPI_BASE_URL}/api/users?populate=picture&pagination[pageSize]=200`, {
+                    headers: { Authorization: `Bearer ${jwt}` }
+                }),
+                fetch(`${STRAPI_BASE_URL}/api/rankings?populate[user_id][populate][0]=picture&sort[0]=mmr:desc&pagination[pageSize]=200`, {
+                    headers: { Authorization: `Bearer ${jwt}` }
+                }),
+            ]);
+
+            const usersData: ApiUser[] = usersRes.ok ? await usersRes.json() : [];
+            const rankingsJson = rankingsRes.ok ? await rankingsRes.json() : { data: [] };
+            const rankingsData: TRanking[] = rankingsJson.data ?? [];
+
+            // Build lookup: userId -> ranking
+            const rankingMap = new Map<number, TRanking>();
+            rankingsData.forEach((r) => {
+                if (r.user_id?.id) rankingMap.set(r.user_id.id, r);
+            });
+
+            // Merge: all users + their ranking (if any)
+            const merged: PlayerRow[] = usersData.map((u) => {
+                const r = rankingMap.get(u.id);
+                return {
+                    userId: u.id,
+                    username: u.username,
+                    email: u.email,
+                    picture: u.picture,
+                    mmr: r?.mmr ?? 1500,
+                    win: r?.win ?? 0,
+                    lose: r?.lose ?? 0,
+                    win_streak: r?.win_streak ?? 0,
+                    match_played: r?.match_played ?? 0,
+                    hasRanking: !!r,
+                    rankingId: r?.id,
+                };
+            });
+
+            // Sort: ranked players by MMR desc, then unranked
+            merged.sort((a, b) => {
+                if (a.hasRanking && !b.hasRanking) return -1;
+                if (!a.hasRanking && b.hasRanking) return 1;
+                return b.mmr - a.mmr;
+            });
+
+            setPlayers(merged);
         } catch (error) {
             console.error("Fetch error:", error);
         } finally {
@@ -88,11 +141,11 @@ export default function RankingPage() {
         }
     };
 
-    const filteredRankings = rankings.filter((r) =>
-        r.user_id?.username.toLowerCase().includes(search.toLowerCase())
+    const filteredPlayers = players.filter((p) =>
+        !search || p.username?.toLowerCase().includes(search.toLowerCase())
     );
 
-    const top3 = rankings.slice(0, 3);
+    const top3 = players.filter(p => p.hasRanking).slice(0, 3);
 
     return (
         <div className="min-h-screen bg-[#0f1923] text-white">
@@ -142,28 +195,27 @@ export default function RankingPage() {
                 {/* Podium — only show when no search and loading complete */}
                 {!search && !loading && top3.length >= 1 && (
                     <div className="grid grid-cols-3 gap-2 sm:gap-6 mt-4">
-                        {[top3[1], top3[0], top3[2]].map((r, idx) => {
-                            if (!r) return <div key={idx} />;
+                        {[top3[1], top3[0], top3[2]].map((p, idx) => {
+                            if (!p) return <div key={idx} />;
                             const podiumIdx = idx === 0 ? 1 : idx === 1 ? 0 : 2;
-                            const level = getPlayerLevel(r.mmr);
+                            const level = getPlayerLevel(p.mmr);
                             const c = podiumColors[podiumIdx];
-                            const u = r.user_id;
-                            const pUrl = u?.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
+                            const pUrl = p.picture?.url ? (p.picture.url.startsWith("http") ? p.picture.url : `${STRAPI_BASE_URL}${p.picture.url}`) : null;
                             const heights = ["h-24 sm:h-32", "h-36 sm:h-48", "h-16 sm:h-24"];
 
                             return (
-                                <div key={r.id} className="flex flex-col items-center gap-2 sm:gap-4">
+                                <div key={p.userId} className="flex flex-col items-center gap-2 sm:gap-4">
                                     {/* Card */}
                                     <div className={`w-full bg-gradient-to-b ${c.bg} border ${c.border} rounded-2xl sm:rounded-3xl p-3 sm:p-5 flex flex-col items-center gap-2 sm:gap-3 shadow-2xl ${c.glow} transition-all hover:-translate-y-2 duration-300 relative overflow-hidden group`}>
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
 
                                         <div className={`w-12 h-12 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-slate-800 ring-2 sm:ring-4 ${c.ring} flex items-center justify-center text-xl sm:text-3xl font-bold overflow-hidden shrink-0 shadow-inner relative z-10`}>
-                                            {pUrl ? <img src={pUrl} alt={u?.username} className="w-full h-full object-cover" /> : <span className={c.text}>{u?.username.charAt(0).toUpperCase()}</span>}
+                                            {pUrl ? <img src={pUrl} alt={p.username} className="w-full h-full object-cover" /> : <span className={c.text}>{p.username.charAt(0).toUpperCase()}</span>}
                                         </div>
 
                                         <div className="text-center relative z-10 min-w-0 w-full">
-                                            <p className="font-black text-white text-xs sm:text-base leading-tight truncate px-1">{u?.username}</p>
-                                            <p className={`text-[10px] sm:text-sm mt-1 sm:mt-2 font-black tracking-tighter sm:tracking-normal ${c.text}`}>{r.mmr.toLocaleString()} MMR</p>
+                                            <p className="font-black text-white text-xs sm:text-base leading-tight truncate px-1">{p.username}</p>
+                                            <p className={`text-[10px] sm:text-sm mt-1 sm:mt-2 font-black tracking-tighter sm:tracking-normal ${c.text}`}>{p.mmr.toLocaleString()} MMR</p>
                                         </div>
 
                                         <div className={`text-[8px] sm:text-[10px] font-black px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border relative z-10 ${levelColors[level]}`}>
@@ -173,8 +225,8 @@ export default function RankingPage() {
                                         <div className="text-xl sm:text-3xl relative z-10 filter drop-shadow-md">{c.icon}</div>
 
                                         <div className="flex gap-2 sm:gap-4 text-[9px] sm:text-xs text-slate-400 font-bold relative z-10">
-                                            <span className="text-green-400">{r.win}W</span>
-                                            <span className="text-red-400">{r.lose}L</span>
+                                            <span className="text-green-400">{p.win}W</span>
+                                            <span className="text-red-400">{p.lose}L</span>
                                         </div>
                                     </div>
 
@@ -203,7 +255,7 @@ export default function RankingPage() {
                                 Seasons: 2026/01
                             </span>
                             <span className="text-xs font-bold text-green-400 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
-                                {filteredRankings.length} ผู้เล่น
+                                {filteredPlayers.length} ผู้เล่น
                             </span>
                         </div>
                     </div>
@@ -223,66 +275,70 @@ export default function RankingPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
-                                {filteredRankings.map((r, idx) => {
-                                    const level = getPlayerLevel(r.mmr);
-                                    const u = r.user_id;
-                                    const pUrl = u?.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
+                                {filteredPlayers.map((p, idx) => {
+                                    const level = getPlayerLevel(p.mmr);
+                                    const pUrl = p.picture?.url ? (p.picture.url.startsWith("http") ? p.picture.url : `${STRAPI_BASE_URL}${p.picture.url}`) : null;
                                     const rank = idx + 1;
 
                                     return (
-                                        <tr key={r.id} className={`group hover:bg-white/[0.04] transition-all cursor-pointer ${rank <= 3 ? "bg-white/[0.02]" : ""}`}>
+                                        <tr key={p.userId} className={`group hover:bg-white/[0.04] transition-all cursor-pointer ${rank <= 3 && p.hasRanking ? "bg-white/[0.02]" : ""}`}>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2">
-                                                    <span className={`text-sm sm:text-base font-black ${rank === 1 ? "text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.4)]" :
-                                                        rank === 2 ? "text-slate-300" :
-                                                            rank === 3 ? "text-orange-400" :
+                                                    <span className={`text-sm sm:text-base font-black ${rank === 1 && p.hasRanking ? "text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.4)]" :
+                                                        rank === 2 && p.hasRanking ? "text-slate-300" :
+                                                            rank === 3 && p.hasRanking ? "text-orange-400" :
                                                                 "text-slate-500"
                                                         }`}>
-                                                        {rank <= 3 ? ["🥇", "🥈", "🥉"][rank - 1] : `#${rank}`}
+                                                        {rank <= 3 && p.hasRanking ? ["🥇", "🥈", "🥉"][rank - 1] : `#${rank}`}
                                                     </span>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center text-sm font-bold shadow-lg overflow-hidden shrink-0 ${rank === 1 ? "bg-gradient-to-br from-yellow-400 to-yellow-600 ring-2 ring-yellow-400/50" :
-                                                        rank === 2 ? "bg-gradient-to-br from-slate-300 to-slate-500 ring-2 ring-slate-400/50" :
-                                                            rank === 3 ? "bg-gradient-to-br from-orange-400 to-orange-600 ring-2 ring-orange-500/50" :
+                                                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center text-sm font-bold shadow-lg overflow-hidden shrink-0 ${rank === 1 && p.hasRanking ? "bg-gradient-to-br from-yellow-400 to-yellow-600 ring-2 ring-yellow-400/50" :
+                                                        rank === 2 && p.hasRanking ? "bg-gradient-to-br from-slate-300 to-slate-500 ring-2 ring-slate-400/50" :
+                                                            rank === 3 && p.hasRanking ? "bg-gradient-to-br from-orange-400 to-orange-600 ring-2 ring-orange-500/50" :
                                                                 "bg-slate-800 border border-white/10"
                                                         }`}>
-                                                        {pUrl ? <img src={pUrl} alt={u?.username} className="w-full h-full object-cover" /> : <span className="text-white">{u?.username?.charAt(0).toUpperCase()}</span>}
+                                                        {pUrl ? <img src={pUrl} alt={p.username} className="w-full h-full object-cover" /> : <span className="text-white">{p.username?.charAt(0).toUpperCase()}</span>}
                                                     </div>
                                                     <div className="flex flex-col min-w-0">
                                                         <span className="text-sm sm:text-base font-bold text-white group-hover:text-green-400 transition-colors truncate">
-                                                            {u?.username || "Unknown"}
-                                                            {u?.id === user?.id && (
+                                                            {p.username || "Unknown"}
+                                                            {p.userId === user?.id && (
                                                                 <span className="ml-2 text-[8px] px-1.5 py-0.5 rounded-md bg-green-500/20 text-green-400 border border-green-500/30 uppercase tracking-tighter">
                                                                     ฉัน
                                                                 </span>
                                                             )}
+                                                            {!p.hasRanking && (
+                                                                <span className="ml-2 text-[8px] px-1.5 py-0.5 rounded-md bg-slate-500/20 text-slate-400 border border-slate-500/30 uppercase tracking-tighter">
+                                                                    ยังไม่มีคะแนน
+                                                                </span>
+                                                            )}
                                                         </span>
-                                                        <span className="text-[10px] text-slate-500 truncate">{u?.email}</span>
+                                                        <span className="text-[10px] text-slate-500 truncate">{p.email}</span>
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-center hidden md:table-cell">
-                                                <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border shadow-sm ${levelColors[level]}`}>
-                                                    {level}
+                                                <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border shadow-sm ${p.hasRanking ? levelColors[level] : "bg-white/5 text-slate-500 border-white/10"}`}>
+                                                    {p.hasRanking ? level : "-"}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-center">
-                                                <span className="text-xs sm:text-sm font-bold text-slate-300">{r.match_played}</span>
+                                                <span className="text-xs sm:text-sm font-bold text-slate-300">{p.match_played}</span>
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <div className="flex items-center justify-center gap-2">
-                                                    <span className="text-green-400 font-black text-xs sm:text-sm">{r.win}</span>
+                                                    <span className="text-green-400 font-black text-xs sm:text-sm">{p.win}</span>
                                                     <span className="text-slate-600 text-[10px]">/</span>
-                                                    <span className="text-red-400 font-black text-xs sm:text-sm">{r.lose}</span>
+                                                    <span className="text-red-400 font-black text-xs sm:text-sm">{p.lose}</span>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-center hidden sm:table-cell">
-                                                {r.win_streak > 0 ? (
+                                                {p.win_streak > 0 ? (
                                                     <span className="inline-flex items-center px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 text-xs font-black gap-1 border border-orange-500/20 animate-pulse">
-                                                        🔥{r.win_streak}
+                                                        🔥{p.win_streak}
                                                     </span>
                                                 ) : (
                                                     <span className="text-slate-700 font-bold">─</span>
@@ -290,8 +346,8 @@ export default function RankingPage() {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex flex-col items-end">
-                                                    <span className={`text-sm sm:text-lg font-black tracking-tight ${rank <= 3 ? "text-white" : "text-slate-200"}`}>
-                                                        {r.mmr.toLocaleString()}
+                                                    <span className={`text-sm sm:text-lg font-black tracking-tight ${rank <= 3 && p.hasRanking ? "text-white" : p.hasRanking ? "text-slate-200" : "text-slate-500"}`}>
+                                                        {p.hasRanking ? p.mmr.toLocaleString() : "-"}
                                                     </span>
                                                     <span className="text-[8px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5 sm:mt-0">Points</span>
                                                 </div>
@@ -300,7 +356,7 @@ export default function RankingPage() {
                                     );
                                 })}
 
-                                {filteredRankings.length === 0 && !loading && (
+                                {filteredPlayers.length === 0 && !loading && (
                                     <tr>
                                         <td colSpan={7} className="py-24 text-center">
                                             <div className="flex flex-col items-center gap-4 opacity-40">

@@ -12,6 +12,7 @@ const STRAPI_BASE_URL =
 type PlayerType = "single" | "double";
 type Format = "round_robin" | "knockout" | "americano";
 type Status = "upcoming" | "ongoing" | "completed";
+type Mode = "ranking" | "casual";
 
 interface Tournament {
     id: number;
@@ -22,8 +23,9 @@ interface Tournament {
     tournament_status: Status;
     startDate: string;
     createdAt: string;
-    playerCount: number;   // จาก tournament_player populate
-    isJoined: boolean;     // ตรวจว่า user นี้ join แล้วหรือยัง
+    playerCount: number;
+    isJoined: boolean;
+    mode: Mode;
 }
 
 const statusConfig: Record<Status, { label: string; cls: string }> = {
@@ -92,6 +94,7 @@ export default function TournamentListPage() {
                     createdAt: item.createdAt ?? "",
                     playerCount: players.length,
                     isJoined: players.some((p) => p.user?.id === user.id),
+                    mode: (item as any).mode ?? "ranking",
                 };
             });
             setTournaments(items);
@@ -250,6 +253,9 @@ export default function TournamentListPage() {
                                                 </h2>
                                                 <span className={`shrink-0 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${sc.cls}`}>
                                                     {sc.label}
+                                                </span>
+                                                <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${t.mode === "ranking" ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" : "bg-blue-500/10 text-blue-400 border-blue-500/20"}`}>
+                                                    {t.mode === "ranking" ? "🏆 Ranking" : "🎮 Casual"}
                                                 </span>
                                             </div>
 

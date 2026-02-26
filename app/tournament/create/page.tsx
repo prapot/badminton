@@ -11,12 +11,14 @@ const STRAPI_BASE_URL =
 
 type PlayerType = "single" | "double";
 type Format = "round_robin" | "knockout" | "americano";
+type Mode = "ranking" | "casual";
 
 interface FormData {
     name: string;
     type: PlayerType;
     format: Format;
     startDate: string;
+    mode: Mode;
 }
 
 const typeOptions: { value: PlayerType; label: string; desc: string; icon: string }[] = [
@@ -28,6 +30,11 @@ const formatOptions: { value: Format; label: string; desc: string; icon: string 
     { value: "round_robin", label: "พบกันหมด (Round Robin)", desc: "ทุกคนแข่งกับทุกคน คิดคะแนนรวม", icon: "🔄" },
     { value: "knockout", label: "แพ้คัดออก (Knockout)", desc: "แพ้ปุ๊บตกรอบทันที", icon: "⚡" },
     { value: "americano", label: "อเมริกาโน (Americano)", desc: "สลับคู่แข่งทุกเซต คิดคะแนนสะสมส่วนตัว", icon: "🌀" },
+];
+
+const modeOptions: { value: Mode; label: string; desc: string; icon: string; color: string }[] = [
+    { value: "ranking", label: "Ranking", desc: "บันทึก MMR และสถิติผู้เล่น ใช้คัดอันดับ", icon: "🏆", color: "from-yellow-500/10 to-amber-500/10 border-yellow-500/30 ring-yellow-500/20 text-yellow-300" },
+    { value: "casual", label: "Casual", desc: "ไม่บันทึกสถิติ เล่นสนุกๆ ไม่กระทบ MMR", icon: "🎮", color: "from-blue-500/10 to-cyan-500/10 border-blue-500/30 ring-blue-500/20 text-blue-300" },
 ];
 
 export default function CreateTournamentPage() {
@@ -42,6 +49,7 @@ export default function CreateTournamentPage() {
         type: "single",
         format: "round_robin",
         startDate: new Date().toISOString().split('T')[0],
+        mode: "ranking",
     });
 
     if (!user) return null;
@@ -65,6 +73,7 @@ export default function CreateTournamentPage() {
                         type: form.type,
                         format: form.format,
                         startDate: form.startDate,
+                        mode: form.mode,
                         tournament_status: "upcoming",
                     },
                 }),
@@ -107,7 +116,7 @@ export default function CreateTournamentPage() {
 
                 {/* Step indicator */}
                 <div className="flex items-center gap-0">
-                    {[1, 2, 3].map((s, i) => (
+                    {[1, 2, 3, 4].map((s, i) => (
                         <div key={s} className="flex items-center flex-1 last:flex-none">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all ${step > s ? "bg-green-500 text-white" :
                                 step === s ? "bg-gradient-to-br from-[#2ecc71] to-[#27ae60] text-white ring-4 ring-green-500/20" :
@@ -115,7 +124,7 @@ export default function CreateTournamentPage() {
                                 }`}>
                                 {step > s ? "✓" : s}
                             </div>
-                            {i < 2 && (
+                            {i < 3 && (
                                 <div className={`flex-1 h-0.5 mx-2 rounded ${step > s ? "bg-green-500" : "bg-white/10"}`} />
                             )}
                         </div>
@@ -124,7 +133,8 @@ export default function CreateTournamentPage() {
                 <div className="flex justify-between text-[11px] text-slate-500 -mt-2 px-1">
                     <span className={step >= 1 ? "text-green-400" : ""}>ชื่อรายการ</span>
                     <span className={step >= 2 ? "text-green-400" : ""}>รูปแบบ</span>
-                    <span className={step >= 3 ? "text-green-400" : ""}>ยืนยัน</span>
+                    <span className={step >= 3 ? "text-green-400" : ""}>โหมด</span>
+                    <span className={step >= 4 ? "text-green-400" : ""}>ยืนยัน</span>
                 </div>
 
                 {/* ── Step 1: Name + Type ── */}
@@ -243,8 +253,51 @@ export default function CreateTournamentPage() {
                     </div>
                 )}
 
-                {/* ── Step 3: Confirm ── */}
+                {/* ── Step 3: Mode ── */}
                 {step === 3 && (
+                    <div className="space-y-4">
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
+                            <h2 className="font-semibold text-white flex items-center gap-2">
+                                <span>🎯</span> โหมดการแข่งขัน
+                            </h2>
+                            <p className="text-xs text-slate-400">เลือกว่าทัวร์นาเมนต์นี้จะส่งผลต่อ MMR และสถิติผู้เล่นหรือไม่</p>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {modeOptions.map((m) => (
+                                    <button
+                                        key={m.value}
+                                        onClick={() => setForm({ ...form, mode: m.value })}
+                                        className={`relative flex flex-col items-start gap-2 p-5 rounded-2xl border text-left transition-all ${form.mode === m.value
+                                                ? `bg-gradient-to-br ${m.color} ring-1`
+                                                : "bg-white/3 border-white/8 hover:bg-white/8"
+                                            }`}
+                                    >
+                                        <span className="text-3xl">{m.icon}</span>
+                                        <p className={`text-base font-black ${form.mode === m.value ? m.color.split(" ").find(c => c.startsWith("text-")) : "text-white"}`}>
+                                            {m.label}
+                                        </p>
+                                        <p className="text-xs text-slate-400 leading-relaxed">{m.desc}</p>
+                                        {form.mode === m.value && (
+                                            <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-white text-[10px] font-bold">✓</span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="flex justify-between">
+                            <button onClick={() => setStep(2)} className="px-5 py-2.5 bg-white/5 border border-white/10 text-slate-300 text-sm rounded-xl hover:bg-white/10 transition-all">
+                                ← ย้อนกลับ
+                            </button>
+                            <button onClick={() => setStep(4)} className="px-6 py-2.5 bg-gradient-to-r from-[#2ecc71] to-[#27ae60] text-white text-sm font-semibold rounded-xl hover:from-[#3de382] hover:to-[#2ecc71] transition-all">
+                                ถัดไป →
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Step 4: Confirm ── */}
+                {step === 4 && (
                     <div className="space-y-4">
                         <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
                             <h2 className="font-semibold text-white mb-5 flex items-center gap-2">
@@ -257,6 +310,7 @@ export default function CreateTournamentPage() {
                                     { label: "วันที่แข่งขัน", value: new Date(form.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) },
                                     { label: "ประเภท", value: typeOptions.find((t) => t.value === form.type)?.label ?? "-" },
                                     { label: "รูปแบบ", value: formatOptions.find((f) => f.value === form.format)?.label ?? "-" },
+                                    { label: "โหมด", value: modeOptions.find((m) => m.value === form.mode)?.label ?? "-" },
                                     { label: "สถานะเริ่มต้น", value: "รอเริ่ม (upcoming)" },
                                 ].map((row) => (
                                     <div key={row.label} className="flex items-start justify-between gap-4 py-3 border-b border-white/5 last:border-0">
@@ -274,7 +328,7 @@ export default function CreateTournamentPage() {
                         )}
 
                         <div className="flex justify-between">
-                            <button onClick={() => setStep(2)} className="px-5 py-2.5 bg-white/5 border border-white/10 text-slate-300 text-sm rounded-xl hover:bg-white/10 transition-all">
+                            <button onClick={() => setStep(3)} className="px-5 py-2.5 bg-white/5 border border-white/10 text-slate-300 text-sm rounded-xl hover:bg-white/10 transition-all">
                                 ← ย้อนกลับ
                             </button>
                             <button

@@ -60,11 +60,11 @@ export default function HomePage() {
     setLoading(true);
     try {
       // 1. Members count
-      const rankingsRes = await fetch(`${STRAPI_BASE_URL}/api/rankings?pagination[pageSize]=1`, {
+      const usersRes = await fetch(`${STRAPI_BASE_URL}/api/users/count`, {
         headers: { Authorization: `Bearer ${jwt}` }
       });
-      const rankingsData = await rankingsRes.json();
-      setMembersCount(rankingsData.meta?.pagination?.total || 0);
+      const usersCount = await usersRes.json();
+      setMembersCount(typeof usersCount === "number" ? usersCount : 0);
 
       // Current Time for filters (UTC+7 Thailand)
       const getTHDateStr = (date: Date) => {

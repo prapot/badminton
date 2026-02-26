@@ -39,6 +39,7 @@ interface TournamentInfo {
     type: string;
     format: string;
     startDate: string;
+    mode: "ranking" | "casual";
     players: RegisteredPlayer[];
 }
 
@@ -407,6 +408,7 @@ export default function TournamentDetailPage() {
                     type: data.type ?? "single",
                     format: data.format ?? "round_robin",
                     startDate: data.startDate ?? "",
+                    mode: data.mode ?? "ranking",
                     players: tpArr
                         .filter((tp) => !!tp.user)
                         .map((tp) => ({ ...tp.user!, tpDocumentId: tp.documentId ?? "" })),
@@ -435,6 +437,7 @@ export default function TournamentDetailPage() {
                 setTournamentInfo((prev) => prev ? {
                     ...prev,
                     startDate: data.startDate ?? prev.startDate,
+                    mode: data.mode ?? prev.mode,
                     players: tpArr
                         .filter((tp) => !!tp.user)
                         .map((tp) => ({ ...tp.user!, tpDocumentId: tp.documentId ?? "" })),
@@ -778,40 +781,41 @@ export default function TournamentDetailPage() {
                 throw new Error(err?.error?.message || `HTTP ${res.status}`);
             }
 
-            // Record match for ranking update
-            try {
-                const isTeamAWinner = scoreA > scoreB;
-                const isTeamBWinner = scoreB > scoreA;
+            // Record match for ranking update (ranking mode only)
+            if (tournamentInfo?.mode === "ranking") {
+                try {
+                    const isTeamAWinner = scoreA > scoreB;
+                    const isTeamBWinner = scoreB > scoreA;
 
-                let winners: number[] = [];
-                let losers: number[] = [];
+                    let winners: number[] = [];
+                    let losers: number[] = [];
 
-                if (isTeamAWinner) {
-                    winners = scoreEditing.team_a_id?.team_players.map(tp => tp.user_id?.id).filter((id): id is number => id !== undefined) || [];
-                    losers = scoreEditing.team_b_id?.team_players.map(tp => tp.user_id?.id).filter((id): id is number => id !== undefined) || [];
-                } else if (isTeamBWinner) {
-                    winners = scoreEditing.team_b_id?.team_players.map(tp => tp.user_id?.id).filter((id): id is number => id !== undefined) || [];
-                    losers = scoreEditing.team_a_id?.team_players.map(tp => tp.user_id?.id).filter((id): id is number => id !== undefined) || [];
+                    if (isTeamAWinner) {
+                        winners = scoreEditing.team_a_id?.team_players.map(tp => tp.user_id?.id).filter((id): id is number => id !== undefined) || [];
+                        losers = scoreEditing.team_b_id?.team_players.map(tp => tp.user_id?.id).filter((id): id is number => id !== undefined) || [];
+                    } else if (isTeamBWinner) {
+                        winners = scoreEditing.team_b_id?.team_players.map(tp => tp.user_id?.id).filter((id): id is number => id !== undefined) || [];
+                        losers = scoreEditing.team_a_id?.team_players.map(tp => tp.user_id?.id).filter((id): id is number => id !== undefined) || [];
+                    }
+
+                    if (winners.length > 0 && losers.length > 0) {
+                        await fetch(`${STRAPI_BASE_URL}/api/rankings/record-match`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+                            body: JSON.stringify({
+                                data: {
+                                    winners,
+                                    losers,
+                                    winner_score: isTeamAWinner ? scoreA : scoreB,
+                                    loser_score: isTeamAWinner ? scoreB : scoreA,
+                                    match_id: scoreEditing.documentId,
+                                }
+                            }),
+                        });
+                    }
+                } catch (err) {
+                    console.error("Failed to record match for ranking", err);
                 }
-
-                if (winners.length > 0 && losers.length > 0) {
-                    await fetch(`${STRAPI_BASE_URL}/api/rankings/record-match`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
-                        body: JSON.stringify({
-                            data: {
-                                winners,
-                                losers,
-                                winner_score: isTeamAWinner ? scoreA : scoreB,
-                                loser_score: isTeamAWinner ? scoreB : scoreA,
-                                match_id: scoreEditing.documentId,
-                            }
-                        }),
-                    });
-                }
-            } catch (err) {
-                console.error("Failed to record match for ranking", err);
-                // We don't throw here to ensure the score saving flow completes even if ranking update fails
             }
 
             // Check if all matches (including this one just updated) are done
@@ -1065,6 +1069,9 @@ export default function TournamentDetailPage() {
                                 <span className="text-xs px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-[#2ecc71] font-bold">
                                     📅 {tournamentInfo.startDate ? new Date(tournamentInfo.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : "ไม่ระบุวันที่"}
                                 </span>
+                                <span className={`text-xs px-2.5 py-1 rounded-lg border font-bold ${tournamentInfo.mode === "ranking" ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400" : "bg-blue-500/10 border-blue-500/20 text-blue-400"}`}>
+                                    {tournamentInfo.mode === "ranking" ? "🏆 Ranking" : "🎮 Casual"}
+                                </span>
                                 <span className="text-xs px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300">
                                     {tournamentInfo.type === "single" ? "🏸 เดี่ยว" : "👥 คู่"}
                                 </span>
@@ -1155,14 +1162,16 @@ export default function TournamentDetailPage() {
                                                     <p className="text-sm font-bold text-white truncate">{player.username}</p>
                                                     <p className="text-[10px] text-slate-500 truncate">{player.email}</p>
                                                 </div>
-                                                <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] text-slate-400 font-medium bg-black/30 px-2 py-1 rounded-lg border border-white/5 w-fit">
-                                                    <span className="text-yellow-500 font-bold">MMR: {player.ranking?.mmr ?? 1500}</span>
-                                                    <span className="text-slate-600">|</span>
-                                                    <span className="text-green-400">W: {player.ranking?.win ?? "-"}</span>
-                                                    <span className="text-red-400">L: {player.ranking?.lose ?? "-"}</span>
-                                                    <span className="text-slate-600">|</span>
-                                                    <span className="text-orange-400 font-bold">🔥 {player.ranking?.win_streak ?? "-"}</span>
-                                                </div>
+                                                {tournamentInfo.mode === "ranking" && (
+                                                    <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] text-slate-400 font-medium bg-black/30 px-2 py-1 rounded-lg border border-white/5 w-fit">
+                                                        <span className="text-yellow-500 font-bold">MMR: {player.ranking?.mmr ?? 1500}</span>
+                                                        <span className="text-slate-600">|</span>
+                                                        <span className="text-green-400">W: {player.ranking?.win ?? "-"}</span>
+                                                        <span className="text-red-400">L: {player.ranking?.lose ?? "-"}</span>
+                                                        <span className="text-slate-600">|</span>
+                                                        <span className="text-orange-400 font-bold">🔥 {player.ranking?.win_streak ?? "-"}</span>
+                                                    </div>
+                                                )}
                                             </div>
                                             {player.id === user?.id && (
                                                 <button onClick={handleLeave} disabled={leaving}
@@ -1388,15 +1397,17 @@ export default function TournamentDetailPage() {
                                                                                         {winnerA && idx === 0 && <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1 sm:px-1.5 py-0.5 rounded-md">Winner</span>}
                                                                                         <p className="font-bold text-xs sm:text-base truncate">{u.username}</p>
                                                                                     </div>
-                                                                                    {/* Stats */}
-                                                                                    <div className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] text-slate-400 mt-0.5 sm:mt-1 font-medium bg-black/20 px-1.5 sm:px-2 py-0.5 rounded border border-white/5">
-                                                                                        <span className="text-yellow-500 font-bold">MMR: {rank ? rank.mmr : 1500}</span>
-                                                                                        <span className="text-slate-600">|</span>
-                                                                                        <span className="text-green-400">W: {rank ? rank.win : "-"}</span>
-                                                                                        <span className="text-red-400">L: {rank ? rank.lose : "-"}</span>
-                                                                                        <span className="text-slate-600">|</span>
-                                                                                        <span className="text-orange-400 font-bold">🔥 {rank ? rank.win_streak : "-"}</span>
-                                                                                    </div>
+                                                                                    {/* Stats - ranking mode only */}
+                                                                                    {tournamentInfo.mode === "ranking" && (
+                                                                                        <div className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] text-slate-400 mt-0.5 sm:mt-1 font-medium bg-black/20 px-1.5 sm:px-2 py-0.5 rounded border border-white/5">
+                                                                                            <span className="text-yellow-500 font-bold">MMR: {rank ? rank.mmr : 1500}</span>
+                                                                                            <span className="text-slate-600">|</span>
+                                                                                            <span className="text-green-400">W: {rank ? rank.win : "-"}</span>
+                                                                                            <span className="text-red-400">L: {rank ? rank.lose : "-"}</span>
+                                                                                            <span className="text-slate-600">|</span>
+                                                                                            <span className="text-orange-400 font-bold">🔥 {rank ? rank.win_streak : "-"}</span>
+                                                                                        </div>
+                                                                                    )}
                                                                                 </div>
                                                                                 <div className="relative">
                                                                                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 border-slate-700/50 flex items-center justify-center shadow-inner">
@@ -1470,15 +1481,17 @@ export default function TournamentDetailPage() {
                                                                                         <p className="font-bold text-xs sm:text-base truncate">{u.username}</p>
                                                                                         {winnerB && idx === 0 && <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1 sm:px-1.5 py-0.5 rounded-md">Winner</span>}
                                                                                     </div>
-                                                                                    {/* Stats */}
-                                                                                    <div className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] text-slate-400 mt-0.5 sm:mt-1 font-medium bg-black/20 px-1.5 sm:px-2 py-0.5 rounded border border-white/5">
-                                                                                        <span className="text-yellow-500 font-bold">MMR: {rank ? rank.mmr : "-"}</span>
-                                                                                        <span className="text-slate-600">|</span>
-                                                                                        <span className="text-green-400">W: {rank ? rank.win : "-"}</span>
-                                                                                        <span className="text-red-400">L: {rank ? rank.lose : "-"}</span>
-                                                                                        <span className="text-slate-600">|</span>
-                                                                                        <span className="text-orange-400 font-bold">🔥 {rank ? rank.win_streak : "-"}</span>
-                                                                                    </div>
+                                                                                    {/* Stats - ranking mode only */}
+                                                                                    {tournamentInfo.mode === "ranking" && (
+                                                                                        <div className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] text-slate-400 mt-0.5 sm:mt-1 font-medium bg-black/20 px-1.5 sm:px-2 py-0.5 rounded border border-white/5">
+                                                                                            <span className="text-yellow-500 font-bold">MMR: {rank ? rank.mmr : "-"}</span>
+                                                                                            <span className="text-slate-600">|</span>
+                                                                                            <span className="text-green-400">W: {rank ? rank.win : "-"}</span>
+                                                                                            <span className="text-red-400">L: {rank ? rank.lose : "-"}</span>
+                                                                                            <span className="text-slate-600">|</span>
+                                                                                            <span className="text-orange-400 font-bold">🔥 {rank ? rank.win_streak : "-"}</span>
+                                                                                        </div>
+                                                                                    )}
                                                                                 </div>
                                                                             </div>
                                                                         );

@@ -499,6 +499,7 @@ export default function TournamentDetailPage() {
     // teamA/teamB = 1 player (singles) or 2 players (doubles)
     interface DrawnPair { teamA: RegisteredPlayer[]; teamB: RegisteredPlayer[] | null }
     const [drawnPairs, setDrawnPairs] = useState<DrawnPair[] | null>(null);
+    const [drawMode, setDrawMode] = useState<"random" | "mmr_balanced">("random");
     const [starting, setStarting] = useState(false);
 
     const handleDraw = () => {
@@ -557,6 +558,54 @@ export default function TournamentDetailPage() {
                 });
             }
         }
+        setDrawnPairs(pairs);
+    };
+
+    // ── MMR Balanced Draw ──────────────────────────────────────────
+    // Singles: rank#1 vs rank#N, rank#2 vs rank#N-1, ...
+    // Doubles: snake draft → team A gets rank 1,4 / team B gets rank 2,3
+    const handleDrawMMR = () => {
+        const originalPlayers = [...(tournamentInfo?.players ?? [])];
+        const isDouble = tournamentInfo?.type === "double";
+
+        if (originalPlayers.length === 0) { setDrawnPairs([]); return; }
+
+        // Sort by MMR desc (use ranking.mmr if available, else 1500)
+        const sorted = [...originalPlayers].sort((a, b) =>
+            (b.ranking?.mmr ?? 1500) - (a.ranking?.mmr ?? 1500)
+        );
+
+        const pairs: DrawnPair[] = [];
+
+        if (!isDouble) {
+            // Singles: top vs bottom
+            let lo = sorted.length - 1;
+            let hi = 0;
+            while (hi < lo) {
+                pairs.push({ teamA: [sorted[hi]], teamB: [sorted[lo]] });
+                hi++; lo--;
+            }
+            // Odd player out — bye
+            if (hi === lo) {
+                pairs.push({ teamA: [sorted[hi]], teamB: null });
+            }
+        } else {
+            // Doubles: snake draft every 4 players
+            // Group 1234: A=1,4  B=2,3  →  MMR A ≈ MMR B
+            for (let i = 0; i < sorted.length; i += 4) {
+                const chunk = sorted.slice(i, i + 4);
+                if (chunk.length === 4) {
+                    pairs.push({ teamA: [chunk[0], chunk[3]], teamB: [chunk[1], chunk[2]] });
+                } else if (chunk.length === 3) {
+                    pairs.push({ teamA: [chunk[0], chunk[2]], teamB: [chunk[1]].filter(Boolean) });
+                } else if (chunk.length === 2) {
+                    pairs.push({ teamA: [chunk[0]], teamB: [chunk[1]] });
+                } else {
+                    pairs.push({ teamA: [chunk[0]], teamB: null });
+                }
+            }
+        }
+
         setDrawnPairs(pairs);
     };
 
@@ -643,6 +692,7 @@ export default function TournamentDetailPage() {
             setStartStep("สร้างตารางแข่งขัน...");
             for (let i = 0; i < teamIds.length; i++) {
                 const { teamA: teamAId, teamB: teamBId } = teamIds[i];
+                const isBye = !teamBId;
                 await postJSON("/api/matches", {
                     data: {
                         tournament_id: id,
@@ -650,10 +700,10 @@ export default function TournamentDetailPage() {
                         match_no: i + 1,
                         team_a_id: teamAId,
                         team_b_id: teamBId,
-                        score_a: 0,
+                        score_a: isBye ? 1 : 0,
                         score_b: 0,
-                        team_winner: null,
-                        match_status: "upcoming",
+                        team_winner: isBye ? teamAId : null,
+                        match_status: isBye ? "done" : "upcoming",
                     },
                 });
             }
@@ -1192,7 +1242,7 @@ export default function TournamentDetailPage() {
                                     <h2 className="font-semibold text-white flex items-center gap-2">
                                         <span>🎲</span> สุ่มคู่แข่งขัน
                                     </h2>
-                                    <button onClick={handleDraw}
+                                    <button onClick={drawMode === "random" ? handleDraw : handleDrawMMR}
                                         className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/20 text-purple-300 text-xs font-semibold transition-all">
                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1201,14 +1251,38 @@ export default function TournamentDetailPage() {
                                     </button>
                                 </div>
 
+                                {/* Mode selector */}
+                                <div className="px-5 py-3 bg-black/20 border-b border-white/5 flex gap-2">
+                                    <button
+                                        onClick={() => { setDrawMode("random"); setDrawnPairs(null); }}
+                                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold border transition-all ${drawMode === "random" ? "bg-purple-500/20 border-purple-500/30 text-purple-300" : "bg-white/3 border-white/8 text-slate-400 hover:bg-white/8"}`}
+                                    >
+                                        🎲 สุ่มธรรมดา
+                                    </button>
+                                    <button
+                                        onClick={() => { setDrawMode("mmr_balanced"); setDrawnPairs(null); }}
+                                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold border transition-all ${drawMode === "mmr_balanced" ? "bg-yellow-500/20 border-yellow-500/30 text-yellow-300" : "bg-white/3 border-white/8 text-slate-400 hover:bg-white/8"}`}
+                                    >
+                                        ⚖️ สมดุล MMR
+                                    </button>
+                                </div>
+                                {drawMode === "mmr_balanced" && (
+                                    <div className="px-5 py-2 bg-yellow-500/5 border-b border-yellow-500/10 text-[10px] text-yellow-400/70">
+                                        {tournamentInfo.type === "single"
+                                            ? "จับคู่อันดับ 1 vs N, 2 vs N-1, ... เพื่อให้ MMR ทั้งคู่ใกล้เคียงกัน"
+                                            : "Snake draft: A=อันดับ 1,4 / B=อันดับ 2,3 เพื่อให้ MMR รวมแต่ละทีมเท่ากัน"}
+                                    </div>
+                                )}
+
                                 {!drawnPairs ? (
                                     <div className="py-10 text-center text-slate-500">
-                                        <p className="text-3xl mb-2">🎲</p>
+                                        <p className="text-3xl mb-2">{drawMode === "mmr_balanced" ? "⚖️" : "🎲"}</p>
                                         <p className="text-sm">กดปุ่ม &quot;สุ่มคู่&quot; เพื่อจับคู่ผู้เล่น</p>
                                         <p className="text-xs mt-1 text-slate-600">
                                             ผู้เล่น {tournamentInfo.players.length} คน → {Math.floor(tournamentInfo.players.length / 2)} คู่
                                             {tournamentInfo.players.length % 2 !== 0 ? " + 1 คนที่พักรอ" : ""}
                                         </p>
+
                                     </div>
                                 ) : (
                                     <div className="divide-y divide-white/5">
@@ -1230,6 +1304,11 @@ export default function TournamentDetailPage() {
                                                             </div>
                                                         );
                                                     })}
+                                                    {drawMode === "mmr_balanced" && (
+                                                        <span className="text-[9px] text-yellow-400/60 font-bold">
+                                                            MMR รวม: {pair.teamA.reduce((s, p) => s + (p.ranking?.mmr ?? 1500), 0).toLocaleString()}
+                                                        </span>
+                                                    )}
                                                 </div>
 
                                                 <span className="px-1.5 py-0.5 rounded-md bg-white/5 text-[9px] sm:text-[11px] font-bold text-slate-500 shrink-0 uppercase tracking-tighter sm:tracking-normal">VS</span>
@@ -1249,6 +1328,11 @@ export default function TournamentDetailPage() {
                                                                 </div>
                                                             );
                                                         })}
+                                                        {drawMode === "mmr_balanced" && (
+                                                            <span className="text-[9px] text-yellow-400/60 font-bold">
+                                                                MMR รวม: {pair.teamB.reduce((s, p) => s + (p.ranking?.mmr ?? 1500), 0).toLocaleString()}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 ) : (
                                                     <div className="flex-1 flex items-center justify-end">

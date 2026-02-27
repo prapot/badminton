@@ -26,10 +26,10 @@ const typeOptions: { value: PlayerType; label: string; desc: string; icon: strin
     { value: "double", label: "คู่ (Double)", desc: "ผู้เล่น 2 คน ต่อ 1 ทีม", icon: "👥" },
 ];
 
-const formatOptions: { value: Format; label: string; desc: string; icon: string }[] = [
+const formatOptions: { value: Format; label: string; desc: string; icon: string; disabled?: boolean }[] = [
     { value: "round_robin", label: "พบกันหมด (Round Robin)", desc: "ทุกคนแข่งกับทุกคน คิดคะแนนรวม", icon: "🔄" },
-    { value: "knockout", label: "แพ้คัดออก (Knockout)", desc: "แพ้ปุ๊บตกรอบทันที", icon: "⚡" },
-    { value: "americano", label: "อเมริกาโน (Americano)", desc: "สลับคู่แข่งทุกเซต คิดคะแนนสะสมส่วนตัว", icon: "🌀" },
+    { value: "knockout", label: "แพ้คัดออก (Knockout)", desc: "แพ้ปุ๊บตกรอบทันที", icon: "⚡", disabled: true },
+    { value: "americano", label: "อเมริกาโน (Americano)", desc: "สลับคู่แข่งทุกเซต คิดคะแนนสะสมส่วนตัว", icon: "🌀", disabled: true },
 ];
 
 const modeOptions: { value: Mode; label: string; desc: string; icon: string; color: string }[] = [
@@ -222,19 +222,27 @@ export default function CreateTournamentPage() {
                                     <button
                                         key={f.value}
                                         onClick={() => setForm({ ...form, format: f.value })}
-                                        className={`w-full flex items-start gap-4 p-4 rounded-xl border text-left transition-all ${form.format === f.value
-                                            ? "bg-green-500/10 border-green-500/30 ring-1 ring-green-500/20"
-                                            : "bg-white/3 border-white/8 hover:bg-white/8"
+                                        className={`w-full flex items-start gap-4 p-4 rounded-xl border text-left transition-all ${f.disabled
+                                            ? "bg-white/2 border-white/5 opacity-40 cursor-not-allowed"
+                                            : form.format === f.value
+                                                ? "bg-green-500/10 border-green-500/30 ring-1 ring-green-500/20"
+                                                : "bg-white/3 border-white/8 hover:bg-white/8"
                                             }`}
+                                        disabled={f.disabled}
                                     >
                                         <span className="text-2xl shrink-0">{f.icon}</span>
                                         <div className="flex-1">
-                                            <p className={`text-sm font-semibold ${form.format === f.value ? "text-green-300" : "text-white"}`}>
+                                            <p className={`text-sm font-semibold ${form.format === f.value ? "text-green-300" : "text-white"} flex items-center gap-2`}>
                                                 {f.label}
+                                                {f.disabled && (
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-500/20 text-slate-400 border border-slate-500/20">
+                                                        เร็วๆ นี้
+                                                    </span>
+                                                )}
                                             </p>
                                             <p className="text-xs text-slate-400 mt-0.5">{f.desc}</p>
                                         </div>
-                                        {form.format === f.value && (
+                                        {form.format === f.value && !f.disabled && (
                                             <span className="shrink-0 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white text-[10px] font-bold">✓</span>
                                         )}
                                     </button>
@@ -268,8 +276,8 @@ export default function CreateTournamentPage() {
                                         key={m.value}
                                         onClick={() => setForm({ ...form, mode: m.value })}
                                         className={`relative flex flex-col items-start gap-2 p-5 rounded-2xl border text-left transition-all ${form.mode === m.value
-                                                ? `bg-gradient-to-br ${m.color} ring-1`
-                                                : "bg-white/3 border-white/8 hover:bg-white/8"
+                                            ? `bg-gradient-to-br ${m.color} ring-1`
+                                            : "bg-white/3 border-white/8 hover:bg-white/8"
                                             }`}
                                     >
                                         <span className="text-3xl">{m.icon}</span>

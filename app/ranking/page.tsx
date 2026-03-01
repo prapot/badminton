@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import { useAuth } from "@/lib/useAuth";
 
 interface User {
@@ -86,33 +87,40 @@ export default function RankingPage() {
     const router = useRouter();
     const { jwt, user } = useAuth();
     const [search, setSearch] = useState("");
-    const [players, setPlayers] = useState<PlayerRow[]>([]);
+    const [allPlayers, setAllPlayers] = useState<PlayerRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
-    const [meta, setMeta] = useState<PaginationMeta | null>(null);
 
     useEffect(() => {
-        if (jwt) fetchRankings(page);
-    }, [jwt, page]);
+        if (jwt) fetchAllData();
+    }, [jwt]);
 
-    const fetchRankings = async (pageNum: number = 1) => {
+    const fetchAllData = async () => {
         setLoading(true);
         try {
-            // 1. Fetch rankings with pagination (primary source for the list)
+            // 1. Fetch rankings with high pageSize to get all
             const rankingsRes = await fetch(
-                `${STRAPI_BASE_URL}/api/rankings?populate[user_id][populate][0]=picture&sort[0]=mmr:desc&pagination[page]=${pageNum}&pagination[pageSize]=10&pagination[withCount]=true${search ? `&filters[user_id][username][$containsi]=${search}` : ""}`,
+                `${STRAPI_BASE_URL}/api/rankings?populate[user_id][populate][0]=picture&sort[0]=mmr:desc&pagination[pageSize]=1000`,
                 { headers: { Authorization: `Bearer ${jwt}` } }
             );
 
             if (!rankingsRes.ok) throw new Error("ไม่สามารถโหลดอันดับได้");
             const rankingsJson = await rankingsRes.json();
             const rankingsData: TRanking[] = rankingsJson.data ?? [];
-            setMeta(rankingsJson.meta.pagination);
 
-            // 2. Clear current list if on page 1 and searching, otherwise append or just set
-            // For simplicity in a 10-item list, we just set the current page's players
+            // 2. Fetch all users
+            const usersRes = await fetch(
+                `${STRAPI_BASE_URL}/api/users?populate=picture`,
+                { headers: { Authorization: `Bearer ${jwt}` } }
+            );
+            if (!usersRes.ok) throw new Error("ไม่สามารถโหลดผู้ใช้ได้");
+            const usersData: ApiUser[] = await usersRes.json();
+
+            // 3. Merge
+            const rankedUserIds = new Set<number>();
             const merged: PlayerRow[] = rankingsData.map((r) => {
                 const u = r.user_id;
+                if (u?.id) rankedUserIds.add(u.id);
                 return {
                     userId: u?.id ?? 0,
                     username: u?.username ?? "Unknown",
@@ -126,9 +134,35 @@ export default function RankingPage() {
                     hasRanking: true,
                     rankingId: r.id,
                 };
+            }).filter(p => p.userId !== 0);
+
+            // 4. Append unranked users
+            usersData.forEach(u => {
+                if (!rankedUserIds.has(u.id)) {
+                    merged.push({
+                        userId: u.id,
+                        username: u.username,
+                        email: u.email,
+                        picture: u.picture,
+                        mmr: 0,
+                        win: 0,
+                        lose: 0,
+                        win_streak: 0,
+                        match_played: 0,
+                        hasRanking: false,
+                    });
+                }
             });
 
-            setPlayers(merged);
+            // 5. Sort unranked users alphabetically
+            merged.sort((a, b) => {
+                if (a.hasRanking && !b.hasRanking) return -1;
+                if (!a.hasRanking && b.hasRanking) return 1;
+                if (a.hasRanking && b.hasRanking) return b.mmr - a.mmr;
+                return a.username.localeCompare(b.username);
+            });
+
+            setAllPlayers(merged);
         } catch (error) {
             console.error("Fetch error:", error);
         } finally {
@@ -136,9 +170,12 @@ export default function RankingPage() {
         }
     };
 
-    const filteredPlayers = players; // Filtering is now handled by the API
+    const searchLower = search.toLowerCase();
+    const filteredPlayers = allPlayers.filter(p => p.username.toLowerCase().includes(searchLower) || (p.email && p.email.toLowerCase().includes(searchLower)));
+    const pageCount = Math.max(1, Math.ceil(filteredPlayers.length / 10));
+    const currentPagePlayers = filteredPlayers.slice((page - 1) * 10, page * 10);
 
-    const top3 = page === 1 ? players.filter(p => p.hasRanking).slice(0, 3) : [];
+    const top3 = page === 1 && !searchLower ? allPlayers.filter(p => p.hasRanking).slice(0, 3) : [];
 
     return (
         <div className="min-h-screen bg-[#0f1923] text-white">
@@ -159,7 +196,7 @@ export default function RankingPage() {
                             <span>🏅</span> ตารางอันดับผู้เล่น
                         </div>
                         <h1 className="text-3xl sm:text-5xl font-black text-white mb-2 tracking-tight">Leaderboard</h1>
-                        <p className="text-slate-400 text-sm sm:text-base">อัปเดตล่าสุด: {new Date().toLocaleDateString("th-TH")} · {meta?.total ?? 0} ผู้เล่นทั้งหมด</p>
+                        <p className="text-slate-400 text-sm sm:text-base">อัปเดตล่าสุด: {new Date().toLocaleDateString("th-TH")} · {allPlayers.length} ผู้เล่นทั้งหมด</p>
                     </div>
                 </div>
 
@@ -173,12 +210,9 @@ export default function RankingPage() {
                             type="text"
                             placeholder="ค้นหาชื่อผู้เล่น..."
                             value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                    setPage(1);
-                                    fetchRankings(1);
-                                }
+                            onChange={(e) => {
+                                setSearch(e.target.value);
+                                setPage(1);
                             }}
                             className="w-full h-11 sm:h-12 pl-12 pr-4 bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/40 transition-all shadow-inner"
                         />
@@ -257,7 +291,7 @@ export default function RankingPage() {
                                 Seasons: 2026/01
                             </span>
                             <span className="text-xs font-bold text-green-400 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
-                                {filteredPlayers.length} ผู้เล่น
+                                {allPlayers.length} ผู้เล่นทั้งหมด
                             </span>
                         </div>
                     </div>
@@ -277,7 +311,7 @@ export default function RankingPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
-                                {filteredPlayers.map((p, idx) => {
+                                {currentPagePlayers.map((p, idx) => {
                                     const level = getPlayerLevel(p.mmr);
                                     const pUrl = p.picture?.url ? (p.picture.url.startsWith("http") ? p.picture.url : `${STRAPI_BASE_URL}${p.picture.url}`) : null;
                                     const rank = (page - 1) * 10 + idx + 1;
@@ -362,7 +396,7 @@ export default function RankingPage() {
                                     );
                                 })}
 
-                                {filteredPlayers.length === 0 && !loading && (
+                                {currentPagePlayers.length === 0 && !loading && (
                                     <tr>
                                         <td colSpan={7} className="py-24 text-center">
                                             <div className="flex flex-col items-center gap-4 opacity-40">
@@ -381,7 +415,7 @@ export default function RankingPage() {
                 </div>
 
                 {/* Pagination Controls */}
-                {!loading && meta && meta.pageCount > 1 && (
+                {!loading && pageCount > 1 && (
                     <div className="mt-8 flex items-center justify-center gap-2 sm:gap-4 pb-12">
                         <button
                             onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -395,12 +429,12 @@ export default function RankingPage() {
                             <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Page</span>
                             <span className="text-sm font-black text-[#2ecc71]">{page}</span>
                             <span className="text-xs font-bold text-slate-600">/</span>
-                            <span className="text-sm font-black text-slate-400">{meta.pageCount}</span>
+                            <span className="text-sm font-black text-slate-400">{pageCount}</span>
                         </div>
 
                         <button
-                            onClick={() => setPage(p => Math.min(meta.pageCount, p + 1))}
-                            disabled={page === meta.pageCount}
+                            onClick={() => setPage(p => Math.min(pageCount, p + 1))}
+                            disabled={page === pageCount}
                             className="h-10 px-4 rounded-xl bg-white/5 border border-white/10 text-sm font-bold text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all flex items-center gap-2"
                         >
                             ถัดไป <span>›</span>
@@ -435,11 +469,7 @@ export default function RankingPage() {
                 </div>
 
                 {/* Footer */}
-                <div className="text-center py-10 border-t border-white/5">
-                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.4em]">
-                        🏸 Badminton Club Management System · v1.4.2
-                    </p>
-                </div>
+                <Footer />
             </main>
         </div>
     );

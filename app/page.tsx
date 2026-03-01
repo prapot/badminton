@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/lib/useAuth";
+import Footer from "@/components/Footer";
 
 const STRAPI_BASE_URL = process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
 
@@ -382,10 +383,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="text-center text-xs text-slate-600 pt-8 pb-4">
-          🏸 Badminton Club Management System · {new Date().getFullYear()}
-        </div>
+        <Footer></Footer>
       </main >
     </div >
   );

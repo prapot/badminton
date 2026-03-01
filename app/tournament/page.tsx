@@ -26,6 +26,11 @@ interface Tournament {
     playerCount: number;
     isJoined: boolean;
     mode: Mode;
+    user_created?: {
+        id: number;
+        username: string;
+        picture?: { url: string } | null;
+    } | null;
 }
 
 const statusConfig: Record<Status, { label: string; cls: string }> = {
@@ -65,7 +70,7 @@ export default function TournamentListPage() {
         if (!jwt || !user) return;
         try {
             const res = await fetch(
-                `${STRAPI_BASE_URL}/api/tournaments?populate[tournament_players][populate]=user&sort=createdAt:desc`,
+                `${STRAPI_BASE_URL}/api/tournaments?populate[tournament_players][populate]=user&populate[user_created][populate]=picture&sort=createdAt:desc`,
                 { headers: { Authorization: `Bearer ${jwt}` } }
             );
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -81,6 +86,8 @@ export default function TournamentListPage() {
                 startDate?: string;
                 createdAt?: string;
                 tournament_players?: Array<{ user?: { id?: number } }> | null;
+                user_created?: { id: number; username: string; picture?: { url: string } | null } | null;
+                mode?: Mode;
             }) => {
                 const players = item.tournament_players ?? [];
                 return {
@@ -94,7 +101,8 @@ export default function TournamentListPage() {
                     createdAt: item.createdAt ?? "",
                     playerCount: players.length,
                     isJoined: players.some((p) => p.user?.id === user.id),
-                    mode: (item as any).mode ?? "ranking",
+                    mode: item.mode ?? "ranking",
+                    user_created: item.user_created,
                 };
             });
             setTournaments(items);
@@ -267,12 +275,27 @@ export default function TournamentListPage() {
                                                 <span>{typeLabel[t.type]}</span>
                                                 <span>{formatLabel[t.format]}</span>
                                                 <span>👥 {t.playerCount} ผู้เล่น</span>
+                                                <span className="w-px h-3 bg-white/10 hidden sm:block" />
+                                                <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-lg border border-white/5">
+                                                    {t.user_created?.picture?.url ? (
+                                                        <img
+                                                            src={t.user_created.picture.url.startsWith("http") ? t.user_created.picture.url : `${STRAPI_BASE_URL}${t.user_created.picture.url}`}
+                                                            alt={t.user_created.username}
+                                                            className="w-4 h-4 rounded-full object-cover border border-white/20"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-4 h-4 rounded-full bg-slate-700 flex items-center justify-center text-[8px] font-bold text-slate-300">
+                                                            {t.user_created?.username?.charAt(0).toUpperCase() || "?"}
+                                                        </div>
+                                                    )}
+                                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">BY: {t.user_created?.username || "ADMIN"}</span>
+                                                </div>
                                             </div>
                                         </div>
 
                                         {/* Right: Join / Arrow */}
                                         <div className="flex items-center gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                            {t.tournament_status !== "completed" && (
+                                            {t.tournament_status === "upcoming" && (
                                                 t.isJoined ? (
                                                     <span className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-semibold">
                                                         ✓ เข้าร่วมแล้ว

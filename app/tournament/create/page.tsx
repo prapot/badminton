@@ -75,6 +75,7 @@ export default function CreateTournamentPage() {
                         startDate: form.startDate,
                         mode: form.mode,
                         tournament_status: "upcoming",
+                        user_created: user.id,
                     },
                 }),
             });

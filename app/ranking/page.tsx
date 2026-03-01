@@ -38,6 +38,13 @@ interface TRanking {
     user_id: ApiUser | null;
 }
 
+interface PaginationMeta {
+    page: number;
+    pageSize: number;
+    pageCount: number;
+    total: number;
+}
+
 // Merged: user + ranking (ranking may be null for new users)
 interface PlayerRow {
     userId: number;
@@ -76,61 +83,49 @@ const podiumColors = [
 ];
 
 export default function RankingPage() {
+    const router = useRouter();
     const { jwt, user } = useAuth();
     const [search, setSearch] = useState("");
     const [players, setPlayers] = useState<PlayerRow[]>([]);
     const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [meta, setMeta] = useState<PaginationMeta | null>(null);
 
     useEffect(() => {
-        if (jwt) fetchRankings();
-    }, [jwt]);
+        if (jwt) fetchRankings(page);
+    }, [jwt, page]);
 
-    const fetchRankings = async () => {
+    const fetchRankings = async (pageNum: number = 1) => {
         setLoading(true);
         try {
-            // Fetch users + rankings in parallel
-            const [usersRes, rankingsRes] = await Promise.all([
-                fetch(`${STRAPI_BASE_URL}/api/users?populate=picture&pagination[pageSize]=200`, {
-                    headers: { Authorization: `Bearer ${jwt}` }
-                }),
-                fetch(`${STRAPI_BASE_URL}/api/rankings?populate[user_id][populate][0]=picture&sort[0]=mmr:desc&pagination[pageSize]=200`, {
-                    headers: { Authorization: `Bearer ${jwt}` }
-                }),
-            ]);
+            // 1. Fetch rankings with pagination (primary source for the list)
+            const rankingsRes = await fetch(
+                `${STRAPI_BASE_URL}/api/rankings?populate[user_id][populate][0]=picture&sort[0]=mmr:desc&pagination[page]=${pageNum}&pagination[pageSize]=10${search ? `&filters[user_id][username][$containsi]=${search}` : ""}`,
+                { headers: { Authorization: `Bearer ${jwt}` } }
+            );
 
-            const usersData: ApiUser[] = usersRes.ok ? await usersRes.json() : [];
-            const rankingsJson = rankingsRes.ok ? await rankingsRes.json() : { data: [] };
+            if (!rankingsRes.ok) throw new Error("ไม่สามารถโหลดอันดับได้");
+            const rankingsJson = await rankingsRes.json();
             const rankingsData: TRanking[] = rankingsJson.data ?? [];
+            setMeta(rankingsJson.meta.pagination);
 
-            // Build lookup: userId -> ranking
-            const rankingMap = new Map<number, TRanking>();
-            rankingsData.forEach((r) => {
-                if (r.user_id?.id) rankingMap.set(r.user_id.id, r);
-            });
-
-            // Merge: all users + their ranking (if any)
-            const merged: PlayerRow[] = usersData.map((u) => {
-                const r = rankingMap.get(u.id);
+            // 2. Clear current list if on page 1 and searching, otherwise append or just set
+            // For simplicity in a 10-item list, we just set the current page's players
+            const merged: PlayerRow[] = rankingsData.map((r) => {
+                const u = r.user_id;
                 return {
-                    userId: u.id,
-                    username: u.username,
-                    email: u.email,
-                    picture: u.picture,
-                    mmr: r?.mmr ?? 1500,
-                    win: r?.win ?? 0,
-                    lose: r?.lose ?? 0,
-                    win_streak: r?.win_streak ?? 0,
-                    match_played: r?.match_played ?? 0,
-                    hasRanking: !!r,
-                    rankingId: r?.id,
+                    userId: u?.id ?? 0,
+                    username: u?.username ?? "Unknown",
+                    email: u?.email ?? "",
+                    picture: u?.picture,
+                    mmr: r.mmr,
+                    win: r.win,
+                    lose: r.lose,
+                    win_streak: r.win_streak,
+                    match_played: r.match_played,
+                    hasRanking: true,
+                    rankingId: r.id,
                 };
-            });
-
-            // Sort: ranked players by MMR desc, then unranked
-            merged.sort((a, b) => {
-                if (a.hasRanking && !b.hasRanking) return -1;
-                if (!a.hasRanking && b.hasRanking) return 1;
-                return b.mmr - a.mmr;
             });
 
             setPlayers(merged);
@@ -141,11 +136,9 @@ export default function RankingPage() {
         }
     };
 
-    const filteredPlayers = players.filter((p) =>
-        !search || p.username?.toLowerCase().includes(search.toLowerCase())
-    );
+    const filteredPlayers = players; // Filtering is now handled by the API
 
-    const top3 = players.filter(p => p.hasRanking).slice(0, 3);
+    const top3 = page === 1 ? players.filter(p => p.hasRanking).slice(0, 3) : [];
 
     return (
         <div className="min-h-screen bg-[#0f1923] text-white">
@@ -181,7 +174,13 @@ export default function RankingPage() {
                             placeholder="ค้นหาชื่อผู้เล่น..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="w-full pl-9 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-green-500/50 focus:bg-white/8 transition-all"
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    setPage(1);
+                                    fetchRankings(1);
+                                }
+                            }}
+                            className="w-full h-11 sm:h-12 pl-12 pr-4 bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/40 transition-all shadow-inner"
                         />
                     </div>
                     {loading && (
@@ -206,7 +205,10 @@ export default function RankingPage() {
                             return (
                                 <div key={p.userId} className="flex flex-col items-center gap-2 sm:gap-4">
                                     {/* Card */}
-                                    <div className={`w-full bg-gradient-to-b ${c.bg} border ${c.border} rounded-2xl sm:rounded-3xl p-3 sm:p-5 flex flex-col items-center gap-2 sm:gap-3 shadow-2xl ${c.glow} transition-all hover:-translate-y-2 duration-300 relative overflow-hidden group`}>
+                                    <div
+                                        onClick={() => router.push(`/history/${p.userId}`)}
+                                        className={`w-full bg-gradient-to-b ${c.bg} border ${p.userId === user?.id ? "border-green-500/60" : c.border} rounded-2xl sm:rounded-3xl p-3 sm:p-5 flex flex-col items-center gap-2 sm:gap-3 shadow-2xl ${p.userId === user?.id ? "shadow-green-500/30" : c.glow} transition-all hover:-translate-y-2 cursor-pointer duration-300 relative overflow-hidden group`}
+                                    >
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
 
                                         <div className={`w-12 h-12 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-slate-800 ring-2 sm:ring-4 ${c.ring} flex items-center justify-center text-xl sm:text-3xl font-bold overflow-hidden shrink-0 shadow-inner relative z-10`}>
@@ -267,10 +269,10 @@ export default function RankingPage() {
                                 <tr className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] border-b border-white/5 bg-black/20">
                                     <th className="px-6 py-4 text-left w-16">Rank</th>
                                     <th className="px-6 py-4 text-left">Player</th>
-                                    <th className="px-6 py-4 text-center hidden md:table-cell">Level</th>
+                                    <th className="px-6 py-4 text-center md:table-cell">Level</th>
                                     <th className="px-6 py-4 text-center">Played</th>
                                     <th className="px-6 py-4 text-center">W / L</th>
-                                    <th className="px-6 py-4 text-center hidden sm:table-cell">Streak</th>
+                                    <th className="px-6 py-4 text-center sm:table-cell">Streak</th>
                                     <th className="px-6 py-4 text-right">MMR</th>
                                 </tr>
                             </thead>
@@ -278,10 +280,14 @@ export default function RankingPage() {
                                 {filteredPlayers.map((p, idx) => {
                                     const level = getPlayerLevel(p.mmr);
                                     const pUrl = p.picture?.url ? (p.picture.url.startsWith("http") ? p.picture.url : `${STRAPI_BASE_URL}${p.picture.url}`) : null;
-                                    const rank = idx + 1;
+                                    const rank = (page - 1) * 10 + idx + 1;
 
                                     return (
-                                        <tr key={p.userId} className={`group hover:bg-white/[0.04] transition-all cursor-pointer ${rank <= 3 && p.hasRanking ? "bg-white/[0.02]" : ""}`}>
+                                        <tr
+                                            key={p.userId}
+                                            onClick={() => router.push(`/history/${p.userId}`)}
+                                            className={`group hover:bg-white/[0.04] transition-all cursor-pointer ${rank <= 3 && p.hasRanking ? "bg-white/[0.02]" : ""} ${p.userId === user?.id ? "bg-green-500/5 border-l-4 border-l-green-500/50" : ""}`}
+                                        >
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2">
                                                     <span className={`text-sm sm:text-base font-black ${rank === 1 && p.hasRanking ? "text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.4)]" :
@@ -320,7 +326,7 @@ export default function RankingPage() {
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-center hidden md:table-cell">
+                                            <td className="px-6 py-4 text-center md:table-cell">
                                                 <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border shadow-sm ${p.hasRanking ? levelColors[level] : "bg-white/5 text-slate-500 border-white/10"}`}>
                                                     {p.hasRanking ? level : "-"}
                                                 </span>
@@ -335,7 +341,7 @@ export default function RankingPage() {
                                                     <span className="text-red-400 font-black text-xs sm:text-sm">{p.lose}</span>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-center hidden sm:table-cell">
+                                            <td className="px-6 py-4 text-center sm:table-cell">
                                                 {p.win_streak > 0 ? (
                                                     <span className="inline-flex items-center px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 text-xs font-black gap-1 border border-orange-500/20 animate-pulse">
                                                         🔥{p.win_streak}
@@ -373,6 +379,34 @@ export default function RankingPage() {
                         </table>
                     </div>
                 </div>
+
+                {/* Pagination Controls */}
+                {!loading && meta && meta.pageCount > 1 && (
+                    <div className="mt-8 flex items-center justify-center gap-2 sm:gap-4 pb-12">
+                        <button
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={page === 1}
+                            className="h-10 px-4 rounded-xl bg-white/5 border border-white/10 text-sm font-bold text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                        >
+                            <span>‹</span> ย้อนกลับ
+                        </button>
+
+                        <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 h-10 rounded-xl backdrop-blur-md">
+                            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Page</span>
+                            <span className="text-sm font-black text-[#2ecc71]">{page}</span>
+                            <span className="text-xs font-bold text-slate-600">/</span>
+                            <span className="text-sm font-black text-slate-400">{meta.pageCount}</span>
+                        </div>
+
+                        <button
+                            onClick={() => setPage(p => Math.min(meta.pageCount, p + 1))}
+                            disabled={page === meta.pageCount}
+                            className="h-10 px-4 rounded-xl bg-white/5 border border-white/10 text-sm font-bold text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                        >
+                            ถัดไป <span>›</span>
+                        </button>
+                    </div>
+                )}
 
                 {/* Legend */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

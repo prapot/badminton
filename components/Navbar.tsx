@@ -11,18 +11,21 @@ interface User {
     picture?: { url: string } | null;
 }
 
-const navLinks = [
-    { href: "/", label: "หน้าหลัก", icon: "🏠" },
-    { href: "/ranking", label: "อันดับ", icon: "🏆" },
-    { href: "/tournament", label: "ตารางแข่ง", icon: "🎯" },
-    { href: "/profile", label: "โปรไฟล์", icon: "👤" },
-];
+
 
 export default function Navbar() {
     const router = useRouter();
     const pathname = usePathname();
     const [user, setUser] = useState<User | null>(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
+
+    const navLinks = [
+        { href: "/", label: "หน้าหลัก", icon: "🏠" },
+        { href: "/ranking", label: "อันดับ", icon: "🏆" },
+        { href: "/tournament", label: "ตารางแข่ง", icon: "🎯" },
+        { href: "/profile", label: "โปรไฟล์", icon: "👤" },
+        ...(user ? [{ href: `/history/${user.id}`, label: "ประวัติการแข่งขัน", icon: "📜" }] : []),
+    ];
 
     const updateUserData = () => {
         const stored = localStorage.getItem("user");
@@ -198,10 +201,10 @@ export default function Navbar() {
                             className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 ${pathname === link.href
                                 ? "bg-gradient-to-r from-green-500/20 to-emerald-500/10 text-white border border-green-500/20"
                                 : "text-slate-400 hover:text-white hover:bg-white/5"
-                                }`}
+                                } truncate shadow-sm`}
                         >
-                            <span className="text-base">{link.icon}</span>
-                            {link.label}
+                            <span className="text-base shrink-0">{link.icon}</span>
+                            <span className="truncate">{link.label}</span>
                             {pathname === link.href && (
                                 <span className="ml-auto w-1.5 h-1.5 rounded-full bg-green-400" />
                             )}

@@ -32,7 +32,9 @@ export function useAuth() {
             const storedUser = localStorage.getItem("user");
 
             if (!storedJwt) {
-                router.push("/login");
+                const currentPath = window.location.pathname + window.location.search;
+                const redirectParam = currentPath !== "/login" && currentPath !== "/register" ? `?redirect=${encodeURIComponent(currentPath)}` : "";
+                router.push(`/login${redirectParam}`);
                 return;
             }
 

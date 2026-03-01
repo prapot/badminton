@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/lib/useAuth";
 import Swal from "sweetalert2";
+import { QRCodeCanvas } from "qrcode.react";
 
 
 const STRAPI_BASE_URL =
@@ -382,6 +383,12 @@ export default function TournamentDetailPage() {
     const [scoreA, setScoreA] = useState(0);
     const [scoreB, setScoreB] = useState(0);
     const [savingScore, setSavingScore] = useState(false);
+    const [showScoreEdit, setShowScoreEdit] = useState(false);
+    const [courtInput, setCourtInput] = useState("");
+    const [timeInput, setTimeInput] = useState("");
+
+    const [showQR, setShowQR] = useState(false);
+    const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
 
     const fetchMatches = (token = jwt) => {
         if (!token || !id) return;
@@ -1303,6 +1310,12 @@ export default function TournamentDetailPage() {
                                 <span className="text-xs px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-400">
                                     🆔 {id}
                                 </span>
+                                <button
+                                    onClick={() => setShowQR(true)}
+                                    className="text-xs px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 font-bold transition-all flex items-center gap-1.5"
+                                >
+                                    <span>🔗</span> เชิญเพื่อน
+                                </button>
                             </div>
                         )}
 
@@ -1376,17 +1389,26 @@ export default function TournamentDetailPage() {
                                         <li key={player.id} className="flex items-center gap-4 px-5 py-3.5">
                                             <span className="w-6 text-center text-xs text-slate-600 shrink-0">{idx + 1}</span>
                                             {player.picture?.url ? (
-                                                <div className="w-8 h-8 rounded-xl shrink-0 overflow-hidden border border-[#2ecc71]/40 shadow-sm shadow-green-900/20">
+                                                <div
+                                                    onClick={() => router.push(`/history/${player.id}`)}
+                                                    className="w-8 h-8 rounded-xl shrink-0 overflow-hidden border border-[#2ecc71]/40 shadow-sm shadow-green-900/20 cursor-pointer hover:scale-110 transition-transform"
+                                                >
                                                     <img src={player.picture.url.startsWith("http") ? player.picture.url : `${STRAPI_BASE_URL}${player.picture.url}`} alt={player.username} className="w-full h-full object-cover" />
                                                 </div>
                                             ) : (
-                                                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#2ecc71] to-[#27ae60] flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm shadow-green-900/20">
+                                                <div
+                                                    onClick={() => router.push(`/history/${player.id}`)}
+                                                    className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#2ecc71] to-[#27ae60] flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm shadow-green-900/20 cursor-pointer hover:scale-110 transition-transform"
+                                                >
                                                     {player.username.charAt(0).toUpperCase()}
                                                 </div>
                                             )}
-                                            <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+                                            <div
+                                                onClick={() => router.push(`/history/${player.id}`)}
+                                                className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 cursor-pointer group/name"
+                                            >
                                                 <div className="min-w-0">
-                                                    <p className="text-sm font-bold text-white truncate">{player.username}</p>
+                                                    <p className="text-sm font-bold text-white truncate group-hover/name:text-green-400 transition-colors">{player.username}</p>
                                                     <p className="text-[10px] text-slate-500 truncate">{player.email}</p>
                                                 </div>
                                                 {tournamentInfo.mode === "ranking" && (
@@ -1847,6 +1869,55 @@ export default function TournamentDetailPage() {
                     🏸 Badminton Club Management System · {new Date().getFullYear()}
                 </div>
             </main>
+
+            {/* QR Invite Modal */}
+            {showQR && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowQR(false)} />
+                    <div className="relative w-full max-w-sm bg-[#1a2535] border border-white/10 rounded-3xl shadow-2xl overflow-hidden p-8 animate-in animate-out fade-in zoom-in duration-200">
+                        <div className="flex flex-col items-center text-center">
+                            <div className="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center text-3xl mb-4">🔗</div>
+                            <h3 className="text-xl font-bold text-white mb-2">เชิญเพื่อนเข้าแข่งขัน</h3>
+                            <p className="text-sm text-slate-400 mb-6">แสกน QR Code ด้านล่างเพื่อเข้าร่วมรายการนี้</p>
+
+                            <div className="p-4 bg-white rounded-2xl shadow-inner mb-6">
+                                <QRCodeCanvas
+                                    value={shareUrl}
+                                    size={200}
+                                    level="H"
+                                    includeMargin={false}
+                                />
+                            </div>
+
+                            <div className="w-full space-y-3">
+                                <button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(shareUrl);
+                                        Swal.fire({
+                                            title: "คัดลอกลิงก์แล้ว!",
+                                            text: "คุณสามารถส่งลิงก์ให้เพื่อนได้ทันที",
+                                            icon: "success",
+                                            timer: 1500,
+                                            showConfirmButton: false,
+                                            background: "#1a2535",
+                                            color: "#fff"
+                                        });
+                                    }}
+                                    className="w-full py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold transition-all"
+                                >
+                                    คัดลอกลิงก์
+                                </button>
+                                <button
+                                    onClick={() => setShowQR(false)}
+                                    className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 font-bold transition-all"
+                                >
+                                    ปิด
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

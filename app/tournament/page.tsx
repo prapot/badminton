@@ -33,6 +33,13 @@ interface Tournament {
     } | null;
 }
 
+interface PaginationMeta {
+    page: number;
+    pageSize: number;
+    pageCount: number;
+    total: number;
+}
+
 const statusConfig: Record<Status, { label: string; cls: string }> = {
     ongoing: { label: "● กำลังแข่ง", cls: "bg-green-500/10 text-green-400 border-green-500/20 animate-pulse" },
     upcoming: { label: "รอเริ่ม", cls: "bg-blue-500/10 text-blue-400 border-blue-500/20" },
@@ -60,21 +67,26 @@ export default function TournamentListPage() {
     const [error, setError] = useState<string | null>(null);
     const [joiningId, setJoiningId] = useState<string | null>(null);
     const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+    const [page, setPage] = useState(1);
+    const [meta, setMeta] = useState<PaginationMeta | null>(null);
 
     const showToast = (msg: string, type: "success" | "error" = "success") => {
         setToast({ msg, type });
         setTimeout(() => setToast(null), 3500);
     };
 
-    const fetchTournaments = useCallback(async () => {
+    const fetchTournaments = useCallback(async (pageNum: number = 1, currentFilter: string = filter) => {
         if (!jwt || !user) return;
+        setLoading(true);
         try {
+            const filterQuery = currentFilter !== "all" ? `&filters[tournament_status][$eq]=${currentFilter}` : "";
             const res = await fetch(
-                `${STRAPI_BASE_URL}/api/tournaments?populate[tournament_players][populate]=user&populate[user_created][populate]=picture&sort=createdAt:desc`,
+                `${STRAPI_BASE_URL}/api/tournaments?populate[tournament_players][populate]=user&populate[user_created][populate]=picture&sort=createdAt:desc&pagination[page]=${pageNum}&pagination[pageSize]=10${filterQuery}`,
                 { headers: { Authorization: `Bearer ${jwt}` } }
             );
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const json = await res.json();
+            setMeta(json.meta.pagination);
 
             const items: Tournament[] = (json.data ?? []).map((item: {
                 id: number;
@@ -111,11 +123,11 @@ export default function TournamentListPage() {
         } finally {
             setLoading(false);
         }
-    }, [jwt, user]);
+    }, [jwt, user, filter]);
 
     useEffect(() => {
-        fetchTournaments();
-    }, [fetchTournaments]);
+        fetchTournaments(page, filter);
+    }, [fetchTournaments, page, filter]);
 
     if (!user) return null;
 
@@ -186,7 +198,7 @@ export default function TournamentListPage() {
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
                         <h1 className="text-2xl font-bold text-white">ตารางการแข่งขัน</h1>
-                        <p className="text-slate-400 text-sm mt-1">{tournaments.length} ทัวร์นาเมนต์ทั้งหมด</p>
+                        <p className="text-slate-400 text-sm mt-1">{meta?.total ?? 0} ทัวร์นาเมนต์ทั้งหมด</p>
                     </div>
                     <Link
                         href="/tournament/create"
@@ -209,18 +221,21 @@ export default function TournamentListPage() {
                     ] as ["all" | Status, string][]).map(([val, label]) => (
                         <button
                             key={val}
-                            onClick={() => setFilter(val)}
+                            onClick={() => {
+                                setFilter(val);
+                                setPage(1);
+                            }}
                             className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${filter === val
                                 ? "bg-white/15 text-white border border-white/20"
                                 : "bg-white/5 border border-white/8 text-slate-400 hover:text-white hover:bg-white/10"
                                 }`}
                         >
                             {label}
-                            <span className="ml-2 text-xs opacity-60">
-                                {val === "all"
-                                    ? tournaments.length
-                                    : tournaments.filter((t) => t.tournament_status === val).length}
-                            </span>
+                            {filter === val && meta && (
+                                <span className="ml-2 text-xs opacity-60">
+                                    {meta.total}
+                                </span>
+                            )}
                         </button>
                     ))}
                 </div>
@@ -332,12 +347,40 @@ export default function TournamentListPage() {
                             );
                         })}
 
-                        {filtered.length === 0 && (
+                        {tournaments.length === 0 && (
                             <div className="py-20 text-center text-slate-500">
                                 <p className="text-5xl mb-3">🏸</p>
                                 <p className="text-sm">ไม่พบทัวร์นาเมนต์ในหมวดนี้</p>
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* Pagination Controls */}
+                {!loading && meta && meta.pageCount > 1 && (
+                    <div className="mt-8 flex items-center justify-center gap-2 sm:gap-4 pb-12">
+                        <button
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={page === 1}
+                            className="h-10 px-4 rounded-xl bg-white/5 border border-white/10 text-sm font-bold text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                        >
+                            <span>‹</span> หน้าก่อนหน้า
+                        </button>
+
+                        <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 h-10 rounded-xl backdrop-blur-md">
+                            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Page</span>
+                            <span className="text-sm font-black text-[#2ecc71]">{page}</span>
+                            <span className="text-xs font-bold text-slate-600">/</span>
+                            <span className="text-sm font-black text-slate-400">{meta.pageCount}</span>
+                        </div>
+
+                        <button
+                            onClick={() => setPage(p => Math.min(meta.pageCount, p + 1))}
+                            disabled={page === meta.pageCount}
+                            className="h-10 px-4 rounded-xl bg-white/5 border border-white/10 text-sm font-bold text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                        >
+                            หน้าถัดไป <span>›</span>
+                        </button>
                     </div>
                 )}
 

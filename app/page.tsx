@@ -34,6 +34,11 @@ interface Tournament {
   matches?: Match[];
   tournament_players?: any[];
   tournament_players_count?: number;
+  user_created?: {
+    id: number;
+    username: string;
+    picture?: { url: string } | null;
+  } | null;
 }
 
 const news = [
@@ -47,7 +52,6 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [membersCount, setMembersCount] = useState(0);
   const [todayTournaments, setTodayTournaments] = useState<Tournament[]>([]);
-  const [expandedTourney, setExpandedTourney] = useState<number | null>(null);
   const [upcomingDays, setUpcomingDays] = useState<{ date: string; label: string; items: any[] }[]>([]);
 
   useEffect(() => {
@@ -85,7 +89,7 @@ export default function HomePage() {
 
       // 2. Today's Tournaments (Accordion)
       const todayTourneysRes = await fetch(
-        `${STRAPI_BASE_URL}/api/tournaments?filters[$or][0][startDate]=${todayDateStr}&filters[$or][1][tournament_status]=ongoing&populate[matches][populate][team_a_id][populate][team_players][populate]=user_id&populate[matches][populate][team_b_id][populate][team_players][populate]=user_id&populate[tournament_players][count]=true`,
+        `${STRAPI_BASE_URL}/api/tournaments?filters[$or][0][startDate]=${todayDateStr}&filters[$or][1][tournament_status]=ongoing&populate[matches][populate][team_a_id][populate][team_players][populate]=user_id&populate[matches][populate][team_b_id][populate][team_players][populate]=user_id&populate[tournament_players][count]=true&populate[user_created][populate]=picture`,
         { headers: { Authorization: `Bearer ${jwt}` } }
       );
       const todayTourneysData = await todayTourneysRes.json();
@@ -94,9 +98,6 @@ export default function HomePage() {
         tournament_players_count: t.tournament_players?.count || 0
       }));
       setTodayTournaments(mappedToday);
-      if (mappedToday.length > 0) {
-        setExpandedTourney(mappedToday[0].id);
-      }
 
       // 3. Upcoming 5 days
       const in5Days = new Date(now);
@@ -104,7 +105,7 @@ export default function HomePage() {
       const in5DaysStr = getTHDateStr(in5Days);
 
       const upcomingTourneysRes = await fetch(
-        `${STRAPI_BASE_URL}/api/tournaments?filters[startDate][$gte]=${tomorrowDateStr}&filters[startDate][$lt]=${in5DaysStr}&sort[0]=startDate:asc&populate[tournament_players][count]=true`,
+        `${STRAPI_BASE_URL}/api/tournaments?filters[startDate][$gte]=${tomorrowDateStr}&filters[startDate][$lt]=${in5DaysStr}&sort[0]=startDate:asc&populate[tournament_players][count]=true&populate[user_created][populate]=picture`,
         { headers: { Authorization: `Bearer ${jwt}` } }
       );
       const tourneysData = await upcomingTourneysRes.json();
@@ -208,12 +209,16 @@ export default function HomePage() {
                 Array(3).fill(0).map((_, i) => <div key={i} className="h-20 bg-white/5 animate-pulse rounded-2xl" />)
               ) : todayTournaments.length > 0 ? (
                 todayTournaments.map((t) => (
-                  <div key={t.id} className={`overflow-hidden rounded-2xl border transition-all duration-300 ${expandedTourney === t.id ? 'bg-white/8 border-green-500/30' : 'bg-white/3 border-white/5 hover:border-white/20'}`}>
-                    <div className="w-full flex items-center justify-between p-4 group" onClick={() => setExpandedTourney(expandedTourney === t.id ? null : t.id)}>
-                      <div className="flex items-center gap-4">
+                  <Link
+                    key={t.id}
+                    href={`/tournament/${t.documentId}`}
+                    className="block group"
+                  >
+                    <div className="flex items-center justify-between p-4 rounded-2xl bg-white/3 border border-white/5 hover:bg-white/8 hover:border-green-500/30 transition-all duration-200">
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
                         <span className="text-2xl group-hover:scale-110 transition-transform">🏆</span>
-                        <div className="text-left">
-                          <p className="text-sm font-bold text-white group-hover:text-green-400 transition-colors">{t.name}</p>
+                        <div className="text-left truncate">
+                          <p className="text-sm font-bold text-white group-hover:text-green-400 transition-colors truncate">{t.name}</p>
                           <div className="flex items-center gap-2 mt-1">
                             {(() => {
                               const cfg: Record<string, { label: string; cls: string }> = {
@@ -228,71 +233,31 @@ export default function HomePage() {
                                 </span>
                               );
                             })()}
-                            <p className="text-[10px] text-slate-500 font-medium">
+                            <p className="text-[10px] text-slate-500 font-medium truncate">
                               {t.type === 'double' ? '👥 คู่' : '👤 เดี่ยว'} · {t.tournament_players_count || 0} คนลงแข่ง
                             </p>
+                            <div className="flex items-center gap-1 mt-1 opacity-60">
+                              {t.user_created?.picture?.url ? (
+                                <img
+                                  src={t.user_created.picture.url.startsWith("http") ? t.user_created.picture.url : `${STRAPI_BASE_URL}${t.user_created.picture.url}`}
+                                  alt={t.user_created.username}
+                                  className="w-3 h-3 rounded-full object-cover border border-white/10"
+                                />
+                              ) : (
+                                <div className="w-3 h-3 rounded-full bg-slate-700 flex items-center justify-center text-[6px] font-bold text-slate-300">
+                                  {t.user_created?.username?.charAt(0).toUpperCase() || "?"}
+                                </div>
+                              )}
+                              <span className="text-[8px] font-bold text-slate-400">BY: {t.user_created?.username || "ADMIN"}</span>
+                            </div>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <Link
-                          href={`/tournament/${t.documentId}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="hidden sm:block text-[10px] text-slate-500 hover:text-white font-bold uppercase tracking-tight bg-white/5 px-2.5 py-1.5 rounded-lg border border-white/5 transition-all"
-                        >
-                          Detail ➜
-                        </Link>
-                        <svg className={`w-5 h-5 text-slate-500 transition-transform duration-300 ${expandedTourney === t.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
+                      <div className="flex items-center gap-4 shrink-0">
+                        <p className="text-[9px] text-slate-600 font-bold uppercase tracking-tighter transition-colors group-hover:text-white">Detail ➜</p>
                       </div>
                     </div>
-
-                    {expandedTourney === t.id && (
-                      <div className="px-4 pb-4 space-y-2 animate-in slide-in-from-top-2 duration-300">
-                        {t.matches && t.matches.length > 0 ? (
-                          [...t.matches]
-                            .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
-                            .map((m) => {
-                              const teamANames = m.team_a_id?.team_players?.map(tp => tp.user_id?.username).filter(Boolean).join(" / ") || m.team_a_id?.name || "รอยืนยัน";
-                              const teamBNames = m.team_b_id?.team_players?.map(tp => tp.user_id?.username).filter(Boolean).join(" / ") || m.team_b_id?.name || "รอยืนยัน";
-                              const isDone = m.match_status === 'done';
-
-                              return (
-                                <div key={m.id} className="flex items-center gap-3 p-3 rounded-xl bg-black/20 border border-white/5">
-                                  <div className="text-center w-12 shrink-0 border-r border-white/10 pr-3">
-                                    <p className="text-[10px] font-bold text-green-400">
-                                      {m.scheduledAt ? new Date(m.scheduledAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : `M#${m.match_no}`}
-                                    </p>
-                                  </div>
-                                  <div className="flex-1 min-w-0 flex items-center justify-between px-2 gap-2">
-                                    <span className="text-xs text-white font-medium truncate flex-1 text-right">{teamANames}</span>
-                                    {isDone ? (
-                                      <div className="flex items-center gap-1.5 px-2 py-0.5 bg-black/30 rounded-lg border border-white/10 shrink-0">
-                                        <span className={`text-xs font-black ${m.score_a! > m.score_b! ? 'text-green-400' : 'text-white'}`}>{m.score_a}</span>
-                                        <span className="text-[10px] text-slate-600 font-bold">:</span>
-                                        <span className={`text-xs font-black ${m.score_b! > m.score_a! ? 'text-green-400' : 'text-white'}`}>{m.score_b}</span>
-                                      </div>
-                                    ) : (
-                                      <span className="text-[10px] text-slate-600 italic shrink-0">vs</span>
-                                    )}
-                                    <span className="text-xs text-white font-medium truncate flex-1 text-left">{teamBNames}</span>
-                                  </div>
-                                  <div className="shrink-0 flex items-center gap-1">
-                                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md ${m.match_status === 'live' ? 'bg-red-500/20 text-red-400 animate-pulse border-red-500/30' : isDone ? 'bg-white/5 text-slate-500 border-white/5' : 'bg-green-500/20 text-green-400 border-green-500/30'
-                                      } border uppercase`}>
-                                      {m.match_status === 'done' ? 'จบ' : m.match_status === 'live' ? 'สด' : 'รอ'}
-                                    </span>
-                                  </div>
-                                </div>
-                              );
-                            })
-                        ) : (
-                          <div className="text-center py-4 text-[10px] text-slate-500 italic">ยังไม่มีแมตช์ที่ลงทะเบียนสำหรับวันนี้</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  </Link>
                 ))
               ) : (
                 <div className="text-center py-12 bg-white/3 rounded-3xl border border-white/5">
@@ -344,6 +309,20 @@ export default function HomePage() {
                                   <span className="w-1 h-1 rounded-full bg-slate-700"></span>
                                   <span>ผู้ลงแข่ง: {item.tournament_players_count || 0} คน</span>
                                 </p>
+                                <div className="flex items-center gap-1 mt-1 opacity-50">
+                                  {item.user_created?.picture?.url ? (
+                                    <img
+                                      src={item.user_created.picture.url.startsWith("http") ? item.user_created.picture.url : `${STRAPI_BASE_URL}${item.user_created.picture.url}`}
+                                      alt={item.user_created.username}
+                                      className="w-3 h-3 rounded-full object-cover border border-white/10"
+                                    />
+                                  ) : (
+                                    <div className="w-3 h-3 rounded-full bg-slate-700 flex items-center justify-center text-[6px] font-bold text-slate-300">
+                                      {item.user_created?.username?.charAt(0).toUpperCase() || "?"}
+                                    </div>
+                                  )}
+                                  <span className="text-[8px] font-bold text-slate-400">BY: {item.user_created?.username || "ADMIN"}</span>
+                                </div>
                               </div>
                             </div>
                             <div className="text-right">
@@ -407,7 +386,7 @@ export default function HomePage() {
         <div className="text-center text-xs text-slate-600 pt-8 pb-4">
           🏸 Badminton Club Management System · {new Date().getFullYear()}
         </div>
-      </main>
-    </div>
+      </main >
+    </div >
   );
 }

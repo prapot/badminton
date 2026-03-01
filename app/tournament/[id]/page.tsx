@@ -388,7 +388,8 @@ export default function TournamentDetailPage() {
     const [timeInput, setTimeInput] = useState("");
 
     const [showQR, setShowQR] = useState(false);
-    const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+    const shareUrl = `${appUrl}/tournament/${id}`;
 
     const fetchMatches = (token = jwt) => {
         if (!token || !id) return;

@@ -81,7 +81,7 @@ export default function TournamentListPage() {
         try {
             const filterQuery = currentFilter !== "all" ? `&filters[tournament_status][$eq]=${currentFilter}` : "";
             const res = await fetch(
-                `${STRAPI_BASE_URL}/api/tournaments?populate[tournament_players][populate]=user&populate[user_created][populate]=picture&sort=createdAt:desc&pagination[page]=${pageNum}&pagination[pageSize]=10${filterQuery}`,
+                `${STRAPI_BASE_URL}/api/tournaments?populate[tournament_players][populate]=user&populate[user_created][populate]=picture&sort=createdAt:desc&pagination[page]=${pageNum}&pagination[pageSize]=10&pagination[withCount]=true${filterQuery}`,
                 { headers: { Authorization: `Bearer ${jwt}` } }
             );
             if (!res.ok) throw new Error(`HTTP ${res.status}`);

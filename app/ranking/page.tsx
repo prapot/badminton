@@ -100,7 +100,7 @@ export default function RankingPage() {
         try {
             // 1. Fetch rankings with pagination (primary source for the list)
             const rankingsRes = await fetch(
-                `${STRAPI_BASE_URL}/api/rankings?populate[user_id][populate][0]=picture&sort[0]=mmr:desc&pagination[page]=${pageNum}&pagination[pageSize]=10${search ? `&filters[user_id][username][$containsi]=${search}` : ""}`,
+                `${STRAPI_BASE_URL}/api/rankings?populate[user_id][populate][0]=picture&sort[0]=mmr:desc&pagination[page]=${pageNum}&pagination[pageSize]=10&pagination[withCount]=true${search ? `&filters[user_id][username][$containsi]=${search}` : ""}`,
                 { headers: { Authorization: `Bearer ${jwt}` } }
             );
 
@@ -159,7 +159,7 @@ export default function RankingPage() {
                             <span>🏅</span> ตารางอันดับผู้เล่น
                         </div>
                         <h1 className="text-3xl sm:text-5xl font-black text-white mb-2 tracking-tight">Leaderboard</h1>
-                        <p className="text-slate-400 text-sm sm:text-base">อัปเดตล่าสุด: {new Date().toLocaleDateString("th-TH")} · ฤดูกาลปัจจุบัน</p>
+                        <p className="text-slate-400 text-sm sm:text-base">อัปเดตล่าสุด: {new Date().toLocaleDateString("th-TH")} · {meta?.total ?? 0} ผู้เล่นทั้งหมด</p>
                     </div>
                 </div>
 

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { registerWithStrapi } from "@/lib/auth";
 
-export default function RegisterPage() {
+function RegisterForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const redirectPath = searchParams.get("redirect") || "/";
@@ -218,5 +218,17 @@ export default function RegisterPage() {
                 </p>
             </div>
         </div>
+    );
+}
+
+export default function RegisterPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-[#0f1923]">
+                <div className="text-green-500 animate-pulse text-4xl">🏸</div>
+            </div>
+        }>
+            <RegisterForm />
+        </Suspense>
     );
 }

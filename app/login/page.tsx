@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { loginWithStrapi } from "@/lib/auth";
 
-export default function LoginPage() {
+function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const redirectPath = searchParams.get("redirect") || "/";
@@ -194,5 +194,17 @@ export default function LoginPage() {
                 </p>
             </div>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-[#0f1923]">
+                <div className="text-green-500 animate-pulse text-4xl">🏸</div>
+            </div>
+        }>
+            <LoginForm />
+        </Suspense>
     );
 }

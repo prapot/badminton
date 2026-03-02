@@ -982,6 +982,59 @@ export default function TournamentDetailPage() {
         }
     };
 
+    const handleFinishTournament = async () => {
+        if (!jwt || !tournamentInfo || tournamentInfo.user_created?.id !== user?.id) return;
+
+        const unfinishedMatches = apiMatches.filter(m => m.match_status !== 'done' && m.match_status !== 'cancelled');
+
+        const result = await Swal.fire({
+            title: "ยืนยันจบการแข่งขัน?",
+            html: `สถานะทัวร์นาเมนต์จะเปลี่ยนเป็น <b>จบการแข่งขัน</b>${unfinishedMatches.length > 0 ? `<br/><span style="color:#ef4444;font-size:12px">ตรวจพบ ${unfinishedMatches.length} แมตซ์ที่ยังไม่เสร็จ ซึ่งจะถูกยกเลิกทั้งหมด</span>` : ""}`,
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "🏁 จบการแข่งขัน",
+            cancelButtonText: "ยกเลิก",
+            confirmButtonColor: "#3498db",
+            cancelButtonColor: "#64748b",
+            background: "#1a2535",
+            color: "#f1f5f9",
+        });
+
+        if (!result.isConfirmed) return;
+
+        setStarting(true);
+        setStartStep("กำลังจบการแข่งขัน...");
+
+        try {
+            // 1. Cancel unfinished matches
+            for (const match of unfinishedMatches) {
+                await fetch(`${STRAPI_BASE_URL}/api/matches/${match.documentId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+                    body: JSON.stringify({ data: { match_status: "cancelled" } }),
+                });
+            }
+
+            // 2. Update tournament status
+            const res = await fetch(`${STRAPI_BASE_URL}/api/tournaments/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+                body: JSON.stringify({ data: { tournament_status: "completed" } }),
+            });
+
+            if (!res.ok) throw new Error("ไม่สามารถเปลี่ยนสถานะทัวร์นาเมนต์ได้");
+
+            showToast("จบการแข่งขันเรียบร้อยแล้ว! 🎉", "success");
+            setTournamentInfo(prev => prev ? { ...prev, tournament_status: "completed" } : null);
+            fetchMatches();
+        } catch (e: unknown) {
+            showToast(e instanceof Error ? e.message : "ดำเนินการไม่สำเร็จ", "error");
+        } finally {
+            setStarting(false);
+            setStartStep(null);
+        }
+    };
+
     const totalEffectiveMatches = apiMatches.filter(m => m.match_status !== "cancelled").length;
     const pct = totalEffectiveMatches > 0
         ? Math.round((apiMatches.filter(m => m.match_status === "done").length / totalEffectiveMatches) * 100)
@@ -1552,7 +1605,7 @@ export default function TournamentDetailPage() {
                                                         </span>
                                                     )}
                                                     {pair.servingSide === "A" && (
-                                                        <span className="w-[68px] text-center text-[9px] font-black text-[#2ecc71] bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20 italic block">SERVE 🏸</span>
+                                                        <span className="w-[80px] text-center text-[11px] font-black text-white bg-[#2ecc71] px-2 py-1 rounded-full shadow-[0_0_15px_rgba(46,204,113,0.4)] italic block">SERVE 🏸</span>
                                                     )}
                                                 </div>
 
@@ -1579,7 +1632,7 @@ export default function TournamentDetailPage() {
                                                             </span>
                                                         )}
                                                         {pair.servingSide === "B" && (
-                                                            <span className="w-[68px] text-center text-[9px] font-black text-[#3498db] bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 italic block">SERVE 🏸</span>
+                                                            <span className="w-[80px] text-center text-[11px] font-black text-white bg-[#3498db] px-2 py-1 rounded-full shadow-[0_0_15px_rgba(52,152,219,0.4)] italic block">SERVE 🏸</span>
                                                         )}
                                                     </div>
                                                 ) : (
@@ -1633,6 +1686,18 @@ export default function TournamentDetailPage() {
                                 </svg>
                                 <span className="hidden sm:inline">รีเฟรช</span>
                             </button>
+                            {tournamentInfo?.tournament_status === "ongoing" && tournamentInfo.user_created?.id === user?.id && (
+                                <button
+                                    onClick={handleFinishTournament}
+                                    disabled={starting}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-400 text-xs font-bold transition-all disabled:opacity-50"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    <span>จบการแข่งขัน</span>
+                                </button>
+                            )}
                         </div>
 
                         {apiMatches.length === 0 ? (
@@ -1732,7 +1797,7 @@ export default function TournamentDetailPage() {
                                                                                 <div className="flex flex-col items-end min-w-0">
                                                                                     <div className="flex items-center gap-1 sm:gap-1.5">
                                                                                         {match.first_serve === "A" && (
-                                                                                            <span className="w-[50px] text-center text-[7px] font-black text-[#2ecc71] bg-green-500/10 px-1 py-0.5 rounded border border-green-500/20 italic">SERVE 🏸</span>
+                                                                                            <span className="w-[60px] text-center text-[9px] font-black text-white bg-[#2ecc71] px-1.5 py-0.5 rounded-full shadow-[0_0_10px_rgba(46,204,113,0.3)] italic">SERVE 🏸</span>
                                                                                         )}
                                                                                         {winnerA && idx === 0 && <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1 sm:px-1.5 py-0.5 rounded-md">Winner</span>}
                                                                                         <p className="font-bold text-xs sm:text-base truncate">{u.username}</p>
@@ -1821,7 +1886,7 @@ export default function TournamentDetailPage() {
                                                                                         <p className="font-bold text-xs sm:text-base truncate">{u.username}</p>
                                                                                         {winnerB && idx === 0 && <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1 sm:px-1.5 py-0.5 rounded-md">Winner</span>}
                                                                                         {match.first_serve === "B" && (
-                                                                                            <span className="w-[50px] text-center text-[7px] font-black text-[#3498db] bg-blue-500/10 px-1 py-0.5 rounded border border-blue-500/20 italic">SERVE 🏸</span>
+                                                                                            <span className="w-[60px] text-center text-[9px] font-black text-white bg-[#3498db] px-1.5 py-0.5 rounded-full shadow-[0_0_10px_rgba(52,152,219,0.3)] italic">SERVE 🏸</span>
                                                                                         )}
                                                                                     </div>
                                                                                     {/* Stats - ranking mode only */}

@@ -82,6 +82,7 @@ interface ApiMatch {
     team_a_id: ApiTeam | null;
     team_b_id: ApiTeam | null;
     match_histories?: ApiMatchHistory[];
+    first_serve?: "A" | "B";
 }
 
 type MatchStatus = "done" | "live" | "upcoming";
@@ -1730,6 +1731,9 @@ export default function TournamentDetailPage() {
                                                                             <div key={idx} className="flex items-center justify-end gap-2 sm:gap-3 relative">
                                                                                 <div className="flex flex-col items-end min-w-0">
                                                                                     <div className="flex items-center gap-1 sm:gap-1.5">
+                                                                                        {match.first_serve === "A" && (
+                                                                                            <span className="w-[50px] text-center text-[7px] font-black text-[#2ecc71] bg-green-500/10 px-1 py-0.5 rounded border border-green-500/20 italic">SERVE 🏸</span>
+                                                                                        )}
                                                                                         {winnerA && idx === 0 && <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1 sm:px-1.5 py-0.5 rounded-md">Winner</span>}
                                                                                         <p className="font-bold text-xs sm:text-base truncate">{u.username}</p>
                                                                                     </div>
@@ -1816,6 +1820,9 @@ export default function TournamentDetailPage() {
                                                                                     <div className="flex items-center gap-1 sm:gap-1.5">
                                                                                         <p className="font-bold text-xs sm:text-base truncate">{u.username}</p>
                                                                                         {winnerB && idx === 0 && <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1 sm:px-1.5 py-0.5 rounded-md">Winner</span>}
+                                                                                        {match.first_serve === "B" && (
+                                                                                            <span className="w-[50px] text-center text-[7px] font-black text-[#3498db] bg-blue-500/10 px-1 py-0.5 rounded border border-blue-500/20 italic">SERVE 🏸</span>
+                                                                                        )}
                                                                                     </div>
                                                                                     {/* Stats - ranking mode only */}
                                                                                     {tournamentInfo.mode === "ranking" && (

@@ -517,142 +517,126 @@ export default function TournamentDetailPage() {
 
     // ── Draw Pairs ──
     // teamA/teamB = 1 player (singles) or 2 players (doubles)
-    interface DrawnPair { teamA: RegisteredPlayer[]; teamB: RegisteredPlayer[] | null }
+    interface DrawnPair { teamA: RegisteredPlayer[]; teamB: RegisteredPlayer[] | null; servingSide?: "A" | "B" }
     const [drawnPairs, setDrawnPairs] = useState<DrawnPair[] | null>(null);
     const [drawMode, setDrawMode] = useState<"random" | "mmr_balanced">("random");
     const [roundsPerPlayer, setRoundsPerPlayer] = useState(1);
+    const [startStep, setStartStep] = useState<string | null>(null); // progress label
     const [starting, setStarting] = useState(false);
 
-    const handleDraw = () => {
-        handleDrawFair();
+    const shuffle = (array: any[]) => {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
     };
 
     const handleDrawFair = () => {
-        const players = [...(tournamentInfo?.players ?? [])];
-        const isDouble = tournamentInfo?.type === "double";
-        const playersPerMatch = isDouble ? 4 : 2;
+        if (!tournamentInfo) return;
+        const isDouble = tournamentInfo.type === "double";
+        const pPerMatch = isDouble ? 4 : 2;
+        const playersForDraw = [...tournamentInfo.players];
+        const pCount = playersForDraw.length;
 
-        if (players.length < playersPerMatch) {
+        if (pCount < pPerMatch) {
             setDrawnPairs([]);
             return;
         }
 
-        const totalSlotsNeeded = lcm(players.length, playersPerMatch);
-        const minRounds = totalSlotsNeeded / players.length;
-        const actualRounds = minRounds * (roundsPerPlayer || 1);
+        const minRoundsNeeded = lcm(pCount, pPerMatch) / pCount;
+        const totalRounds = minRoundsNeeded * (roundsPerPlayer || 1);
+        const totalMatches = (pCount * totalRounds) / pPerMatch;
 
-        let attempts = 0;
-        while (attempts < 100) {
-            attempts++;
-            let pool: RegisteredPlayer[] = [];
-            for (let r = 0; r < actualRounds; r++) {
-                pool = [...pool, ...players];
-            }
+        // Back-to-back avoidance logic: Try several times and pick best
+        let bestPairs: DrawnPair[] | null = null;
+        let minConflicts = Infinity;
 
-            // Shuffle or sort pool based on mode
-            if (drawMode === "mmr_balanced") {
-                // Sort by MMR desc with small jitter to prevent deadlocks and vary matches
-                pool.sort((a, b) => {
-                    const jitterA = Math.random() * 2 - 1;
-                    const jitterB = Math.random() * 2 - 1;
-                    return ((b.ranking?.mmr ?? 1500) + jitterB) - ((a.ranking?.mmr ?? 1500) + jitterA);
-                });
-            } else {
-                // Shuffle pool randomly
-                for (let i = pool.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [pool[i], pool[j]] = [pool[j], pool[i]];
-                }
-            }
+        for (let attempt = 0; attempt < 100; attempt++) {
+            const currentPairs: DrawnPair[] = [];
+            const playerMatchCounts = new Map<number, number>();
+            playersForDraw.forEach(p => playerMatchCounts.set(p.id, 0));
 
-            const pairs: DrawnPair[] = [];
+            const playerUsedInThisRound = new Set<number>();
             let possible = true;
 
-            // Generate matches
-            if (drawMode === "mmr_balanced") {
-                const used = new Set<number>();
-                for (let i = 0; i < pool.length; i++) {
-                    if (used.has(i)) continue;
-
-                    let chunk: RegisteredPlayer[] = [pool[i]];
-                    used.add(i);
-
-                    const slotsNeeded = playersPerMatch - 1;
-                    for (let s = 0; s < slotsNeeded; s++) {
-                        let found = false;
-                        // For doubles balance (Top1, Top2, Low1, Low2)
-                        // Slot 0 (player 2) should be another Top player for snake draft
-                        const lookFromTop = isDouble && s === 0;
-
-                        const start = lookFromTop ? 0 : pool.length - 1;
-                        const end = lookFromTop ? pool.length - 1 : 0;
-                        const step = lookFromTop ? 1 : -1;
-
-                        for (let k = start; lookFromTop ? k <= end : k >= end; k += step) {
-                            if (!used.has(k) && !chunk.some(p => p.id === pool[k].id)) {
-                                chunk.push(pool[k]);
-                                used.add(k);
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (!found) { possible = false; break; }
-                    }
-                    if (!possible) break;
-
-                    if (isDouble) {
-                        // Team A: Top 1 + Low 2 | Team B: Top 2 + Low 1
-                        pairs.push({ teamA: [chunk[0], chunk[3]].filter(Boolean), teamB: [chunk[1], chunk[2]].filter(Boolean) });
-                    } else {
-                        // Top 1 vs Low 1
-                        pairs.push({ teamA: [chunk[0]].filter(Boolean), teamB: [chunk[1]].filter(Boolean) });
-                    }
+            for (let m = 0; m < totalMatches; m++) {
+                if (playerUsedInThisRound.size >= pCount - (pCount % pPerMatch)) {
+                    playerUsedInThisRound.clear();
                 }
-            } else {
-                // Random grouping
-                for (let i = 0; i < pool.length; i += playersPerMatch) {
-                    const chunk = pool.slice(i, i + playersPerMatch);
-                    const seen = new Set<number>();
-                    let matchConflict = false;
 
-                    for (let j = 0; j < chunk.length; j++) {
-                        if (seen.has(chunk[j].id)) {
-                            let swapped = false;
-                            for (let k = i + j + 1; k < pool.length; k++) {
-                                if (!seen.has(pool[k].id)) {
-                                    [pool[i + j], pool[k]] = [pool[k], pool[i + j]];
-                                    chunk[j] = pool[i + j];
-                                    seen.add(chunk[j].id);
-                                    swapped = true;
-                                    break;
-                                }
-                            }
-                            if (!swapped) { matchConflict = true; break; }
-                        } else {
-                            seen.add(chunk[j].id);
-                        }
-                    }
-                    if (matchConflict) { possible = false; break; }
+                const available = playersForDraw.filter(p =>
+                    (playerMatchCounts.get(p.id) || 0) < totalRounds &&
+                    !playerUsedInThisRound.has(p.id)
+                );
 
-                    if (isDouble) {
-                        pairs.push({ teamA: [chunk[0], chunk[1]].filter(Boolean), teamB: chunk.length > 2 ? [chunk[2], chunk[3]].filter(Boolean) : null });
-                    } else {
-                        pairs.push({ teamA: [chunk[0]].filter(Boolean), teamB: chunk.length > 1 ? [chunk[1]].filter(Boolean) : null });
-                    }
+                if (available.length < pPerMatch) {
+                    possible = false;
+                    break;
+                }
+
+                let chunk: RegisteredPlayer[] = [];
+                if (drawMode === "mmr_balanced") {
+                    available.sort((a, b) => {
+                        const jitterA = Math.random() * 2 - 1;
+                        const jitterB = Math.random() * 2 - 1;
+                        return ((b.ranking?.mmr ?? 1500) + jitterB) - ((a.ranking?.mmr ?? 1500) + jitterA);
+                    });
+                    chunk = available.slice(0, pPerMatch);
+                } else {
+                    shuffle(available);
+                    chunk = available.slice(0, pPerMatch);
+                }
+
+                chunk.forEach(p => {
+                    playerMatchCounts.set(p.id, (playerMatchCounts.get(p.id) || 0) + 1);
+                    playerUsedInThisRound.add(p.id);
+                });
+
+                if (isDouble) {
+                    currentPairs.push({
+                        teamA: [chunk[0], chunk[3]].filter(Boolean),
+                        teamB: [chunk[1], chunk[2]].filter(Boolean),
+                        servingSide: Math.random() > 0.5 ? "A" : "B"
+                    });
+                } else {
+                    currentPairs.push({
+                        teamA: [chunk[0]].filter(Boolean),
+                        teamB: [chunk[1]].filter(Boolean),
+                        servingSide: Math.random() > 0.5 ? "A" : "B"
+                    });
                 }
             }
 
-            if (possible) {
-                setDrawnPairs(pairs);
-                return;
+            if (!possible) continue;
+
+            // Calculate back-to-back conflict score
+            let conflicts = 0;
+            for (let i = 1; i < currentPairs.length; i++) {
+                const prevIds = new Set([
+                    ...currentPairs[i - 1].teamA.map(p => p.id),
+                    ...(currentPairs[i - 1].teamB?.map(p => p.id) || [])
+                ]);
+                const currIds = [
+                    ...currentPairs[i].teamA.map(p => p.id),
+                    ...(currentPairs[i].teamB?.map(p => p.id) || [])
+                ];
+                currIds.forEach(pid => { if (prevIds.has(pid)) conflicts++; });
+            }
+
+            if (conflicts < minConflicts) {
+                minConflicts = conflicts;
+                bestPairs = currentPairs;
+                if (conflicts === 0) break; // Perfect score
             }
         }
 
-        showToast("ไม่สามารถจัดตารางที่สมบูรณ์ได้ (ลองกดอีกครั้ง)", "error");
+        if (bestPairs) {
+            setDrawnPairs(bestPairs);
+            showToast(`จับคู่เรียบร้อย (Back-to-back: ${minConflicts}) 🎲`, "success");
+        } else {
+            showToast("ไม่สามารถจัดคู่ที่สมบูรณ์ได้ตามเงื่อนไข กรุณาลองใหม่", "error");
+        }
     };
-
-
-    const [startStep, setStartStep] = useState<string | null>(null); // progress label
 
     const postJSON = async (url: string, body: unknown) => {
         const res = await fetch(`${STRAPI_BASE_URL}${url}`, {
@@ -746,6 +730,7 @@ export default function TournamentDetailPage() {
                         score_b: 0,
                         team_winner: isBye ? teamAId : null,
                         match_status: isBye ? "done" : "upcoming",
+                        first_serve: drawnPairs[i].servingSide,
                     },
                 });
             }
@@ -1565,6 +1550,9 @@ export default function TournamentDetailPage() {
                                                             MMR รวม: {pair.teamA.reduce((s, p) => s + (p.ranking?.mmr ?? 1500), 0).toLocaleString()}
                                                         </span>
                                                     )}
+                                                    {pair.servingSide === "A" && (
+                                                        <span className="w-[68px] text-center text-[9px] font-black text-[#2ecc71] bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20 italic block">SERVE 🏸</span>
+                                                    )}
                                                 </div>
 
                                                 <span className="px-1.5 py-0.5 rounded-md bg-white/5 text-[9px] sm:text-[11px] font-bold text-slate-500 shrink-0 uppercase tracking-tighter sm:tracking-normal">VS</span>
@@ -1588,6 +1576,9 @@ export default function TournamentDetailPage() {
                                                             <span className="text-[9px] text-yellow-400/60 font-bold">
                                                                 MMR รวม: {pair.teamB.reduce((s, p) => s + (p.ranking?.mmr ?? 1500), 0).toLocaleString()}
                                                             </span>
+                                                        )}
+                                                        {pair.servingSide === "B" && (
+                                                            <span className="w-[68px] text-center text-[9px] font-black text-[#3498db] bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 italic block">SERVE 🏸</span>
                                                         )}
                                                     </div>
                                                 ) : (

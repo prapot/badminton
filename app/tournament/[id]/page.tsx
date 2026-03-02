@@ -395,7 +395,7 @@ export default function TournamentDetailPage() {
     const fetchMatches = (token = jwt) => {
         if (!token || !id) return;
         fetch(
-            `${STRAPI_BASE_URL}/api/matches?filters[tournament_id][documentId][$eq]=${id}&populate[team_a_id][populate][team_players][populate][user_id][populate][0]=ranking&populate[team_a_id][populate][team_players][populate][user_id][populate][1]=picture&populate[team_b_id][populate][team_players][populate][user_id][populate][0]=ranking&populate[team_b_id][populate][team_players][populate][user_id][populate][1]=picture&populate[match_histories][populate][users][fields]=*&sort=match_no:asc`,
+            `${STRAPI_BASE_URL}/api/matches?filters[tournament_id][documentId][$eq]=${id}&populate[team_a_id][populate][team_players][populate][user_id][populate][0]=ranking&populate[team_a_id][populate][team_players][populate][user_id][populate][1]=picture&populate[team_b_id][populate][team_players][populate][user_id][populate][0]=ranking&populate[team_b_id][populate][team_players][populate][user_id][populate][1]=picture&populate[match_histories][populate][users][fields]=*&sort=match_no:asc&pagination[pageSize]=100`,
             { headers: { Authorization: `Bearer ${token}` } }
         )
             .then((r) => r.json())
@@ -430,7 +430,14 @@ export default function TournamentDetailPage() {
                     mode: data.mode ?? "ranking",
                     players: tpArr
                         .filter((tp) => !!tp.user)
-                        .map((tp) => ({ ...tp.user!, tpDocumentId: tp.documentId ?? "" })),
+                        .reduce((acc, current) => {
+                            const x = acc.find(item => item.id === current.user!.id);
+                            if (!x) {
+                                return acc.concat([{ ...current.user!, tpDocumentId: current.documentId ?? "" }]);
+                            } else {
+                                return acc;
+                            }
+                        }, [] as RegisteredPlayer[]),
                     user_created: data.user_created || data.user_id,
                 });
             })
@@ -475,6 +482,13 @@ export default function TournamentDetailPage() {
 
     const handleJoin = async () => {
         if (!jwt || !user || joining || tournamentInfo?.tournament_status !== "upcoming") return;
+
+        // Final guard: check if already joined to prevent duplicates
+        if (tournamentInfo.players.some(p => p.id === user.id)) {
+            showToast("คุณเข้าร่วมการแข่งขันนี้แล้ว", "error");
+            return;
+        }
+
         setJoining(true);
         try {
             const res = await fetch(`${STRAPI_BASE_URL}/api/tournament-players`, {
@@ -536,7 +550,10 @@ export default function TournamentDetailPage() {
         if (!tournamentInfo) return;
         const isDouble = tournamentInfo.type === "double";
         const pPerMatch = isDouble ? 4 : 2;
-        const playersForDraw = [...tournamentInfo.players];
+
+        // Ensure unique players for draw to prevent duplicates in matches
+        const uniquePlayers = Array.from(new Map(tournamentInfo.players.map(p => [p.id, p])).values());
+        const playersForDraw = [...uniquePlayers];
         const pCount = playersForDraw.length;
 
         if (pCount < pPerMatch) {
@@ -548,9 +565,29 @@ export default function TournamentDetailPage() {
         const totalRounds = minRoundsNeeded * (roundsPerPlayer || 1);
         const totalMatches = (pCount * totalRounds) / pPerMatch;
 
-        // Back-to-back avoidance logic: Try several times and pick best
+        // ── partner history from previous matches ──
+        const partnerHistory = new Map<number, Set<number>>();
+        apiMatches.forEach(m => {
+            if (m.match_status === "cancelled") return;
+            [m.team_a_id, m.team_b_id].forEach(t => {
+                if (!t) return;
+                const pids = t.team_players.map(tp => tp.user_id?.id).filter((id): id is number => !!id);
+                if (pids.length > 1) {
+                    for (let i = 0; i < pids.length; i++) {
+                        for (let j = i + 1; j < pids.length; j++) {
+                            if (!partnerHistory.has(pids[i])) partnerHistory.set(pids[i], new Set());
+                            if (!partnerHistory.has(pids[j])) partnerHistory.set(pids[j], new Set());
+                            partnerHistory.get(pids[i])!.add(pids[j]);
+                            partnerHistory.get(pids[j])!.add(pids[i]);
+                        }
+                    }
+                }
+            });
+        });
+
+        // Back-to-back and Partner repeat avoidance logic: Try several times and pick best
         let bestPairs: DrawnPair[] | null = null;
-        let minConflicts = Infinity;
+        let minScore = Infinity;
 
         for (let attempt = 0; attempt < 100; attempt++) {
             const currentPairs: DrawnPair[] = [];
@@ -559,6 +596,8 @@ export default function TournamentDetailPage() {
 
             const playerUsedInThisRound = new Set<number>();
             let possible = true;
+            let partnerRepeats = 0;
+            const internalPartners = new Map<number, Set<number>>();
 
             for (let m = 0; m < totalMatches; m++) {
                 if (playerUsedInThisRound.size >= pCount - (pCount % pPerMatch)) {
@@ -593,25 +632,44 @@ export default function TournamentDetailPage() {
                     playerUsedInThisRound.add(p.id);
                 });
 
+                let pair: DrawnPair;
                 if (isDouble) {
-                    currentPairs.push({
+                    pair = {
                         teamA: [chunk[0], chunk[3]].filter(Boolean),
                         teamB: [chunk[1], chunk[2]].filter(Boolean),
                         servingSide: Math.random() > 0.5 ? "A" : "B"
+                    };
+
+                    // Check partner repeats for Team A and B
+                    [pair.teamA, pair.teamB].forEach(team => {
+                        if (team && team.length > 1) {
+                            const p1 = team[0].id;
+                            const p2 = team[1].id;
+                            // From history
+                            if (partnerHistory.get(p1)?.has(p2)) partnerRepeats++;
+                            // Within this draw
+                            if (internalPartners.get(p1)?.has(p2)) partnerRepeats += 2; // Extra penalty for multi-repeat in same draw
+
+                            if (!internalPartners.has(p1)) internalPartners.set(p1, new Set());
+                            if (!internalPartners.has(p2)) internalPartners.set(p2, new Set());
+                            internalPartners.get(p1)!.add(p2);
+                            internalPartners.get(p2)!.add(p1);
+                        }
                     });
                 } else {
-                    currentPairs.push({
+                    pair = {
                         teamA: [chunk[0]].filter(Boolean),
                         teamB: [chunk[1]].filter(Boolean),
                         servingSide: Math.random() > 0.5 ? "A" : "B"
-                    });
+                    };
                 }
+                currentPairs.push(pair);
             }
 
             if (!possible) continue;
 
             // Calculate back-to-back conflict score
-            let conflicts = 0;
+            let backToBackConflicts = 0;
             for (let i = 1; i < currentPairs.length; i++) {
                 const prevIds = new Set([
                     ...currentPairs[i - 1].teamA.map(p => p.id),
@@ -621,19 +679,21 @@ export default function TournamentDetailPage() {
                     ...currentPairs[i].teamA.map(p => p.id),
                     ...(currentPairs[i].teamB?.map(p => p.id) || [])
                 ];
-                currIds.forEach(pid => { if (prevIds.has(pid)) conflicts++; });
+                currIds.forEach(pid => { if (prevIds.has(pid)) backToBackConflicts++; });
             }
 
-            if (conflicts < minConflicts) {
-                minConflicts = conflicts;
+            const totalScore = (backToBackConflicts * 1000) + (partnerRepeats * 50);
+
+            if (totalScore < minScore) {
+                minScore = totalScore;
                 bestPairs = currentPairs;
-                if (conflicts === 0) break; // Perfect score
+                if (totalScore === 0) break; // Perfect score
             }
         }
 
         if (bestPairs) {
             setDrawnPairs(bestPairs);
-            showToast(`จับคู่เรียบร้อย (Back-to-back: ${minConflicts}) 🎲`, "success");
+            showToast(`จับคู่เรียบร้อย 🎲`, "success");
         } else {
             showToast("ไม่สามารถจัดคู่ที่สมบูรณ์ได้ตามเงื่อนไข กรุณาลองใหม่", "error");
         }
@@ -672,68 +732,70 @@ export default function TournamentDetailPage() {
         const randTeamNo = () => Math.random().toString(36).substring(2, 10).toUpperCase();
 
         try {
-            // ── Step 1: Create Teams ──────────────────────────────────
-            setStartStep("สร้างทีม...");
+            // ── Step 1: Create Teams with Batching ───────────────────
+            setStartStep("เตรียมทีมและแมตซ์...");
             const teamIds: { teamA: string; teamB: string | null }[] = [];
+            const batchSize = 10;
 
-            for (const pair of drawnPairs) {
-                // Create teamA
-                const resA = await postJSON("/api/teams", {
-                    data: { tournament_id: id, team_no: randTeamNo() },
-                });
-                const teamAId: string = resA.data?.documentId ?? resA.data?.id;
-
-                // Create teamB if exists
-                let teamBId: string | null = null;
-                if (pair.teamB) {
-                    const resB = await postJSON("/api/teams", {
+            for (let i = 0; i < drawnPairs.length; i += batchSize) {
+                const batch = drawnPairs.slice(i, i + batchSize);
+                const batchPromises = batch.map(async (pair) => {
+                    const resA = await postJSON("/api/teams", {
                         data: { tournament_id: id, team_no: randTeamNo() },
                     });
-                    teamBId = resB.data?.documentId ?? resB.data?.id;
-                }
+                    const teamAId: string = resA.data?.documentId ?? resA.data?.id;
 
-                teamIds.push({ teamA: teamAId, teamB: teamBId });
-            }
-
-            // ── Step 2: Create Team Players ───────────────────────────
-            setStartStep("บันทึกผู้เล่นในทีม...");
-            for (let pairIdx = 0; pairIdx < drawnPairs.length; pairIdx++) {
-                const pair = drawnPairs[pairIdx];
-                const { teamA: teamAId, teamB: teamBId } = teamIds[pairIdx];
-
-                for (const player of pair.teamA) {
-                    await postJSON("/api/team-players", {
-                        data: { team_id: teamAId, user_id: player.id },
-                    });
-                }
-                if (pair.teamB && teamBId) {
-                    for (const player of pair.teamB) {
-                        await postJSON("/api/team-players", {
-                            data: { team_id: teamBId, user_id: player.id },
+                    let teamBId: string | null = null;
+                    if (pair.teamB) {
+                        const resB = await postJSON("/api/teams", {
+                            data: { tournament_id: id, team_no: randTeamNo() },
                         });
+                        teamBId = resB.data?.documentId ?? resB.data?.id;
                     }
-                }
+                    return { teamA: teamAId, teamB: teamBId };
+                });
+                const batchResults = await Promise.all(batchPromises);
+                teamIds.push(...batchResults);
             }
 
-            // ── Step 3: Create Matches ────────────────────────────────
-            setStartStep("สร้างตารางแข่งขัน...");
-            for (let i = 0; i < teamIds.length; i++) {
-                const { teamA: teamAId, teamB: teamBId } = teamIds[i];
-                const isBye = !teamBId;
-                await postJSON("/api/matches", {
-                    data: {
-                        tournament_id: id,
-                        round: i + 1,
-                        match_no: i + 1,
-                        team_a_id: teamAId,
-                        team_b_id: teamBId,
-                        score_a: isBye ? 1 : 0,
-                        score_b: 0,
-                        team_winner: isBye ? teamAId : null,
-                        match_status: isBye ? "done" : "upcoming",
-                        first_serve: drawnPairs[i].servingSide,
-                    },
+            // ── Step 2 & 3: Create Team Players and Matches with Batching ──
+            setStartStep("บันทึกข้อมูลการแข่งขัน...");
+            for (let i = 0; i < drawnPairs.length; i += batchSize) {
+                const batchPairs = drawnPairs.slice(i, i + batchSize);
+                const batchPromises = batchPairs.map(async (pair, batchIdx) => {
+                    const globalIdx = i + batchIdx;
+                    const { teamA: teamAId, teamB: teamBId } = teamIds[globalIdx];
+                    const isBye = !teamBId;
+
+                    // Create players for team A
+                    const playerAPromises = pair.teamA.map(player =>
+                        postJSON("/api/team-players", { data: { team_id: teamAId, user_id: player.id } })
+                    );
+
+                    // Create players for team B
+                    const playerBPromises = (pair.teamB && teamBId) ? pair.teamB.map(player =>
+                        postJSON("/api/team-players", { data: { team_id: teamBId, user_id: player.id } })
+                    ) : [];
+
+                    // Create Match
+                    const matchPromise = postJSON("/api/matches", {
+                        data: {
+                            tournament_id: id,
+                            round: globalIdx + 1,
+                            match_no: globalIdx + 1,
+                            team_a_id: teamAId,
+                            team_b_id: teamBId,
+                            score_a: isBye ? 1 : 0,
+                            score_b: 0,
+                            team_winner: isBye ? teamAId : null,
+                            match_status: isBye ? "done" : "upcoming",
+                            first_serve: pair.servingSide,
+                        },
+                    });
+
+                    return Promise.all([...playerAPromises, ...playerBPromises, matchPromise]);
                 });
+                await Promise.all(batchPromises);
             }
 
             // ── Step 4: Update Tournament Status ─────────────────────
@@ -1748,10 +1810,9 @@ export default function TournamentDetailPage() {
 
                                                 return (
                                                     <div key={match.id}
-                                                        className={`group relative overflow-hidden bg-black/20 border border-white/5 rounded-2xl p-4 transition-all duration-300 ${tournamentInfo.user_created?.id === user?.id && match.match_status !== "cancelled" ? "hover:bg-black/40 hover:border-white/10 hover:-translate-y-0.5 hover:shadow-xl cursor-pointer" : ""} ${match.match_status === "cancelled" ? "opacity-60 grayscale" : ""}`}
+                                                        className={`group relative overflow-hidden bg-black/20 border border-white/5 rounded-2xl p-4 transition-all duration-300 ${match.match_status !== "cancelled" ? "hover:bg-black/40 hover:border-white/10 hover:-translate-y-0.5 hover:shadow-xl cursor-pointer" : ""} ${match.match_status === "cancelled" ? "opacity-60 grayscale" : ""}`}
                                                         onClick={() => {
                                                             if (match.match_status === "cancelled") return;
-                                                            if (tournamentInfo.user_created?.id !== user?.id) return; // Only owner can edit scores
                                                             setScoreEditing(match);
                                                             setScoreA(match.score_a ?? 0);
                                                             setScoreB(match.score_b ?? 0);
@@ -1911,7 +1972,7 @@ export default function TournamentDetailPage() {
                                                             </div>
                                                         </div>
 
-                                                        {tournamentInfo.tournament_status === "ongoing" && !isCompleted && tournamentInfo.user_created?.id === user?.id && (
+                                                        {tournamentInfo.tournament_status === "ongoing" && !isCompleted && (
                                                             <div className="mt-4 text-center">
                                                                 <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 group-hover:text-[#3498db] transition-colors border border-transparent group-hover:border-[#3498db]/20 bg-transparent group-hover:bg-[#3498db]/10 px-2 py-0.5 rounded-full">
                                                                     ✍️ คลิกเพื่อบันทึกคะแนน

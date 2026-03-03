@@ -39,6 +39,13 @@ interface TRanking {
     user_id: ApiUser | null;
 }
 
+interface ApiSeason {
+    id: number;
+    documentId: string;
+    name: string;
+    is_active: boolean;
+}
+
 interface PaginationMeta {
     page: number;
     pageSize: number;
@@ -88,21 +95,54 @@ export default function RankingPage() {
     const { jwt, user } = useAuth();
     const [search, setSearch] = useState("");
     const [allPlayers, setAllPlayers] = useState<PlayerRow[]>([]);
+    const [seasons, setSeasons] = useState<ApiSeason[]>([]);
+    const [selectedSeason, setSelectedSeason] = useState<string>("");
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
 
     useEffect(() => {
-        if (jwt) fetchAllData();
+        if (jwt) {
+            fetchSeasons();
+        }
     }, [jwt]);
+
+    useEffect(() => {
+        if (jwt) fetchAllData();
+    }, [jwt, selectedSeason]);
+
+    const fetchSeasons = async () => {
+        try {
+            const res = await fetch(`${STRAPI_BASE_URL}/api/seasons?sort=createdAt:desc`, {
+                headers: { Authorization: `Bearer ${jwt}` }
+            });
+            if (res.ok) {
+                const json = await res.json();
+                const data: ApiSeason[] = json.data ?? [];
+                setSeasons(data);
+
+                // Default to active season
+                const active = data.find(s => s.is_active);
+                if (active) {
+                    setSelectedSeason(active.documentId);
+                } else if (data.length > 0) {
+                    setSelectedSeason(data[0].documentId);
+                }
+            }
+        } catch (err) {
+            console.error("Fetch seasons error:", err);
+        }
+    }
 
     const fetchAllData = async () => {
         setLoading(true);
         try {
-            // 1. Fetch rankings with high pageSize to get all
-            const rankingsRes = await fetch(
-                `${STRAPI_BASE_URL}/api/rankings?populate[user_id][populate][0]=picture&sort[0]=mmr:desc&pagination[pageSize]=1000`,
-                { headers: { Authorization: `Bearer ${jwt}` } }
-            );
+            // 1. Fetch rankings for selected season
+            let url = `${STRAPI_BASE_URL}/api/rankings?populate[user_id][populate][0]=picture&sort[0]=mmr:desc&pagination[pageSize]=1000`;
+            if (selectedSeason) {
+                url += `&filters[season][documentId][$eq]=${selectedSeason}`;
+            }
+
+            const rankingsRes = await fetch(url, { headers: { Authorization: `Bearer ${jwt}` } });
 
             if (!rankingsRes.ok) throw new Error("ไม่สามารถโหลดอันดับได้");
             const rankingsJson = await rankingsRes.json();
@@ -118,14 +158,21 @@ export default function RankingPage() {
 
             // 3. Merge
             const rankedUserIds = new Set<number>();
-            const merged: PlayerRow[] = rankingsData.map((r) => {
+            const merged: PlayerRow[] = [];
+
+            rankingsData.forEach((r) => {
                 const u = r.user_id;
-                if (u?.id) rankedUserIds.add(u.id);
-                return {
-                    userId: u?.id ?? 0,
-                    username: u?.username ?? "Unknown",
-                    email: u?.email ?? "",
-                    picture: u?.picture,
+                if (!u || !u.id) return;
+
+                // Only take the first one found (which is highest MMR due to API sort)
+                if (rankedUserIds.has(u.id)) return;
+
+                rankedUserIds.add(u.id);
+                merged.push({
+                    userId: u.id,
+                    username: u.username || "Unknown",
+                    email: u.email || "",
+                    picture: u.picture,
                     mmr: r.mmr,
                     win: r.win,
                     lose: r.lose,
@@ -133,8 +180,8 @@ export default function RankingPage() {
                     match_played: r.match_played,
                     hasRanking: true,
                     rankingId: r.id,
-                };
-            }).filter(p => p.userId !== 0);
+                });
+            });
 
             // 4. Append unranked users
             usersData.forEach(u => {
@@ -200,9 +247,37 @@ export default function RankingPage() {
                     </div>
                 </div>
 
-                {/* Search */}
-                <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-3">
-                    <div className="relative w-full sm:w-80">
+                {/* Season Winners / Hall of Fame Section (Only if past season is selected) */}
+                {selectedSeason !== "all" && seasons.length > 0 && !seasons.find(s => s.documentId === selectedSeason)?.is_active && allPlayers.filter(p => p.hasRanking).length > 0 && (
+                    <div className="bg-gradient-to-r from-yellow-500/10 via-yellow-500/5 to-transparent border border-yellow-500/20 rounded-3xl p-6 sm:p-8 relative overflow-hidden group mb-8">
+                        <div className="absolute top-0 right-0 p-8 opacity-10 text-8xl grayscale group-hover:grayscale-0 transition-all duration-700">🏆</div>
+                        <div className="relative z-10">
+                            <h2 className="text-xl sm:text-2xl font-black text-yellow-500 mb-4 flex items-center gap-3">
+                                <span>🏛️</span> HALL OF FAME: {seasons.find(s => s.documentId === selectedSeason)?.name}
+                            </h2>
+                            <div className="flex flex-wrap gap-6 items-center">
+                                {allPlayers.filter(p => p.hasRanking).slice(0, 3).map((p, i) => (
+                                    <div key={p.userId} className="flex items-center gap-4 bg-black/40 px-5 py-3 rounded-2xl border border-white/5 shadow-xl transition-transform hover:scale-105">
+                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold shadow-lg ${i === 0 ? "bg-gradient-to-br from-yellow-400 to-yellow-600 ring-2 ring-yellow-400/50" :
+                                            i === 1 ? "bg-gradient-to-br from-slate-300 to-slate-500" :
+                                                "bg-gradient-to-br from-orange-400 to-orange-600"
+                                            }`}>
+                                            {i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}
+                                        </div>
+                                        <div>
+                                            <p className="font-black text-white text-base leading-none mb-1">{p.username}</p>
+                                            <p className="text-[10px] font-black text-yellow-500/80 uppercase tracking-widest">{p.mmr} MMR</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Search & Season Selector */}
+                <div className="flex flex-col md:flex-row items-center gap-4">
+                    <div className="relative w-full md:w-80">
                         <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
@@ -217,8 +292,25 @@ export default function RankingPage() {
                             className="w-full h-11 sm:h-12 pl-12 pr-4 bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/40 transition-all shadow-inner"
                         />
                     </div>
+
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                        <div className="text-xs font-bold text-slate-500 uppercase tracking-widest whitespace-nowrap">Season:</div>
+                        <select
+                            value={selectedSeason}
+                            onChange={(e) => setSelectedSeason(e.target.value)}
+                            className="flex-1 md:w-48 h-11 sm:h-12 px-4 bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all appearance-none cursor-pointer"
+                        >
+                            <option value="" className="bg-[#0f1923]">ทั้งหมด (Legacy)</option>
+                            {seasons.map((s) => (
+                                <option key={s.documentId} value={s.documentId} className="bg-[#0f1923]">
+                                    {s.name} {s.is_active ? "(Active)" : ""}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
                     {loading && (
-                        <div className="flex items-center gap-2 text-xs text-slate-500 animate-pulse">
+                        <div className="flex items-center gap-2 text-xs text-slate-500 animate-pulse ml-auto">
                             <div className="w-2 h-2 rounded-full bg-green-500"></div>
                             กำลังโหลดข้อมูล...
                         </div>
@@ -288,7 +380,7 @@ export default function RankingPage() {
                         </h3>
                         <div className="flex items-center gap-4">
                             <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-black/20 px-3 py-1.5 rounded-full border border-white/5">
-                                Seasons: 2026/01
+                                Season: {seasons.find(s => s.documentId === selectedSeason)?.name || "Current"}
                             </span>
                             <span className="text-xs font-bold text-green-400 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
                                 {allPlayers.length} ผู้เล่นทั้งหมด

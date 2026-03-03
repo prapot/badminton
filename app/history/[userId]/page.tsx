@@ -35,6 +35,12 @@ interface MatchHistory {
             team_players: Array<{ user_id?: { id: number; username: string } }>;
         } | null;
     }>;
+    ranking?: {
+        season?: {
+            name: string;
+            documentId: string;
+        }
+    } | null;
 }
 
 interface PaginationMeta {
@@ -61,6 +67,8 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
     const [error, setError] = useState<string | null>(null);
     const [page, setPage] = useState(1);
     const [meta, setMeta] = useState<PaginationMeta | null>(null);
+    const [seasons, setSeasons] = useState<any[]>([]);
+    const [selectedSeason, setSelectedSeason] = useState<string>("all");
 
     const fetchData = useCallback(async (pageNum: number = 1) => {
         if (!jwt) return;
@@ -76,11 +84,14 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
                 setTargetUser(userData);
             }
 
-            // 2. Fetch match histories with pagination
-            const historyRes = await fetch(
-                `${STRAPI_BASE_URL}/api/match-histories?filters[users][id]=${userId}&populate[matches][populate][team_a_id][populate][team_players][populate]=user_id&populate[matches][populate][team_b_id][populate][team_players][populate]=user_id&populate[matches][populate]=tournament_id&sort=createdAt:desc&pagination[page]=${pageNum}&pagination[pageSize]=10`,
-                { headers: { Authorization: `Bearer ${jwt}` } }
-            );
+            // 2. Fetch match histories with pagination and seasonal filter
+            let url = `${STRAPI_BASE_URL}/api/match-histories?filters[users][id]=${userId}&populate[matches][populate][team_a_id][populate][team_players][populate]=user_id&populate[matches][populate][team_b_id][populate][team_players][populate]=user_id&populate[matches][populate]=tournament_id&populate[ranking][populate]=season&sort=createdAt:desc&pagination[page]=${pageNum}&pagination[pageSize]=10`;
+
+            if (selectedSeason !== "all") {
+                url += `&filters[ranking][season][documentId][$eq]=${selectedSeason}`;
+            }
+
+            const historyRes = await fetch(url, { headers: { Authorization: `Bearer ${jwt}` } });
             if (!historyRes.ok) throw new Error("ไม่สามารถโหลดประวัติได้");
             const historyData = await historyRes.json();
             setHistories(historyData.data || []);
@@ -94,8 +105,17 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
     }, [userId, jwt, targetUser]);
 
     useEffect(() => {
+        if (!jwt) return;
+        fetch(`${STRAPI_BASE_URL}/api/seasons?sort=createdAt:desc`, {
+            headers: { Authorization: `Bearer ${jwt}` }
+        })
+            .then(r => r.json())
+            .then(json => setSeasons(json.data || []));
+    }, [jwt]);
+
+    useEffect(() => {
         fetchData(page);
-    }, [page, jwt, userId]); // Fetch when page changes or initial load
+    }, [page, jwt, userId, selectedSeason]); // Fetch when page or season changes
 
     if (!user) return null;
 
@@ -121,6 +141,24 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
                         <h1 className="text-2xl font-bold text-white mb-1">ประวัติการแข่งขัน</h1>
                         <p className="text-slate-400 font-medium">{targetUser?.username}</p>
                     </div>
+
+                    <div className="ml-auto">
+                        <select
+                            value={selectedSeason}
+                            onChange={(e) => {
+                                setSelectedSeason(e.target.value);
+                                setPage(1);
+                            }}
+                            className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-green-500/50 transition-all cursor-pointer hover:bg-black/60"
+                        >
+                            <option value="all">ทุกฤดูกาล (All Seasons)</option>
+                            {seasons.map((s) => (
+                                <option key={s.documentId} value={s.documentId}>
+                                    {s.name} {s.is_active ? "(Current)" : ""}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 {loading ? (
@@ -141,7 +179,7 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
                 ) : (
                     <div className="space-y-4">
                         {histories.map((h) => {
-                            const match = h.matches?.[0]; // Usually one match per history entry
+                            const match = h.matches?.[0];
                             if (!match) return null;
 
                             const isTeamA = match.team_a_id?.team_players?.some(tp => tp.user_id?.id === Number(userId));
@@ -166,13 +204,11 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
                                         isWin ? 'bg-green-500/5 border-green-500/20 shadow-green-900/10 shadow-lg' : 'bg-red-500/5 border-red-500/20'
                                         }`}
                                 >
-                                    {/* Win/Loss Badge background decoration */}
                                     <div className={`absolute top-0 right-0 px-4 py-8 pointer-events-none opacity-[0.03] text-6xl font-black italic`}>
                                         {isCancelled ? 'CANCEL' : isWin ? 'WIN' : 'LOSS'}
                                     </div>
 
                                     <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                                        {/* Left: Info */}
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-2">
                                                 {isCancelled ? (
@@ -195,6 +231,11 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
                                                         hour: '2-digit', minute: '2-digit'
                                                     })}
                                                 </span>
+                                                {h.ranking?.season?.name && (
+                                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full border bg-purple-500/10 text-purple-400 border-purple-500/20">
+                                                        📅 {h.ranking.season.name}
+                                                    </span>
+                                                )}
                                             </div>
 
                                             <p className="text-sm font-bold text-white mb-1 truncate">
@@ -208,9 +249,7 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
                                             </div>
                                         </div>
 
-                                        {/* Right: Scores & MMR */}
                                         <div className="flex items-center gap-8 shrink-0">
-                                            {/* Score */}
                                             <div className="text-center">
                                                 <p className="text-[9px] text-slate-500 font-bold uppercase mb-1 tracking-widest">Score</p>
                                                 <div className="flex items-center gap-2 px-3 py-1 bg-black/30 rounded-xl border border-white/5">
@@ -220,7 +259,6 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
                                                 </div>
                                             </div>
 
-                                            {/* MMR Change */}
                                             {isRanking && (
                                                 <div className="text-center min-w-[100px]">
                                                     <p className="text-[9px] text-slate-500 font-bold uppercase mb-1 tracking-widest">MMR Change</p>

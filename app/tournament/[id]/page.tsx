@@ -31,7 +31,7 @@ interface RegisteredPlayer {
     email: string;
     tpDocumentId: string;   // documentId ของ tournament_player row (ใช้ DELETE)
     picture?: { url: string } | null;
-    ranking?: ApiRanking | null;
+    rankings?: ApiRanking[] | null;
 }
 
 interface TournamentInfo {
@@ -57,7 +57,7 @@ interface ApiPlayer {
     id: number;
     username: string;
     picture?: { url: string } | null;
-    ranking?: ApiRanking | null;
+    rankings?: ApiRanking[] | null;
 }
 interface ApiTeam {
     id: number;
@@ -395,7 +395,7 @@ export default function TournamentDetailPage() {
     const fetchMatches = (token = jwt) => {
         if (!token || !id) return;
         fetch(
-            `${STRAPI_BASE_URL}/api/matches?filters[tournament_id][documentId][$eq]=${id}&populate[team_a_id][populate][team_players][populate][user_id][populate][0]=ranking&populate[team_a_id][populate][team_players][populate][user_id][populate][1]=picture&populate[team_b_id][populate][team_players][populate][user_id][populate][0]=ranking&populate[team_b_id][populate][team_players][populate][user_id][populate][1]=picture&populate[match_histories][populate][users][fields]=*&sort=match_no:asc&pagination[pageSize]=100`,
+            `${STRAPI_BASE_URL}/api/matches?filters[tournament_id][documentId][$eq]=${id}&populate[team_a_id][populate][team_players][populate][user_id][populate][rankings][filters][season][is_active][$eq]=true&populate[team_a_id][populate][team_players][populate][user_id][populate][picture][fields][0]=url&populate[team_b_id][populate][team_players][populate][user_id][populate][rankings][filters][season][is_active][$eq]=true&populate[team_b_id][populate][team_players][populate][user_id][populate][picture][fields][0]=url&populate[match_histories][populate][users][fields]=*&sort=match_no:asc&pagination[pageSize]=100`,
             { headers: { Authorization: `Bearer ${token}` } }
         )
             .then((r) => r.json())
@@ -414,7 +414,7 @@ export default function TournamentDetailPage() {
     useEffect(() => {
         if (!jwt || !id) return;
         fetch(
-            `${STRAPI_BASE_URL}/api/tournaments/${id}?populate[tournament_players][populate][user][populate][0]=picture&populate[tournament_players][populate][user][populate][1]=ranking&populate[user_created][populate][0]=picture&populate[user_created][populate][1]=ranking`,
+            `${STRAPI_BASE_URL}/api/tournaments/${id}?populate[tournament_players][populate][user][populate][picture][fields][0]=url&populate[tournament_players][populate][user][populate][rankings][filters][season][is_active][$eq]=true&populate[user_created][populate][picture][fields][0]=url&populate[user_created][populate][rankings][filters][season][is_active][$eq]=true`,
             { headers: { Authorization: `Bearer ${jwt}` } }
         )
             .then((r) => r.json())
@@ -454,7 +454,7 @@ export default function TournamentDetailPage() {
     const refreshInfo = () => {
         if (!jwt || !id) return;
         fetch(
-            `${STRAPI_BASE_URL}/api/tournaments/${id}?populate[tournament_players][populate][user][populate][0]=picture&populate[tournament_players][populate][user][populate][1]=ranking&populate[user_created][populate][0]=picture&populate[user_created][populate][1]=ranking`,
+            `${STRAPI_BASE_URL}/api/tournaments/${id}?populate[tournament_players][populate][user][populate][picture][fields][0]=url&populate[tournament_players][populate][user][populate][rankings][filters][season][is_active][$eq]=true&populate[user_created][populate][picture][fields][0]=url&populate[user_created][populate][rankings][filters][season][is_active][$eq]=true`,
             { headers: { Authorization: `Bearer ${jwt}` } }
         )
             .then((r) => r.json())
@@ -619,7 +619,7 @@ export default function TournamentDetailPage() {
                     available.sort((a, b) => {
                         const jitterA = Math.random() * 2 - 1;
                         const jitterB = Math.random() * 2 - 1;
-                        return ((b.ranking?.mmr ?? 1500) + jitterB) - ((a.ranking?.mmr ?? 1500) + jitterA);
+                        return ((b.rankings?.[0]?.mmr ?? 1500) + jitterB) - ((a.rankings?.[0]?.mmr ?? 1500) + jitterA);
                     });
                     chunk = available.slice(0, pPerMatch);
                 } else {
@@ -1515,12 +1515,12 @@ export default function TournamentDetailPage() {
                                                 </div>
                                                 {tournamentInfo.mode === "ranking" && (
                                                     <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] text-slate-400 font-medium bg-black/30 px-2 py-1 rounded-lg border border-white/5 w-fit">
-                                                        <span className="text-yellow-500 font-bold">MMR: {player.ranking?.mmr ?? 1500}</span>
+                                                        <span className="text-yellow-500 font-bold">MMR: {player.rankings?.[0]?.mmr ?? 1500}</span>
                                                         <span className="text-slate-600">|</span>
-                                                        <span className="text-green-400">W: {player.ranking?.win ?? "-"}</span>
-                                                        <span className="text-red-400">L: {player.ranking?.lose ?? "-"}</span>
+                                                        <span className="text-green-400">W: {player.rankings?.[0]?.win ?? "-"}</span>
+                                                        <span className="text-red-400">L: {player.rankings?.[0]?.lose ?? "-"}</span>
                                                         <span className="text-slate-600">|</span>
-                                                        <span className="text-orange-400 font-bold">🔥 {player.ranking?.win_streak ?? "-"}</span>
+                                                        <span className="text-orange-400 font-bold">🔥 {player.rankings?.[0]?.win_streak ?? "-"}</span>
                                                     </div>
                                                 )}
                                             </div>
@@ -1663,7 +1663,7 @@ export default function TournamentDetailPage() {
                                                     })}
                                                     {drawMode === "mmr_balanced" && (
                                                         <span className="text-[9px] text-yellow-400/60 font-bold">
-                                                            MMR รวม: {pair.teamA.reduce((s, p) => s + (p.ranking?.mmr ?? 1500), 0).toLocaleString()}
+                                                            MMR รวม: {pair.teamA.reduce((s, p) => s + (p.rankings?.[0]?.mmr ?? 1500), 0).toLocaleString()}
                                                         </span>
                                                     )}
                                                     {pair.servingSide === "A" && (
@@ -1690,7 +1690,7 @@ export default function TournamentDetailPage() {
                                                         })}
                                                         {drawMode === "mmr_balanced" && (
                                                             <span className="text-[9px] text-yellow-400/60 font-bold">
-                                                                MMR รวม: {pair.teamB.reduce((s, p) => s + (p.ranking?.mmr ?? 1500), 0).toLocaleString()}
+                                                                MMR รวม: {pair.teamB.reduce((s, p) => s + (p.rankings?.[0]?.mmr ?? 1500), 0).toLocaleString()}
                                                             </span>
                                                         )}
                                                         {pair.servingSide === "B" && (
@@ -1795,8 +1795,8 @@ export default function TournamentDetailPage() {
                                                 let predictedBChange = 0;
                                                 let predictedBLose = 0;
                                                 if (!isCompleted && match.team_a_id && match.team_b_id) {
-                                                    const aMmrs = match.team_a_id.team_players.map(tp => tp.user_id?.ranking?.mmr ?? 1500);
-                                                    const bMmrs = match.team_b_id.team_players.map(tp => tp.user_id?.ranking?.mmr ?? 1500);
+                                                    const aMmrs = match.team_a_id.team_players.map(tp => tp.user_id?.rankings?.[0]?.mmr ?? 1500);
+                                                    const bMmrs = match.team_b_id.team_players.map(tp => tp.user_id?.rankings?.[0]?.mmr ?? 1500);
                                                     const avgA = aMmrs.length ? aMmrs.reduce((a, b) => a + b, 0) / aMmrs.length : null;
                                                     const avgB = bMmrs.length ? bMmrs.reduce((a, b) => a + b, 0) / bMmrs.length : null;
                                                     if (avgA !== null && avgB !== null) {
@@ -1850,7 +1850,6 @@ export default function TournamentDetailPage() {
                                                                     {match.team_a_id?.team_players.map((tp, idx) => {
                                                                         const u = tp.user_id;
                                                                         if (!u) return null;
-                                                                        const rank = u.ranking;
                                                                         const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
                                                                         const mmr_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.mmr_change;
                                                                         return (
@@ -1866,12 +1865,11 @@ export default function TournamentDetailPage() {
                                                                                     {/* Stats - ranking mode only */}
                                                                                     {tournamentInfo.mode === "ranking" && (
                                                                                         <div className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] text-slate-400 mt-0.5 sm:mt-1 font-medium bg-black/20 px-1.5 sm:px-2 py-0.5 rounded border border-white/5">
-                                                                                            <span className="text-yellow-500 font-bold">MMR: {rank ? rank.mmr : 1500}</span>
+                                                                                            <span className="text-yellow-500 font-bold">MMR: {u.rankings?.[0] ? u.rankings[0].mmr : 1500}</span>
                                                                                             <span className="text-slate-600">|</span>
-                                                                                            <span className="text-green-400">W: {rank ? rank.win : "-"}</span>
-                                                                                            <span className="text-red-400">L: {rank ? rank.lose : "-"}</span>
+                                                                                            <span className="text-green-400 font-bold">W: {u.rankings?.[0] ? u.rankings[0].win : 0}</span>
                                                                                             <span className="text-slate-600">|</span>
-                                                                                            <span className="text-orange-400 font-bold">🔥 {rank ? rank.win_streak : "-"}</span>
+                                                                                            <span className="text-red-400 font-bold">L: {u.rankings?.[0] ? u.rankings[0].lose : 0}</span>
                                                                                         </div>
                                                                                     )}
                                                                                 </div>
@@ -1921,7 +1919,6 @@ export default function TournamentDetailPage() {
                                                                     {match.team_b_id?.team_players.map((tp, idx) => {
                                                                         const u = tp.user_id;
                                                                         if (!u) return null;
-                                                                        const rank = u.ranking;
                                                                         const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
                                                                         const mmr_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.mmr_change;
                                                                         return (
@@ -1953,12 +1950,13 @@ export default function TournamentDetailPage() {
                                                                                     {/* Stats - ranking mode only */}
                                                                                     {tournamentInfo.mode === "ranking" && (
                                                                                         <div className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] text-slate-400 mt-0.5 sm:mt-1 font-medium bg-black/20 px-1.5 sm:px-2 py-0.5 rounded border border-white/5">
-                                                                                            <span className="text-yellow-500 font-bold">MMR: {rank ? rank.mmr : "-"}</span>
+                                                                                            <span className="text-yellow-500 font-bold">MMR: {u.rankings?.[0] ? u.rankings[0].mmr : "-"}</span>
                                                                                             <span className="text-slate-600">|</span>
-                                                                                            <span className="text-green-400">W: {rank ? rank.win : "-"}</span>
-                                                                                            <span className="text-red-400">L: {rank ? rank.lose : "-"}</span>
+                                                                                            <span className="text-green-400 font-bold">W: {u.rankings?.[0] ? u.rankings[0].win : 0}</span>
                                                                                             <span className="text-slate-600">|</span>
-                                                                                            <span className="text-orange-400 font-bold">🔥 {rank ? rank.win_streak : "-"}</span>
+                                                                                            <span className="text-red-400 font-bold">L: {u.rankings?.[0] ? u.rankings[0].lose : 0}</span>
+                                                                                            <span className="text-slate-600">|</span>
+                                                                                            <span className="text-orange-400 font-bold">🔥 {u.rankings?.[0] ? u.rankings[0].win_streak : 0}</span>
                                                                                         </div>
                                                                                     )}
                                                                                 </div>

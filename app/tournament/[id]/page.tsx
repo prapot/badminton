@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/lib/useAuth";
@@ -19,6 +19,13 @@ const GRADIENT_ANIMATION_STYLE = `
   .animate-gradient-x {
     background-size: 200% auto;
     animation: gradient-x 3s linear infinite;
+  }
+  @keyframes bounce-subtle {
+    0%, 100% { transform: translateY(-5%); animation-timing-function: cubic-bezier(0.8, 0, 1, 1); }
+    50% { transform: translateY(0); animation-timing-function: cubic-bezier(0, 0, 0.2, 1); }
+  }
+  .animate-bounce-subtle {
+    animation: bounce-subtle 2s infinite;
   }
 `;
 
@@ -380,6 +387,23 @@ export default function TournamentDetailPage() {
     const { id } = useParams<{ id: string }>();
     const { user, jwt } = useAuth();
     const [apiMatches, setApiMatches] = useState<ApiMatch[]>([]);
+    const playerMatchCounts = useMemo(() => {
+        const counts: Record<number, number> = {};
+
+        // Count only matches that are completed (scored)
+        apiMatches.forEach(match => {
+            if (match.match_status !== "done") return;
+            [match.team_a_id, match.team_b_id].forEach(team => {
+                team?.team_players.forEach(tp => {
+                    if (tp.user_id) {
+                        counts[tp.user_id.id] = (counts[tp.user_id.id] || 0) + 1;
+                    }
+                });
+            });
+        });
+
+        return counts;
+    }, [apiMatches]);
     const [scoreEditing, setScoreEditing] = useState<ApiMatch | null>(null);
     const [scoreA, setScoreA] = useState(0);
     const [scoreB, setScoreB] = useState(0);
@@ -536,6 +560,7 @@ export default function TournamentDetailPage() {
     const [drawnPairs, setDrawnPairs] = useState<DrawnPair[] | null>(null);
     const [drawMode, setDrawMode] = useState<"random" | "mmr_balanced">("random");
     const [roundsPerPlayer, setRoundsPerPlayer] = useState(1);
+    const [numCourts, setNumCourts] = useState(2);
     const [startStep, setStartStep] = useState<string | null>(null); // progress label
     const [starting, setStarting] = useState(false);
 
@@ -565,10 +590,14 @@ export default function TournamentDetailPage() {
         const totalRounds = minRoundsNeeded * (roundsPerPlayer || 1);
         const totalMatches = (pCount * totalRounds) / pPerMatch;
 
-        // ── partner history from previous matches ──
+        // ── partner and opponent history from previous matches ──
         const partnerHistory = new Map<number, Set<number>>();
+        const opponentHistory = new Map<number, Set<number>>();
+
         apiMatches.forEach(m => {
             if (m.match_status === "cancelled") return;
+
+            // Partner history
             [m.team_a_id, m.team_b_id].forEach(t => {
                 if (!t) return;
                 const pids = t.team_players.map(tp => tp.user_id?.id).filter((id): id is number => !!id);
@@ -583,30 +612,50 @@ export default function TournamentDetailPage() {
                     }
                 }
             });
+
+            // Opponent history
+            if (m.team_a_id && m.team_b_id) {
+                const aids = m.team_a_id.team_players.map(tp => tp.user_id?.id).filter((id): id is number => !!id);
+                const bids = m.team_b_id.team_players.map(tp => tp.user_id?.id).filter((id): id is number => !!id);
+                aids.forEach(aid => {
+                    bids.forEach(bid => {
+                        if (!opponentHistory.has(aid)) opponentHistory.set(aid, new Set());
+                        if (!opponentHistory.has(bid)) opponentHistory.set(bid, new Set());
+                        opponentHistory.get(aid)!.add(bid);
+                        opponentHistory.get(bid)!.add(aid);
+                    });
+                });
+            }
         });
 
-        // Back-to-back and Partner repeat avoidance logic: Try several times and pick best
+        // Try several times and pick best
         let bestPairs: DrawnPair[] | null = null;
         let minScore = Infinity;
 
-        for (let attempt = 0; attempt < 100; attempt++) {
+        for (let attempt = 0; attempt < 1000; attempt++) {
             const currentPairs: DrawnPair[] = [];
             const playerMatchCounts = new Map<number, number>();
             playersForDraw.forEach(p => playerMatchCounts.set(p.id, 0));
 
-            const playerUsedInThisRound = new Set<number>();
+            const playerUsedInThisSlot = new Set<number>();
+            const playerUsedInPreviousSlot = new Set<number>();
             let possible = true;
             let partnerRepeats = 0;
+            let opponentRepeats = 0;
             const internalPartners = new Map<number, Set<number>>();
+            const internalOpponents = new Map<number, Set<number>>();
 
             for (let m = 0; m < totalMatches; m++) {
-                if (playerUsedInThisRound.size >= pCount - (pCount % pPerMatch)) {
-                    playerUsedInThisRound.clear();
+                // Clear slot usage after every numCourts matches
+                if (m % numCourts === 0) {
+                    playerUsedInPreviousSlot.clear();
+                    playerUsedInThisSlot.forEach(id => playerUsedInPreviousSlot.add(id));
+                    playerUsedInThisSlot.clear();
                 }
 
                 const available = playersForDraw.filter(p =>
                     (playerMatchCounts.get(p.id) || 0) < totalRounds &&
-                    !playerUsedInThisRound.has(p.id)
+                    !playerUsedInThisSlot.has(p.id)
                 );
 
                 if (available.length < pPerMatch) {
@@ -614,22 +663,26 @@ export default function TournamentDetailPage() {
                     break;
                 }
 
-                let chunk: RegisteredPlayer[] = [];
-                if (drawMode === "mmr_balanced") {
-                    available.sort((a, b) => {
+                // Prioritize players who rested in previous slot
+                available.sort((a, b) => {
+                    const restedA = playerUsedInPreviousSlot.has(a.id) ? 1 : 0;
+                    const restedB = playerUsedInPreviousSlot.has(b.id) ? 1 : 0;
+                    if (restedA !== restedB) return restedA - restedB;
+
+                    if (drawMode === "mmr_balanced") {
                         const jitterA = Math.random() * 2 - 1;
                         const jitterB = Math.random() * 2 - 1;
                         return ((b.rankings?.[0]?.mmr ?? 1500) + jitterB) - ((a.rankings?.[0]?.mmr ?? 1500) + jitterA);
-                    });
-                    chunk = available.slice(0, pPerMatch);
-                } else {
-                    shuffle(available);
-                    chunk = available.slice(0, pPerMatch);
-                }
+                    } else {
+                        return Math.random() - 0.5;
+                    }
+                });
+
+                const chunk = available.slice(0, pPerMatch);
 
                 chunk.forEach(p => {
                     playerMatchCounts.set(p.id, (playerMatchCounts.get(p.id) || 0) + 1);
-                    playerUsedInThisRound.add(p.id);
+                    playerUsedInThisSlot.add(p.id);
                 });
 
                 let pair: DrawnPair;
@@ -640,21 +693,30 @@ export default function TournamentDetailPage() {
                         servingSide: Math.random() > 0.5 ? "A" : "B"
                     };
 
-                    // Check partner repeats for Team A and B
+                    // Check partner repeats
                     [pair.teamA, pair.teamB].forEach(team => {
                         if (team && team.length > 1) {
                             const p1 = team[0].id;
                             const p2 = team[1].id;
-                            // From history
                             if (partnerHistory.get(p1)?.has(p2)) partnerRepeats++;
-                            // Within this draw
-                            if (internalPartners.get(p1)?.has(p2)) partnerRepeats += 2; // Extra penalty for multi-repeat in same draw
-
+                            if (internalPartners.get(p1)?.has(p2)) partnerRepeats += 2;
                             if (!internalPartners.has(p1)) internalPartners.set(p1, new Set());
                             if (!internalPartners.has(p2)) internalPartners.set(p2, new Set());
                             internalPartners.get(p1)!.add(p2);
                             internalPartners.get(p2)!.add(p1);
                         }
+                    });
+
+                    // Check opponent repeats
+                    pair.teamA.forEach(ta => {
+                        pair.teamB?.forEach(tb => {
+                            if (opponentHistory.get(ta.id)?.has(tb.id)) opponentRepeats++;
+                            if (internalOpponents.get(ta.id)?.has(tb.id)) opponentRepeats += 2;
+                            if (!internalOpponents.has(ta.id)) internalOpponents.set(ta.id, new Set());
+                            if (!internalOpponents.has(tb.id)) internalOpponents.set(tb.id, new Set());
+                            internalOpponents.get(ta.id)!.add(tb.id);
+                            internalOpponents.get(tb.id)!.add(ta.id);
+                        });
                     });
                 } else {
                     pair = {
@@ -662,27 +724,41 @@ export default function TournamentDetailPage() {
                         teamB: [chunk[1]].filter(Boolean),
                         servingSide: Math.random() > 0.5 ? "A" : "B"
                     };
+                    // Opponent repeats for singles
+                    const ta = pair.teamA[0];
+                    const tb = pair.teamB![0];
+                    if (opponentHistory.get(ta.id)?.has(tb.id)) opponentRepeats++;
+                    if (internalOpponents.get(ta.id)?.has(tb.id)) opponentRepeats += 2;
+                    if (!internalOpponents.has(ta.id)) internalOpponents.set(ta.id, new Set());
+                    if (!internalOpponents.has(tb.id)) internalOpponents.set(tb.id, new Set());
+                    internalOpponents.get(ta.id)!.add(tb.id);
+                    internalOpponents.get(tb.id)!.add(ta.id);
                 }
                 currentPairs.push(pair);
             }
 
             if (!possible) continue;
 
-            // Calculate back-to-back conflict score
-            let backToBackConflicts = 0;
-            for (let i = 1; i < currentPairs.length; i++) {
-                const prevIds = new Set([
-                    ...currentPairs[i - 1].teamA.map(p => p.id),
-                    ...(currentPairs[i - 1].teamB?.map(p => p.id) || [])
-                ]);
+            // Calculate rest conflict score (back-to-back across slots)
+            let restConflictScore = 0;
+            for (let i = numCourts; i < currentPairs.length; i++) {
+                // Players in slot S
                 const currIds = [
                     ...currentPairs[i].teamA.map(p => p.id),
                     ...(currentPairs[i].teamB?.map(p => p.id) || [])
                 ];
-                currIds.forEach(pid => { if (prevIds.has(pid)) backToBackConflicts++; });
+                // Check against previous slot (S-1)
+                for (let j = i - numCourts; j < i; j++) {
+                    if (j < 0) continue;
+                    const prevIds = new Set([
+                        ...currentPairs[j].teamA.map(p => p.id),
+                        ...(currentPairs[j].teamB?.map(p => p.id) || [])
+                    ]);
+                    currIds.forEach(pid => { if (prevIds.has(pid)) restConflictScore++; });
+                }
             }
 
-            const totalScore = (backToBackConflicts * 1000) + (partnerRepeats * 50);
+            const totalScore = (restConflictScore * 1000) + (partnerRepeats * 50) + (opponentRepeats * 50);
 
             if (totalScore < minScore) {
                 minScore = totalScore;
@@ -1461,24 +1537,31 @@ export default function TournamentDetailPage() {
                                     <span>👥</span> ผู้เข้าร่วม
                                     <span className="text-xs text-slate-400 font-normal">{tournamentInfo.players.length} คน</span>
                                 </h2>
-                                {tournamentInfo.tournament_status === "upcoming" && (
-                                    <>
-                                        {isJoined ? (
-                                            <button onClick={handleLeave} disabled={leaving}
-                                                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-xs font-semibold transition-all disabled:opacity-50">
-                                                {leaving ? <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> : "🚶 "}
-                                                ออกจากรายการ
-                                            </button>
-                                        ) : (
-                                            <button onClick={handleJoin} disabled={joining}
-                                                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/20 text-blue-400 text-xs font-semibold transition-all disabled:opacity-50">
-                                                {joining ? <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                                                    : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>}
-                                                เข้าร่วม
-                                            </button>
-                                        )}
-                                    </>
-                                )}
+                                <div className="flex items-center gap-2">
+                                    {drawnPairs && tournamentInfo.tournament_status === 'upcoming' && (
+                                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-bold">
+                                            <span>🎾 คาดการณ์: {drawnPairs.length} แมตซ์</span>
+                                        </div>
+                                    )}
+                                    {tournamentInfo.tournament_status === "upcoming" && (
+                                        <>
+                                            {isJoined ? (
+                                                <button onClick={handleLeave} disabled={leaving}
+                                                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-xs font-semibold transition-all disabled:opacity-50">
+                                                    {leaving ? <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> : "🚶 "}
+                                                    ออกจากรายการ
+                                                </button>
+                                            ) : (
+                                                <button onClick={handleJoin} disabled={joining}
+                                                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/20 text-blue-400 text-xs font-semibold transition-all disabled:opacity-50">
+                                                    {joining ? <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                                                        : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>}
+                                                    เข้าร่วม
+                                                </button>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
                             </div>
                             {tournamentInfo.players.length === 0 ? (
                                 <div className="py-12 text-center text-slate-500">
@@ -1513,16 +1596,23 @@ export default function TournamentDetailPage() {
                                                     <p className="text-sm font-bold text-white truncate group-hover/name:text-green-400 transition-colors">{player.username}</p>
                                                     <p className="text-[10px] text-slate-500 truncate">{player.email}</p>
                                                 </div>
-                                                {tournamentInfo.mode === "ranking" && (
-                                                    <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] text-slate-400 font-medium bg-black/30 px-2 py-1 rounded-lg border border-white/5 w-fit">
-                                                        <span className="text-yellow-500 font-bold">MMR: {player.rankings?.[0]?.mmr ?? 1500}</span>
-                                                        <span className="text-slate-600">|</span>
-                                                        <span className="text-green-400">W: {player.rankings?.[0]?.win ?? "-"}</span>
-                                                        <span className="text-red-400">L: {player.rankings?.[0]?.lose ?? "-"}</span>
-                                                        <span className="text-slate-600">|</span>
-                                                        <span className="text-orange-400 font-bold">🔥 {player.rankings?.[0]?.win_streak ?? "-"}</span>
-                                                    </div>
-                                                )}
+                                                <div className="flex items-center gap-2 sm:gap-3">
+                                                    {tournamentInfo.mode === "ranking" && (
+                                                        <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] text-slate-400 font-medium bg-black/30 px-2 py-1 rounded-lg border border-white/5 w-fit">
+                                                            <span className="text-yellow-500 font-bold">MMR: {player.rankings?.[0]?.mmr ?? 1500}</span>
+                                                            <span className="text-slate-600">|</span>
+                                                            <span className="text-green-400">W: {player.rankings?.[0]?.win ?? "-"}</span>
+                                                            <span className="text-red-400">L: {player.rankings?.[0]?.lose ?? "-"}</span>
+                                                            <span className="text-slate-600">|</span>
+                                                            <span className="text-orange-400 font-bold">🔥 {player.rankings?.[0]?.win_streak ?? "-"}</span>
+                                                        </div>
+                                                    )}
+                                                    {((playerMatchCounts[player.id] || 0) > 0 || (tournamentInfo.tournament_status === 'upcoming' && drawnPairs && drawnPairs.filter(dp => [dp.teamA, dp.teamB].flat().some(p => p?.id === player.id)).length > 0)) && (
+                                                        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[9px] font-bold whitespace-nowrap ${tournamentInfo.tournament_status === 'upcoming' ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-blue-500/10 border-blue-500/20 text-blue-400'}`}>
+                                                            🏸 {tournamentInfo.tournament_status === 'upcoming' ? 'คาดการณ์' : 'เล่นแล้ว'} {playerMatchCounts[player.id] || drawnPairs?.filter(dp => [dp.teamA, dp.teamB].flat().some(p => p?.id === player.id)).length || 0} รอบ
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                             {player.id === user?.id && tournamentInfo.tournament_status === "upcoming" && (
                                                 <button onClick={handleLeave} disabled={leaving}
@@ -1602,7 +1692,7 @@ export default function TournamentDetailPage() {
                                 </div>
 
                                 <div className="px-5 py-3 bg-green-500/5 border-b border-green-500/10 space-y-3">
-                                    <div className="flex items-center justify-between gap-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                         <div className="flex-1 min-w-0">
                                             <p className="text-[11px] font-bold text-green-400">⚖️ ทุกคนเล่นเท่ากัน (Fair Play)</p>
                                             <p className="text-[10px] text-green-400/60 mt-0.5">
@@ -1611,7 +1701,7 @@ export default function TournamentDetailPage() {
                                                     : "คำนวณรอบน้อยที่สุดเพื่อให้ทุกคนเล่นเท่ากัน โดยการสุ่มคู่"}
                                             </p>
                                         </div>
-                                        <div className="flex items-center gap-1.5 p-1 bg-black/40 border border-white/10 rounded-xl">
+                                        <div className="flex items-center gap-1.5 p-1 bg-black/40 border border-white/10 rounded-xl w-fit">
                                             {[1, 2, 3, 4, 5].map((m) => (
                                                 <button
                                                     key={m}
@@ -1619,6 +1709,23 @@ export default function TournamentDetailPage() {
                                                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${roundsPerPlayer === m ? "bg-green-500 text-white shadow-lg shadow-green-900/40" : "text-slate-400 hover:text-white hover:bg-white/5"}`}
                                                 >
                                                     {m} รอบ
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2 border-t border-white/5">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[11px] font-bold text-indigo-400">🏟️ จำนวนคอร์ดที่ใช้งาน</p>
+                                            <p className="text-[10px] text-indigo-400/60 mt-0.5">ระบุเพื่อจัดตารางแข่งพร้อมกันและคำนวณการพักเบรก</p>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 p-1 bg-black/40 border border-white/10 rounded-xl w-fit">
+                                            {[1, 2, 3, 4].map((c) => (
+                                                <button
+                                                    key={c}
+                                                    onClick={() => { setNumCourts(c); setDrawnPairs(null); }}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${numCourts === c ? "bg-indigo-500 text-white shadow-lg shadow-indigo-900/40" : "text-slate-400 hover:text-white hover:bg-white/5"}`}
+                                                >
+                                                    {c} คอร์ด
                                                 </button>
                                             ))}
                                         </div>
@@ -1652,12 +1759,17 @@ export default function TournamentDetailPage() {
                                                     {pair.teamA.map((p, pIdx) => {
                                                         const pUrl = p.picture?.url ? (p.picture.url.startsWith("http") ? p.picture.url : `${STRAPI_BASE_URL}${p.picture.url}`) : null;
                                                         return (
-                                                            <div key={`${p.id}-${pIdx}`} className="flex items-center gap-2 min-w-0">
-                                                                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold text-[9px] sm:text-[10px] shrink-0 overflow-hidden border border-[#2ecc71]/40">
+                                                            <div key={`${p.id}-${pIdx}`} className="flex items-center gap-2 min-w-0 relative">
+                                                                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold text-[9px] sm:text-[10px] shrink-0 overflow-hidden border-2 transition-all duration-500 ${pair.servingSide === "A" && pIdx === 0 ? "border-[#2ecc71] shadow-[0_0_15px_rgba(46,204,113,0.6)] scale-110" : "border-[#2ecc71]/40"} relative`}>
                                                                     {pUrl ? <img src={pUrl} alt={p.username} className="w-full h-full object-cover" /> : p.username.charAt(0).toUpperCase()}
                                                                 </div>
                                                                 <p className="text-xs sm:text-sm font-semibold text-white truncate">{p.username}</p>
                                                                 {p.id === user?.id && <span className="text-[9px] sm:text-[10px] text-green-400 shrink-0">คุณ</span>}
+                                                                {pair.servingSide === "A" && pIdx === 0 && (
+                                                                    <div className="absolute -right-5 top-1/2 -translate-y-1/2 z-10 w-4 h-4 bg-[#2ecc71] rounded-full border-2 border-[#1a2535] flex items-center justify-center shadow-[0_0_10px_rgba(46,204,113,0.8)] animate-bounce-subtle">
+                                                                        <span className="text-[8px]">🏸</span>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         );
                                                     })}
@@ -1665,9 +1777,6 @@ export default function TournamentDetailPage() {
                                                         <span className="text-[9px] text-yellow-400/60 font-bold">
                                                             MMR รวม: {pair.teamA.reduce((s, p) => s + (p.rankings?.[0]?.mmr ?? 1500), 0).toLocaleString()}
                                                         </span>
-                                                    )}
-                                                    {pair.servingSide === "A" && (
-                                                        <span className="w-[80px] text-center text-[11px] font-black text-white bg-[#2ecc71] px-2 py-1 rounded-full shadow-[0_0_15px_rgba(46,204,113,0.4)] italic block">SERVE 🏸</span>
                                                     )}
                                                 </div>
 
@@ -1679,10 +1788,15 @@ export default function TournamentDetailPage() {
                                                         {pair.teamB.map((p, pIdx) => {
                                                             const pUrl = p.picture?.url ? (p.picture.url.startsWith("http") ? p.picture.url : `${STRAPI_BASE_URL}${p.picture.url}`) : null;
                                                             return (
-                                                                <div key={`${p.id}-${pIdx}`} className="flex items-center gap-2 min-w-0 text-right">
+                                                                <div key={`${p.id}-${pIdx}`} className="flex items-center gap-2 min-w-0 text-right relative">
+                                                                    {pair.servingSide === "B" && pIdx === 0 && (
+                                                                        <div className="absolute -left-5 top-1/2 -translate-y-1/2 z-10 w-4 h-4 bg-[#3498db] rounded-full border-2 border-[#1a2535] flex items-center justify-center shadow-[0_0_10px_rgba(52,152,219,0.8)] animate-bounce-subtle">
+                                                                            <span className="text-[8px]">🏸</span>
+                                                                        </div>
+                                                                    )}
                                                                     {p.id === user?.id && <span className="text-[9px] sm:text-[10px] text-green-400 shrink-0">คุณ</span>}
                                                                     <p className="text-xs sm:text-sm font-semibold text-white truncate text-right">{p.username}</p>
-                                                                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold text-[9px] sm:text-[10px] shrink-0 overflow-hidden border border-[#3498db]/40">
+                                                                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold text-[9px] sm:text-[10px] shrink-0 overflow-hidden border-2 transition-all duration-500 ${pair.servingSide === "B" && pIdx === 0 ? "border-[#3498db] shadow-[0_0_15px_rgba(52,152,219,0.6)] scale-110" : "border-[#3498db]/40"} relative`}>
                                                                         {pUrl ? <img src={pUrl} alt={p.username} className="w-full h-full object-cover" /> : p.username.charAt(0).toUpperCase()}
                                                                     </div>
                                                                 </div>
@@ -1692,9 +1806,6 @@ export default function TournamentDetailPage() {
                                                             <span className="text-[9px] text-yellow-400/60 font-bold">
                                                                 MMR รวม: {pair.teamB.reduce((s, p) => s + (p.rankings?.[0]?.mmr ?? 1500), 0).toLocaleString()}
                                                             </span>
-                                                        )}
-                                                        {pair.servingSide === "B" && (
-                                                            <span className="w-[80px] text-center text-[11px] font-black text-white bg-[#3498db] px-2 py-1 rounded-full shadow-[0_0_15px_rgba(52,152,219,0.4)] italic block">SERVE 🏸</span>
                                                         )}
                                                     </div>
                                                 ) : (
@@ -1856,9 +1967,6 @@ export default function TournamentDetailPage() {
                                                                             <div key={idx} className="flex items-center justify-end gap-2 sm:gap-3 relative">
                                                                                 <div className="flex flex-col items-end min-w-0">
                                                                                     <div className="flex items-center gap-1 sm:gap-1.5">
-                                                                                        {match.first_serve === "A" && (
-                                                                                            <span className="w-[60px] text-center text-[9px] font-black text-white bg-[#2ecc71] px-1.5 py-0.5 rounded-full shadow-[0_0_10px_rgba(46,204,113,0.3)] italic">SERVE 🏸</span>
-                                                                                        )}
                                                                                         {winnerA && idx === 0 && <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1 sm:px-1.5 py-0.5 rounded-md">Winner</span>}
                                                                                         <p className="font-bold text-xs sm:text-base truncate">{u.username}</p>
                                                                                     </div>
@@ -1873,10 +1981,15 @@ export default function TournamentDetailPage() {
                                                                                         </div>
                                                                                     )}
                                                                                 </div>
-                                                                                <div className="relative">
-                                                                                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 border-slate-700/50 flex items-center justify-center shadow-inner">
+                                                                                <div className="relative flex items-center">
+                                                                                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner ${match.first_serve === "A" && idx === 0 ? "border-[#2ecc71] shadow-[0_0_20px_rgba(46,204,113,0.5)] scale-105" : "border-slate-700/50"}`}>
                                                                                         {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                                                                     </div>
+                                                                                    {match.first_serve === "A" && idx === 0 && (
+                                                                                        <div className="absolute -right-6 z-30 w-7 h-7 bg-[#2ecc71] rounded-full border-2 border-[#1a2535] flex items-center justify-center shadow-[0_0_15px_rgba(46,204,113,0.8)] animate-bounce-subtle">
+                                                                                            <span className="text-[14px] filter drop-shadow-md">🏸</span>
+                                                                                        </div>
+                                                                                    )}
                                                                                     {mmr_change !== undefined ? (
                                                                                         <div className={`absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black border shadow-lg ${mmr_change > 0 ? "bg-[#0f2a1a] border-green-500 text-green-400 shadow-green-900/40" : "bg-[#2a0f0f] border-red-500 text-red-400 shadow-red-900/40"}`}>
                                                                                             {mmr_change > 0 ? "+" : ""}{mmr_change}
@@ -1922,9 +2035,14 @@ export default function TournamentDetailPage() {
                                                                         const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
                                                                         const mmr_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.mmr_change;
                                                                         return (
-                                                                            <div key={idx} className="flex items-center justify-start gap-3 relative">
-                                                                                <div className="relative">
-                                                                                    <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 border-slate-700/50 flex items-center justify-center shadow-inner">
+                                                                            <div key={idx} className="flex items-center justify-start gap-2 sm:gap-3 relative">
+                                                                                {match.first_serve === "B" && idx === 0 && (
+                                                                                    <div className="absolute -left-6 z-30 w-7 h-7 bg-[#3498db] rounded-full border-2 border-[#1a2535] flex items-center justify-center shadow-[0_0_15px_rgba(52,152,219,0.8)] animate-bounce-subtle">
+                                                                                        <span className="text-[14px] filter drop-shadow-md">🏸</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                <div className="relative flex items-center">
+                                                                                    <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner ${match.first_serve === "B" && idx === 0 ? "border-[#3498db] shadow-[0_0_20px_rgba(52,152,219,0.5)] scale-105" : "border-slate-700/50"}`}>
                                                                                         {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                                                                     </div>
                                                                                     {mmr_change !== undefined ? (
@@ -1943,9 +2061,6 @@ export default function TournamentDetailPage() {
                                                                                     <div className="flex items-center gap-1 sm:gap-1.5">
                                                                                         <p className="font-bold text-xs sm:text-base truncate">{u.username}</p>
                                                                                         {winnerB && idx === 0 && <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1 sm:px-1.5 py-0.5 rounded-md">Winner</span>}
-                                                                                        {match.first_serve === "B" && (
-                                                                                            <span className="w-[60px] text-center text-[9px] font-black text-white bg-[#3498db] px-1.5 py-0.5 rounded-full shadow-[0_0_10px_rgba(52,152,219,0.3)] italic">SERVE 🏸</span>
-                                                                                        )}
                                                                                     </div>
                                                                                     {/* Stats - ranking mode only */}
                                                                                     {tournamentInfo.mode === "ranking" && (

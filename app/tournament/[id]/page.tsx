@@ -558,6 +558,49 @@ export default function TournamentDetailPage() {
     // teamA/teamB = 1 player (singles) or 2 players (doubles)
     interface DrawnPair { teamA: RegisteredPlayer[]; teamB: RegisteredPlayer[] | null; servingSide?: "A" | "B" }
     const [drawnPairs, setDrawnPairs] = useState<DrawnPair[] | null>(null);
+
+    // Helper to count partner repeats (Total = History + Current Draw)
+    const getPartnerRepeats = (playerIds: number[], currentMatchIdx: number, matches: ApiMatch[], drawn: DrawnPair[]) => {
+        if (playerIds.length < 2) return 0;
+        let count = 0;
+
+        // 1. From active/history matches
+        matches.forEach(m => {
+            if (m.match_status === "cancelled") return;
+            const teams = [m.team_a_id?.team_players, m.team_b_id?.team_players];
+            teams.forEach(tp => {
+                if (!tp) return;
+                const ids = tp.map(p => p.user_id?.id).filter(Boolean);
+                if (ids.length === 2 && playerIds.every(id => ids.includes(id))) {
+                    count++;
+                }
+            });
+        });
+
+        // 2. From earlier matches in this same draw
+        for (let i = 0; i < currentMatchIdx; i++) {
+            const prevMatch = drawn[i];
+            const prevTeams = [prevMatch.teamA, prevMatch.teamB];
+            prevTeams.forEach(team => {
+                if (!team) return;
+                const ids = team.map(p => p.id);
+                if (ids.length === 2 && playerIds.every(id => ids.includes(id))) {
+                    count++;
+                }
+            });
+        }
+        return count;
+    };
+
+    const totalRepeatsCount = useMemo(() => {
+        if (!drawnPairs) return 0;
+        return drawnPairs.reduce((acc, p, idx) => {
+            const ra = getPartnerRepeats(p.teamA.map(x => x.id), idx, apiMatches, drawnPairs);
+            const rb = p.teamB ? getPartnerRepeats(p.teamB.map(x => x.id), idx, apiMatches, drawnPairs) : 0;
+            return acc + ra + rb;
+        }, 0);
+    }, [drawnPairs, apiMatches]);
+
     const [drawMode, setDrawMode] = useState<"random" | "mmr_balanced">("random");
     const [roundsPerPlayer, setRoundsPerPlayer] = useState(1);
     const [numCourts, setNumCourts] = useState(2);
@@ -1730,6 +1773,25 @@ export default function TournamentDetailPage() {
                                             ))}
                                         </div>
                                     </div>
+
+                                    {drawnPairs && (
+                                        <div className="flex items-center justify-between pt-3 mt-1 border-t border-white/5">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-6 h-6 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center">
+                                                    <span className="text-[10px]">🔄</span>
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-[11px] font-bold text-yellow-500">ผลลัพธ์คู่เดิม (Repeats)</p>
+                                                    <p className="text-[9px] text-yellow-500/60">จำนวนคู่ที่เคยคู่กันมาก่อนในการสุ่มรอบนี้</p>
+                                                </div>
+                                            </div>
+                                            <div className="px-3 py-1 bg-yellow-400/10 border border-yellow-400/20 rounded-lg shadow-[0_0_10px_rgba(234,179,8,0.05)]">
+                                                <span className="text-xs font-black text-yellow-400">
+                                                    คู่เดิม {totalRepeatsCount} ครั้ง
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {!drawnPairs ? (
@@ -1750,91 +1812,116 @@ export default function TournamentDetailPage() {
                                     </div>
                                 ) : (
                                     <div className="divide-y divide-white/5">
-                                        {drawnPairs.map((pair, idx) => (
-                                            <div key={idx} className="flex items-center px-4 sm:px-5 py-3 sm:py-4 gap-2 sm:gap-4">
-                                                <span className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[10px] sm:text-xs font-bold text-slate-400 shrink-0">{idx + 1}</span>
+                                        {drawnPairs.map((pair, idx) => {
+                                            const teamARepeats = getPartnerRepeats(pair.teamA.map(p => p.id), idx, apiMatches, drawnPairs);
+                                            const teamBRepeats = pair.teamB ? getPartnerRepeats(pair.teamB.map(p => p.id), idx, apiMatches, drawnPairs) : 0;
 
-                                                {/* Team A */}
-                                                <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                                                    {pair.teamA.map((p, pIdx) => {
-                                                        const pUrl = p.picture?.url ? (p.picture.url.startsWith("http") ? p.picture.url : `${STRAPI_BASE_URL}${p.picture.url}`) : null;
-                                                        return (
-                                                            <div key={`${p.id}-${pIdx}`} className="flex items-center gap-2 min-w-0 relative">
-                                                                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold text-[9px] sm:text-[10px] shrink-0 overflow-hidden border-2 transition-all duration-500 ${pair.servingSide === "A" && pIdx === 0 ? "border-[#2ecc71] shadow-[0_0_15px_rgba(46,204,113,0.6)] scale-110" : "border-[#2ecc71]/40"} relative`}>
-                                                                    {pUrl ? <img src={pUrl} alt={p.username} className="w-full h-full object-cover" /> : p.username.charAt(0).toUpperCase()}
+                                            return (
+                                                <div key={idx} className="bg-slate-900/40 rounded-xl p-3 sm:p-4 border border-slate-800/50 hover:border-slate-700/50 transition-all group overflow-hidden relative">
+                                                    {/* Match Number Bubble */}
+                                                    <div className="absolute left-0 top-0 w-8 h-8 flex items-center justify-center bg-slate-800/50 rounded-br-lg text-[10px] font-bold text-slate-500">
+                                                        {idx + 1}
+                                                    </div>
+
+                                                    <div className="flex flex-row items-center justify-between gap-2 sm:gap-6 mt-2">
+                                                        {/* Team A */}
+                                                        <div className="flex flex-col gap-2 flex-1 min-w-0">
+                                                            <div className="flex flex-col gap-1.5">
+                                                                {pair.teamA.map((p, pIdx) => {
+                                                                    const pUrl = p.picture?.url ? (p.picture.url.startsWith("http") ? p.picture.url : `${STRAPI_BASE_URL}${p.picture.url}`) : null;
+                                                                    return (
+                                                                        <div key={`${p.id}-${pIdx}`} className="flex items-center gap-2 min-w-0">
+                                                                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold text-[10px] sm:text-xs shrink-0 overflow-hidden border border-green-500/20 shadow-sm relative">
+                                                                                {pUrl ? <img src={pUrl} alt={p.username} className="w-full h-full object-cover" /> : p.username.charAt(0).toUpperCase()}
+                                                                            </div>
+                                                                            <div className="min-w-0">
+                                                                                <p className="text-xs sm:text-sm font-semibold text-white truncate">{p.username}</p>
+                                                                                {p.id === user?.id && <span className="text-[9px] text-green-400 font-bold">คุณ</span>}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                            {teamARepeats > 0 && (
+                                                                <span className="text-[9px] sm:text-[10px] text-yellow-500 font-bold bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20 w-fit">
+                                                                    คู่เดิม {teamARepeats} ครั้ง
+                                                                </span>
+                                                            )}
+                                                            {drawMode === "mmr_balanced" && (
+                                                                <span className="text-[9px] text-yellow-400/40 font-medium">
+                                                                    MMR: {Math.round(pair.teamA.reduce((sum, p) => sum + (p.rankings?.[0]?.mmr || 1500), 0) / pair.teamA.length)}
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* VS Center */}
+                                                        <div className="flex flex-col items-center justify-center shrink-0">
+                                                            <div className="w-10 h-10 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.1)] relative">
+                                                                <span className="text-[10px] font-black text-indigo-400 uppercase">VS</span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Team B */}
+                                                        {pair.teamB ? (
+                                                            <div className="flex flex-col gap-2 flex-1 min-w-0 items-end text-right">
+                                                                <div className="flex flex-col gap-1.5 w-full">
+                                                                    {pair.teamB.map((p, pIdx) => {
+                                                                        const pUrl = p.picture?.url ? (p.picture.url.startsWith("http") ? p.picture.url : `${STRAPI_BASE_URL}${p.picture.url}`) : null;
+                                                                        return (
+                                                                            <div key={`${p.id}-${pIdx}`} className="flex items-center gap-2 min-w-0 justify-end">
+                                                                                <div className="min-w-0">
+                                                                                    <p className="text-xs sm:text-sm font-semibold text-white truncate">{p.username}</p>
+                                                                                    {p.id === user?.id && <span className="text-[9px] text-green-400 font-bold">คุณ</span>}
+                                                                                </div>
+                                                                                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold text-[10px] sm:text-xs shrink-0 overflow-hidden border border-blue-500/20 shadow-sm relative order-none">
+                                                                                    {pUrl ? <img src={pUrl} alt={p.username} className="w-full h-full object-cover" /> : p.username.charAt(0).toUpperCase()}
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
                                                                 </div>
-                                                                <p className="text-xs sm:text-sm font-semibold text-white truncate">{p.username}</p>
-                                                                {p.id === user?.id && <span className="text-[9px] sm:text-[10px] text-green-400 shrink-0">คุณ</span>}
-                                                                {pair.servingSide === "A" && pIdx === 0 && (
-                                                                    <div className="absolute -right-5 top-1/2 -translate-y-1/2 z-10 w-4 h-4 bg-[#2ecc71] rounded-full border-2 border-[#1a2535] flex items-center justify-center shadow-[0_0_10px_rgba(46,204,113,0.8)] animate-bounce-subtle">
-                                                                        <span className="text-[8px]">🏸</span>
-                                                                    </div>
+                                                                {teamBRepeats > 0 && (
+                                                                    <span className="text-[9px] sm:text-[10px] text-yellow-500 font-bold bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20 w-fit">
+                                                                        คู่เดิม {teamBRepeats} ครั้ง
+                                                                    </span>
+                                                                )}
+                                                                {drawMode === "mmr_balanced" && (
+                                                                    <span className="text-[9px] text-yellow-400/40 font-medium">
+                                                                        MMR: {Math.round(pair.teamB.reduce((sum, p) => sum + (p.rankings?.[0]?.mmr || 1500), 0) / pair.teamB.length)}
+                                                                    </span>
                                                                 )}
                                                             </div>
-                                                        );
-                                                    })}
-                                                    {drawMode === "mmr_balanced" && (
-                                                        <span className="text-[9px] text-yellow-400/60 font-bold">
-                                                            MMR รวม: {pair.teamA.reduce((s, p) => s + (p.rankings?.[0]?.mmr ?? 1500), 0).toLocaleString()}
-                                                        </span>
-                                                    )}
-                                                </div>
-
-                                                <span className="px-1.5 py-0.5 rounded-md bg-white/5 text-[9px] sm:text-[11px] font-bold text-slate-500 shrink-0 uppercase tracking-tighter sm:tracking-normal">VS</span>
-
-                                                {/* Team B */}
-                                                {pair.teamB ? (
-                                                    <div className="flex flex-col gap-1 sm:gap-1.5 flex-1 min-w-0 items-end">
-                                                        {pair.teamB.map((p, pIdx) => {
-                                                            const pUrl = p.picture?.url ? (p.picture.url.startsWith("http") ? p.picture.url : `${STRAPI_BASE_URL}${p.picture.url}`) : null;
-                                                            return (
-                                                                <div key={`${p.id}-${pIdx}`} className="flex items-center gap-2 min-w-0 text-right relative">
-                                                                    {pair.servingSide === "B" && pIdx === 0 && (
-                                                                        <div className="absolute -left-5 top-1/2 -translate-y-1/2 z-10 w-4 h-4 bg-[#3498db] rounded-full border-2 border-[#1a2535] flex items-center justify-center shadow-[0_0_10px_rgba(52,152,219,0.8)] animate-bounce-subtle">
-                                                                            <span className="text-[8px]">🏸</span>
-                                                                        </div>
-                                                                    )}
-                                                                    {p.id === user?.id && <span className="text-[9px] sm:text-[10px] text-green-400 shrink-0">คุณ</span>}
-                                                                    <p className="text-xs sm:text-sm font-semibold text-white truncate text-right">{p.username}</p>
-                                                                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold text-[9px] sm:text-[10px] shrink-0 overflow-hidden border-2 transition-all duration-500 ${pair.servingSide === "B" && pIdx === 0 ? "border-[#3498db] shadow-[0_0_15px_rgba(52,152,219,0.6)] scale-110" : "border-[#3498db]/40"} relative`}>
-                                                                        {pUrl ? <img src={pUrl} alt={p.username} className="w-full h-full object-cover" /> : p.username.charAt(0).toUpperCase()}
-                                                                    </div>
+                                                        ) : (
+                                                            <div className="flex-1 flex items-center justify-end">
+                                                                <div className="px-4 py-2 bg-slate-800/20 rounded-lg border border-slate-700/30">
+                                                                    <span className="text-xs text-slate-500 italic font-medium">พักรอบพักผ่อน 💤</span>
                                                                 </div>
-                                                            );
-                                                        })}
-                                                        {drawMode === "mmr_balanced" && (
-                                                            <span className="text-[9px] text-yellow-400/60 font-bold">
-                                                                MMR รวม: {pair.teamB.reduce((s, p) => s + (p.rankings?.[0]?.mmr ?? 1500), 0).toLocaleString()}
-                                                            </span>
+                                                            </div>
                                                         )}
                                                     </div>
-                                                ) : (
-                                                    <div className="flex-1 flex items-center justify-end">
-                                                        <span className="text-xs text-slate-600 italic">พักรอบ</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                        {/* Start tournament */}
-                                        <div className="px-5 py-4 bg-white/3 space-y-2">
-                                            {/* Step progress */}
-                                            {starting && startStep && (
-                                                <div className="flex items-center gap-2 text-xs text-slate-400 justify-center">
-                                                    <svg className="animate-spin w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24">
-                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                                                    <span>⏳ {startStep}</span>
                                                 </div>
-                                            )}
-                                            <button onClick={handleStartTournament} disabled={starting}
-                                                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-[#2ecc71] to-[#27ae60] hover:from-[#3de382] hover:to-[#2ecc71] text-white font-semibold text-sm transition-all shadow-lg shadow-green-900/30 disabled:opacity-60">
-                                                {starting
-                                                    ? <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>กำลังดำเนินการ...</>
-                                                    : "🏆 เริ่มการแข่งขัน"}
-                                            </button>
-                                        </div>
+                                            );
+                                        })}
                                     </div>
                                 )}
+                                {/* Start tournament */}
+                                <div className="px-5 py-4 bg-white/3 space-y-2">
+                                    {/* Step progress */}
+                                    {starting && startStep && (
+                                        <div className="flex items-center gap-2 text-xs text-slate-400 justify-center">
+                                            <svg className="animate-spin w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                                            <span>⏳ {startStep}</span>
+                                        </div>
+                                    )}
+                                    <button onClick={handleStartTournament} disabled={starting}
+                                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-[#2ecc71] to-[#27ae60] hover:from-[#3de382] hover:to-[#2ecc71] text-white font-semibold text-sm transition-all shadow-lg shadow-green-900/30 disabled:opacity-60">
+                                        {starting
+                                            ? <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>กำลังดำเนินการ...</>
+                                            : "🏆 เริ่มการแข่งขัน"}
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </>
@@ -1842,320 +1929,324 @@ export default function TournamentDetailPage() {
 
 
                 {/* ── MATCH SCHEDULE (ongoing/completed) ── */}
-                {(tournamentInfo?.tournament_status === "ongoing" || tournamentInfo?.tournament_status === "completed") && (
-                    <div className="bg-gradient-to-br from-[#1a2535] to-[#0f1923] border border-white/10 rounded-3xl overflow-hidden shadow-2xl relative">
-                        {/* Background Decoration */}
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-[80px] pointer-events-none" />
+                {
+                    (tournamentInfo?.tournament_status === "ongoing" || tournamentInfo?.tournament_status === "completed") && (
+                        <div className="bg-gradient-to-br from-[#1a2535] to-[#0f1923] border border-white/10 rounded-3xl overflow-hidden shadow-2xl relative">
+                            {/* Background Decoration */}
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-[80px] pointer-events-none" />
 
-                        <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between gap-3 relative z-10 bg-white/5">
-                            <h2 className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 flex items-center gap-2.5 text-lg cursor-default">
-                                <span className="p-2 bg-gradient-to-br from-[#3498db] to-[#2980b9] rounded-xl shadow-lg shadow-blue-900/20 text-white shrink-0">📋</span>
-                                ตารางการแข่งขัน
-                            </h2>
-                            <button onClick={() => fetchMatches()}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-semibold transition-all">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                                <span className="hidden sm:inline">รีเฟรช</span>
-                            </button>
-                            {tournamentInfo?.tournament_status === "ongoing" && tournamentInfo.user_created?.id === user?.id && (
-                                <button
-                                    onClick={handleFinishTournament}
-                                    disabled={starting}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-400 text-xs font-bold transition-all disabled:opacity-50"
-                                >
+                            <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between gap-3 relative z-10 bg-white/5">
+                                <h2 className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 flex items-center gap-2.5 text-lg cursor-default">
+                                    <span className="p-2 bg-gradient-to-br from-[#3498db] to-[#2980b9] rounded-xl shadow-lg shadow-blue-900/20 text-white shrink-0">📋</span>
+                                    ตารางการแข่งขัน
+                                </h2>
+                                <button onClick={() => fetchMatches()}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-semibold transition-all">
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                     </svg>
-                                    <span>จบการแข่งขัน</span>
+                                    <span className="hidden sm:inline">รีเฟรช</span>
                                 </button>
-                            )}
-                        </div>
-
-                        {apiMatches.length === 0 ? (
-                            <div className="py-16 text-center text-slate-500 relative z-10">
-                                <p className="text-5xl mb-3 opacity-50">🏟️</p>
-                                <p className="text-sm font-medium">ยังไม่มีข้อมูลแมตซ์การแข่งขัน</p>
+                                {tournamentInfo?.tournament_status === "ongoing" && tournamentInfo.user_created?.id === user?.id && (
+                                    <button
+                                        onClick={handleFinishTournament}
+                                        disabled={starting}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-400 text-xs font-bold transition-all disabled:opacity-50"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        <span>จบการแข่งขัน</span>
+                                    </button>
+                                )}
                             </div>
-                        ) : (
-                            <div className="p-4 sm:p-6 space-y-6 relative z-10">
-                                {/* Group by round */}
-                                {Array.from(new Set(apiMatches.map(m => m.round))).map(round => (
-                                    <div key={round} className="space-y-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent flex-1" />
-                                            <span className="px-3 text-xs font-bold text-slate-400 uppercase tracking-widest text-center">
-                                                แมตซ์ #{round}
-                                            </span>
-                                            <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent flex-1" />
-                                        </div>
 
-                                        <div className="grid gap-3">
-                                            {apiMatches.filter(m => m.round === round).map(match => {
-                                                const teamAName = match.team_a_id?.team_players.map(tp => tp.user_id?.username).filter(Boolean).join(" / ") || `ทีม ${match.team_a_id?.team_no ?? "?"}`;
-                                                const teamBName = match.team_b_id
-                                                    ? match.team_b_id.team_players.map(tp => tp.user_id?.username).filter(Boolean).join(" / ") || `ทีม ${match.team_b_id.team_no}`
-                                                    : "พักรอบ";
-                                                const isCompleted = match.match_status === "done";
-                                                const winnerA = isCompleted && match.score_a > match.score_b;
-                                                const winnerB = isCompleted && match.score_b > match.score_a;
+                            {apiMatches.length === 0 ? (
+                                <div className="py-16 text-center text-slate-500 relative z-10">
+                                    <p className="text-5xl mb-3 opacity-50">🏟️</p>
+                                    <p className="text-sm font-medium">ยังไม่มีข้อมูลแมตซ์การแข่งขัน</p>
+                                </div>
+                            ) : (
+                                <div className="p-4 sm:p-6 space-y-6 relative z-10">
+                                    {/* Group by round */}
+                                    {Array.from(new Set(apiMatches.map(m => m.round))).map(round => (
+                                        <div key={round} className="space-y-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent flex-1" />
+                                                <span className="px-3 text-xs font-bold text-slate-400 uppercase tracking-widest text-center">
+                                                    แมตซ์ #{round}
+                                                </span>
+                                                <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent flex-1" />
+                                            </div>
 
-                                                let predictedAChange = 0;
-                                                let predictedALose = 0;
-                                                let predictedBChange = 0;
-                                                let predictedBLose = 0;
-                                                if (!isCompleted && match.team_a_id && match.team_b_id) {
-                                                    const aMmrs = match.team_a_id.team_players.map(tp => tp.user_id?.rankings?.[0]?.mmr ?? 1500);
-                                                    const bMmrs = match.team_b_id.team_players.map(tp => tp.user_id?.rankings?.[0]?.mmr ?? 1500);
-                                                    const avgA = aMmrs.length ? aMmrs.reduce((a, b) => a + b, 0) / aMmrs.length : null;
-                                                    const avgB = bMmrs.length ? bMmrs.reduce((a, b) => a + b, 0) / bMmrs.length : null;
-                                                    if (avgA !== null && avgB !== null) {
-                                                        const predictions = calculateExpectedMmrChange(avgA, avgB);
-                                                        predictedAChange = predictions.aWins;
-                                                        predictedALose = predictions.aLoses;
-                                                        predictedBChange = predictions.bWins;
-                                                        predictedBLose = predictions.bLoses;
+                                            <div className="grid gap-3">
+                                                {apiMatches.filter(m => m.round === round).map(match => {
+                                                    const teamAName = match.team_a_id?.team_players.map(tp => tp.user_id?.username).filter(Boolean).join(" / ") || `ทีม ${match.team_a_id?.team_no ?? "?"}`;
+                                                    const teamBName = match.team_b_id
+                                                        ? match.team_b_id.team_players.map(tp => tp.user_id?.username).filter(Boolean).join(" / ") || `ทีม ${match.team_b_id.team_no}`
+                                                        : "พักรอบ";
+                                                    const isCompleted = match.match_status === "done";
+                                                    const winnerA = isCompleted && match.score_a > match.score_b;
+                                                    const winnerB = isCompleted && match.score_b > match.score_a;
+
+                                                    let predictedAChange = 0;
+                                                    let predictedALose = 0;
+                                                    let predictedBChange = 0;
+                                                    let predictedBLose = 0;
+                                                    if (!isCompleted && match.team_a_id && match.team_b_id) {
+                                                        const aMmrs = match.team_a_id.team_players.map(tp => tp.user_id?.rankings?.[0]?.mmr ?? 1500);
+                                                        const bMmrs = match.team_b_id.team_players.map(tp => tp.user_id?.rankings?.[0]?.mmr ?? 1500);
+                                                        const avgA = aMmrs.length ? aMmrs.reduce((a, b) => a + b, 0) / aMmrs.length : null;
+                                                        const avgB = bMmrs.length ? bMmrs.reduce((a, b) => a + b, 0) / bMmrs.length : null;
+                                                        if (avgA !== null && avgB !== null) {
+                                                            const predictions = calculateExpectedMmrChange(avgA, avgB);
+                                                            predictedAChange = predictions.aWins;
+                                                            predictedALose = predictions.aLoses;
+                                                            predictedBChange = predictions.bWins;
+                                                            predictedBLose = predictions.bLoses;
+                                                        }
                                                     }
-                                                }
 
-                                                return (
-                                                    <div key={match.id}
-                                                        className={`group relative overflow-hidden bg-black/20 border border-white/5 rounded-2xl p-4 transition-all duration-300 ${match.match_status !== "cancelled" ? "hover:bg-black/40 hover:border-white/10 hover:-translate-y-0.5 hover:shadow-xl cursor-pointer" : ""} ${match.match_status === "cancelled" ? "opacity-60 grayscale" : ""}`}
-                                                        onClick={() => {
-                                                            if (match.match_status === "cancelled") return;
-                                                            setScoreEditing(match);
-                                                            setScoreA(match.score_a ?? 0);
-                                                            setScoreB(match.score_b ?? 0);
-                                                        }}>
+                                                    return (
+                                                        <div key={match.id}
+                                                            className={`group relative overflow-hidden bg-black/20 border border-white/5 rounded-2xl p-4 transition-all duration-300 ${match.match_status !== "cancelled" ? "hover:bg-black/40 hover:border-white/10 hover:-translate-y-0.5 hover:shadow-xl cursor-pointer" : ""} ${match.match_status === "cancelled" ? "opacity-60 grayscale" : ""}`}
+                                                            onClick={() => {
+                                                                if (match.match_status === "cancelled") return;
+                                                                setScoreEditing(match);
+                                                                setScoreA(match.score_a ?? 0);
+                                                                setScoreB(match.score_b ?? 0);
+                                                            }}>
 
-                                                        {/* Status Badge */}
-                                                        <div className="absolute top-3 left-4">
-                                                            <span className="text-[10px] font-bold text-slate-500 bg-white/5 border border-white/10 px-2 py-0.5 rounded-md">
-                                                                แมตซ์ #{match.match_no}
-                                                            </span>
-                                                        </div>
-                                                        <div className="absolute top-3 right-4">
-                                                            {match.match_status === "cancelled" ? (
-                                                                <span className="text-[10px] px-2.5 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-bold flex items-center gap-1">
-                                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
-                                                                    ยกเลิกแล้ว
+                                                            {/* Status Badge */}
+                                                            <div className="absolute top-3 left-4">
+                                                                <span className="text-[10px] font-bold text-slate-500 bg-white/5 border border-white/10 px-2 py-0.5 rounded-md">
+                                                                    แมตซ์ #{match.match_no}
                                                                 </span>
-                                                            ) : isCompleted ? (
-                                                                <span className="text-[10px] px-2.5 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 font-bold shadow-[0_0_10px_rgba(46,204,113,0.15)] flex items-center gap-1">
-                                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                                                    จบเต็มเวลา
-                                                                </span>
-                                                            ) : tournamentInfo.tournament_status === "ongoing" ? (
-                                                                <span className="text-[10px] px-2.5 py-1 rounded-full bg-[#3498db]/20 text-[#3498db] border border-[#3498db]/30 font-bold animate-pulse flex items-center gap-1">
-                                                                    <div className="w-1.5 h-1.5 rounded-full bg-[#3498db]" />
-                                                                    กำลังแข่ง
-                                                                </span>
-                                                            ) : null}
-                                                        </div>
+                                                            </div>
+                                                            <div className="absolute top-3 right-4">
+                                                                {match.match_status === "cancelled" ? (
+                                                                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-bold flex items-center gap-1">
+                                                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                                                                        ยกเลิกแล้ว
+                                                                    </span>
+                                                                ) : isCompleted ? (
+                                                                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 font-bold shadow-[0_0_10px_rgba(46,204,113,0.15)] flex items-center gap-1">
+                                                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                                        จบเต็มเวลา
+                                                                    </span>
+                                                                ) : tournamentInfo.tournament_status === "ongoing" ? (
+                                                                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-[#3498db]/20 text-[#3498db] border border-[#3498db]/30 font-bold animate-pulse flex items-center gap-1">
+                                                                        <div className="w-1.5 h-1.5 rounded-full bg-[#3498db]" />
+                                                                        กำลังแข่ง
+                                                                    </span>
+                                                                ) : null}
+                                                            </div>
 
-                                                        <div className="mt-8 sm:mt-6 flex items-center justify-between gap-4">
-                                                            {/* Team A */}
-                                                            <div className={`flex-1 min-w-0 transition-colors ${winnerA ? "text-green-400" : isCompleted && !winnerA ? "text-slate-500" : "text-white"}`}>
-                                                                <div className="flex flex-col gap-3 justify-center h-full">
-                                                                    {match.team_a_id?.team_players.map((tp, idx) => {
-                                                                        const u = tp.user_id;
-                                                                        if (!u) return null;
-                                                                        const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
-                                                                        const mmr_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.mmr_change;
-                                                                        return (
-                                                                            <div key={idx} className="flex items-center justify-end gap-2 sm:gap-3 relative">
-                                                                                <div className="flex flex-col items-end min-w-0">
-                                                                                    <div className="flex items-center gap-1 sm:gap-1.5">
-                                                                                        {winnerA && idx === 0 && <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1 sm:px-1.5 py-0.5 rounded-md">Winner</span>}
-                                                                                        <p className="font-bold text-xs sm:text-base truncate">{u.username}</p>
-                                                                                    </div>
-                                                                                    {/* Stats - ranking mode only */}
-                                                                                    {tournamentInfo.mode === "ranking" && (
-                                                                                        <div className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] text-slate-400 mt-0.5 sm:mt-1 font-medium bg-black/20 px-1.5 sm:px-2 py-0.5 rounded border border-white/5">
-                                                                                            <span className="text-yellow-500 font-bold">MMR: {u.rankings?.[0] ? u.rankings[0].mmr : 1500}</span>
-                                                                                            <span className="text-slate-600">|</span>
-                                                                                            <span className="text-green-400 font-bold">W: {u.rankings?.[0] ? u.rankings[0].win : 0}</span>
-                                                                                            <span className="text-slate-600">|</span>
-                                                                                            <span className="text-red-400 font-bold">L: {u.rankings?.[0] ? u.rankings[0].lose : 0}</span>
+                                                            <div className="mt-8 sm:mt-6 flex items-center justify-between gap-4">
+                                                                {/* Team A */}
+                                                                <div className={`flex-1 min-w-0 transition-colors ${winnerA ? "text-green-400" : isCompleted && !winnerA ? "text-slate-500" : "text-white"}`}>
+                                                                    <div className="flex flex-col gap-3 justify-center h-full">
+                                                                        {match.team_a_id?.team_players.map((tp, idx) => {
+                                                                            const u = tp.user_id;
+                                                                            if (!u) return null;
+                                                                            const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
+                                                                            const mmr_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.mmr_change;
+                                                                            return (
+                                                                                <div key={idx} className="flex items-center justify-end gap-2 sm:gap-3 relative">
+                                                                                    <div className="flex flex-col items-end min-w-0">
+                                                                                        <div className="flex items-center gap-1 sm:gap-1.5">
+                                                                                            {winnerA && idx === 0 && <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1 sm:px-1.5 py-0.5 rounded-md">Winner</span>}
+                                                                                            <p className="font-bold text-xs sm:text-base truncate">{u.username}</p>
                                                                                         </div>
-                                                                                    )}
-                                                                                </div>
-                                                                                <div className="relative flex items-center">
-                                                                                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner ${match.first_serve === "A" && idx === 0 ? "border-[#2ecc71] shadow-[0_0_20px_rgba(46,204,113,0.5)] scale-105" : "border-slate-700/50"}`}>
-                                                                                        {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                                                                        {/* Stats - ranking mode only */}
+                                                                                        {tournamentInfo.mode === "ranking" && (
+                                                                                            <div className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] text-slate-400 mt-0.5 sm:mt-1 font-medium bg-black/20 px-1.5 sm:px-2 py-0.5 rounded border border-white/5">
+                                                                                                <span className="text-yellow-500 font-bold">MMR: {u.rankings?.[0] ? u.rankings[0].mmr : 1500}</span>
+                                                                                                <span className="text-slate-600">|</span>
+                                                                                                <span className="text-green-400 font-bold">W: {u.rankings?.[0] ? u.rankings[0].win : 0}</span>
+                                                                                                <span className="text-slate-600">|</span>
+                                                                                                <span className="text-red-400 font-bold">L: {u.rankings?.[0] ? u.rankings[0].lose : 0}</span>
+                                                                                            </div>
+                                                                                        )}
                                                                                     </div>
-                                                                                    {match.first_serve === "A" && idx === 0 && (
-                                                                                        <div className="absolute -right-6 z-30 w-7 h-7 bg-[#2ecc71] rounded-full border-2 border-[#1a2535] flex items-center justify-center shadow-[0_0_15px_rgba(46,204,113,0.8)] animate-bounce-subtle">
+                                                                                    <div className="relative flex items-center">
+                                                                                        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner ${match.first_serve === "A" && idx === 0 ? "border-[#2ecc71] shadow-[0_0_20px_rgba(46,204,113,0.5)] scale-105" : "border-slate-700/50"}`}>
+                                                                                            {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                                                                        </div>
+                                                                                        {match.first_serve === "A" && idx === 0 && (
+                                                                                            <div className="absolute -right-6 z-30 w-7 h-7 bg-[#2ecc71] rounded-full border-2 border-[#1a2535] flex items-center justify-center shadow-[0_0_15px_rgba(46,204,113,0.8)] animate-bounce-subtle">
+                                                                                                <span className="text-[14px] filter drop-shadow-md">🏸</span>
+                                                                                            </div>
+                                                                                        )}
+                                                                                        {mmr_change !== undefined ? (
+                                                                                            <div className={`absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black border shadow-lg ${mmr_change > 0 ? "bg-[#0f2a1a] border-green-500 text-green-400 shadow-green-900/40" : "bg-[#2a0f0f] border-red-500 text-red-400 shadow-red-900/40"}`}>
+                                                                                                {mmr_change > 0 ? "+" : ""}{mmr_change}
+                                                                                            </div>
+                                                                                        ) : (!isCompleted && predictedAChange > 0) ? (
+                                                                                            <div title="คะแนน MMR คาดการณ์หากชนะ/แพ้ 21-20" className="absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2 py-[2px] sm:py-0.5 rounded-full text-[8px] sm:text-[9px] font-bold border shadow-lg backdrop-blur-md bg-slate-800/90 border-slate-600/50 shadow-black/50 whitespace-nowrap flex items-center gap-[2px] sm:gap-1 z-10">
+                                                                                                <span className="text-green-400 drop-shadow-[0_0_2px_rgba(74,222,128,0.3)]">+{predictedAChange}</span>
+                                                                                                <span className="text-slate-500 leading-none text-[7px] sm:text-[8px]">/</span>
+                                                                                                <span className="text-red-400 drop-shadow-[0_0_2px_rgba(248,113,113,0.3)]">-{predictedALose}</span>
+                                                                                            </div>
+                                                                                        ) : null}
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                        {(!match.team_a_id || match.team_a_id.team_players.length === 0) && (
+                                                                            <div className="text-right"><p className="font-bold text-sm text-slate-500">ทีม {match.team_a_id?.team_no ?? "?"}</p></div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Score / VS */}
+                                                                <div className="shrink-0 group-hover:scale-105 transition-transform flex flex-col items-center justify-center self-stretch">
+                                                                    {isCompleted ? (
+                                                                        <div className="flex items-center gap-2 sm:gap-3 bg-[#0f1923] px-3 sm:px-4 py-2 sm:py-3 rounded-2xl border border-white/10 shadow-inner">
+                                                                            <span className={`text-xl sm:text-3xl font-black ${winnerA ? "text-green-400" : "text-white"}`}>{match.score_a}</span>
+                                                                            <span className="text-slate-600 font-bold text-lg sm:text-xl">:</span>
+                                                                            <span className={`text-xl sm:text-3xl font-black ${winnerB ? "text-green-400" : "text-white"}`}>{match.score_b}</span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-900/30 border-4 border-[#1a2535]">
+                                                                            <span className="text-white text-xs sm:text-base font-black italic">VS</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* Team B */}
+                                                                <div className={`flex-1 min-w-0 transition-colors ${winnerB ? "text-green-400" : isCompleted && !winnerB ? "text-slate-500" : "text-white"}`}>
+                                                                    <div className="flex flex-col gap-3 justify-center h-full">
+                                                                        {match.team_b_id?.team_players.map((tp, idx) => {
+                                                                            const u = tp.user_id;
+                                                                            if (!u) return null;
+                                                                            const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
+                                                                            const mmr_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.mmr_change;
+                                                                            return (
+                                                                                <div key={idx} className="flex items-center justify-start gap-2 sm:gap-3 relative">
+                                                                                    {match.first_serve === "B" && idx === 0 && (
+                                                                                        <div className="absolute -left-6 z-30 w-7 h-7 bg-[#3498db] rounded-full border-2 border-[#1a2535] flex items-center justify-center shadow-[0_0_15px_rgba(52,152,219,0.8)] animate-bounce-subtle">
                                                                                             <span className="text-[14px] filter drop-shadow-md">🏸</span>
                                                                                         </div>
                                                                                     )}
-                                                                                    {mmr_change !== undefined ? (
-                                                                                        <div className={`absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black border shadow-lg ${mmr_change > 0 ? "bg-[#0f2a1a] border-green-500 text-green-400 shadow-green-900/40" : "bg-[#2a0f0f] border-red-500 text-red-400 shadow-red-900/40"}`}>
-                                                                                            {mmr_change > 0 ? "+" : ""}{mmr_change}
+                                                                                    <div className="relative flex items-center">
+                                                                                        <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner ${match.first_serve === "B" && idx === 0 ? "border-[#3498db] shadow-[0_0_20px_rgba(52,152,219,0.5)] scale-105" : "border-slate-700/50"}`}>
+                                                                                            {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                                                                         </div>
-                                                                                    ) : (!isCompleted && predictedAChange > 0) ? (
-                                                                                        <div title="คะแนน MMR คาดการณ์หากชนะ/แพ้ 21-20" className="absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2 py-[2px] sm:py-0.5 rounded-full text-[8px] sm:text-[9px] font-bold border shadow-lg backdrop-blur-md bg-slate-800/90 border-slate-600/50 shadow-black/50 whitespace-nowrap flex items-center gap-[2px] sm:gap-1 z-10">
-                                                                                            <span className="text-green-400 drop-shadow-[0_0_2px_rgba(74,222,128,0.3)]">+{predictedAChange}</span>
-                                                                                            <span className="text-slate-500 leading-none text-[7px] sm:text-[8px]">/</span>
-                                                                                            <span className="text-red-400 drop-shadow-[0_0_2px_rgba(248,113,113,0.3)]">-{predictedALose}</span>
+                                                                                        {mmr_change !== undefined ? (
+                                                                                            <div className={`absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black border shadow-lg ${mmr_change > 0 ? "bg-[#0f2a1a] border-green-500 text-green-400 shadow-green-900/40" : "bg-[#2a0f0f] border-red-500 text-red-400 shadow-red-900/40"}`}>
+                                                                                                {mmr_change > 0 ? "+" : ""}{mmr_change}
+                                                                                            </div>
+                                                                                        ) : (!isCompleted && predictedBChange > 0) ? (
+                                                                                            <div title="คะแนน MMR คาดการณ์หากชนะ/แพ้ 21-20" className="absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2 py-[2px] sm:py-0.5 rounded-full text-[8px] sm:text-[9px] font-bold border shadow-lg backdrop-blur-md bg-slate-800/90 border-slate-600/50 shadow-black/50 whitespace-nowrap flex items-center gap-[2px] sm:gap-1 z-10">
+                                                                                                <span className="text-green-400 drop-shadow-[0_0_2px_rgba(74,222,128,0.3)]">+{predictedBChange}</span>
+                                                                                                <span className="text-slate-500 leading-none text-[7px] sm:text-[8px]">/</span>
+                                                                                                <span className="text-red-400 drop-shadow-[0_0_2px_rgba(248,113,113,0.3)]">-{predictedBLose}</span>
+                                                                                            </div>
+                                                                                        ) : null}
+                                                                                    </div>
+                                                                                    <div className="flex flex-col items-start min-w-0">
+                                                                                        <div className="flex items-center gap-1 sm:gap-1.5">
+                                                                                            <p className="font-bold text-xs sm:text-base truncate">{u.username}</p>
+                                                                                            {winnerB && idx === 0 && <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1 sm:px-1.5 py-0.5 rounded-md">Winner</span>}
                                                                                         </div>
-                                                                                    ) : null}
+                                                                                        {/* Stats - ranking mode only */}
+                                                                                        {tournamentInfo.mode === "ranking" && (
+                                                                                            <div className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] text-slate-400 mt-0.5 sm:mt-1 font-medium bg-black/20 px-1.5 sm:px-2 py-0.5 rounded border border-white/5">
+                                                                                                <span className="text-yellow-500 font-bold">MMR: {u.rankings?.[0] ? u.rankings[0].mmr : "-"}</span>
+                                                                                                <span className="text-slate-600">|</span>
+                                                                                                <span className="text-green-400 font-bold">W: {u.rankings?.[0] ? u.rankings[0].win : 0}</span>
+                                                                                                <span className="text-slate-600">|</span>
+                                                                                                <span className="text-red-400 font-bold">L: {u.rankings?.[0] ? u.rankings[0].lose : 0}</span>
+                                                                                                <span className="text-slate-600">|</span>
+                                                                                                <span className="text-orange-400 font-bold">🔥 {u.rankings?.[0] ? u.rankings[0].win_streak : 0}</span>
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
                                                                                 </div>
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                    {(!match.team_a_id || match.team_a_id.team_players.length === 0) && (
-                                                                        <div className="text-right"><p className="font-bold text-sm text-slate-500">ทีม {match.team_a_id?.team_no ?? "?"}</p></div>
-                                                                    )}
+                                                                            );
+                                                                        })}
+                                                                        {(!match.team_b_id) && (
+                                                                            <div className="text-left"><p className="font-bold text-sm text-slate-500">พักรอบ</p></div>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             </div>
 
-                                                            {/* Score / VS */}
-                                                            <div className="shrink-0 group-hover:scale-105 transition-transform flex flex-col items-center justify-center self-stretch">
-                                                                {isCompleted ? (
-                                                                    <div className="flex items-center gap-2 sm:gap-3 bg-[#0f1923] px-3 sm:px-4 py-2 sm:py-3 rounded-2xl border border-white/10 shadow-inner">
-                                                                        <span className={`text-xl sm:text-3xl font-black ${winnerA ? "text-green-400" : "text-white"}`}>{match.score_a}</span>
-                                                                        <span className="text-slate-600 font-bold text-lg sm:text-xl">:</span>
-                                                                        <span className={`text-xl sm:text-3xl font-black ${winnerB ? "text-green-400" : "text-white"}`}>{match.score_b}</span>
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-900/30 border-4 border-[#1a2535]">
-                                                                        <span className="text-white text-xs sm:text-base font-black italic">VS</span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-
-                                                            {/* Team B */}
-                                                            <div className={`flex-1 min-w-0 transition-colors ${winnerB ? "text-green-400" : isCompleted && !winnerB ? "text-slate-500" : "text-white"}`}>
-                                                                <div className="flex flex-col gap-3 justify-center h-full">
-                                                                    {match.team_b_id?.team_players.map((tp, idx) => {
-                                                                        const u = tp.user_id;
-                                                                        if (!u) return null;
-                                                                        const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
-                                                                        const mmr_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.mmr_change;
-                                                                        return (
-                                                                            <div key={idx} className="flex items-center justify-start gap-2 sm:gap-3 relative">
-                                                                                {match.first_serve === "B" && idx === 0 && (
-                                                                                    <div className="absolute -left-6 z-30 w-7 h-7 bg-[#3498db] rounded-full border-2 border-[#1a2535] flex items-center justify-center shadow-[0_0_15px_rgba(52,152,219,0.8)] animate-bounce-subtle">
-                                                                                        <span className="text-[14px] filter drop-shadow-md">🏸</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                <div className="relative flex items-center">
-                                                                                    <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner ${match.first_serve === "B" && idx === 0 ? "border-[#3498db] shadow-[0_0_20px_rgba(52,152,219,0.5)] scale-105" : "border-slate-700/50"}`}>
-                                                                                        {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
-                                                                                    </div>
-                                                                                    {mmr_change !== undefined ? (
-                                                                                        <div className={`absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black border shadow-lg ${mmr_change > 0 ? "bg-[#0f2a1a] border-green-500 text-green-400 shadow-green-900/40" : "bg-[#2a0f0f] border-red-500 text-red-400 shadow-red-900/40"}`}>
-                                                                                            {mmr_change > 0 ? "+" : ""}{mmr_change}
-                                                                                        </div>
-                                                                                    ) : (!isCompleted && predictedBChange > 0) ? (
-                                                                                        <div title="คะแนน MMR คาดการณ์หากชนะ/แพ้ 21-20" className="absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2 py-[2px] sm:py-0.5 rounded-full text-[8px] sm:text-[9px] font-bold border shadow-lg backdrop-blur-md bg-slate-800/90 border-slate-600/50 shadow-black/50 whitespace-nowrap flex items-center gap-[2px] sm:gap-1 z-10">
-                                                                                            <span className="text-green-400 drop-shadow-[0_0_2px_rgba(74,222,128,0.3)]">+{predictedBChange}</span>
-                                                                                            <span className="text-slate-500 leading-none text-[7px] sm:text-[8px]">/</span>
-                                                                                            <span className="text-red-400 drop-shadow-[0_0_2px_rgba(248,113,113,0.3)]">-{predictedBLose}</span>
-                                                                                        </div>
-                                                                                    ) : null}
-                                                                                </div>
-                                                                                <div className="flex flex-col items-start min-w-0">
-                                                                                    <div className="flex items-center gap-1 sm:gap-1.5">
-                                                                                        <p className="font-bold text-xs sm:text-base truncate">{u.username}</p>
-                                                                                        {winnerB && idx === 0 && <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1 sm:px-1.5 py-0.5 rounded-md">Winner</span>}
-                                                                                    </div>
-                                                                                    {/* Stats - ranking mode only */}
-                                                                                    {tournamentInfo.mode === "ranking" && (
-                                                                                        <div className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] text-slate-400 mt-0.5 sm:mt-1 font-medium bg-black/20 px-1.5 sm:px-2 py-0.5 rounded border border-white/5">
-                                                                                            <span className="text-yellow-500 font-bold">MMR: {u.rankings?.[0] ? u.rankings[0].mmr : "-"}</span>
-                                                                                            <span className="text-slate-600">|</span>
-                                                                                            <span className="text-green-400 font-bold">W: {u.rankings?.[0] ? u.rankings[0].win : 0}</span>
-                                                                                            <span className="text-slate-600">|</span>
-                                                                                            <span className="text-red-400 font-bold">L: {u.rankings?.[0] ? u.rankings[0].lose : 0}</span>
-                                                                                            <span className="text-slate-600">|</span>
-                                                                                            <span className="text-orange-400 font-bold">🔥 {u.rankings?.[0] ? u.rankings[0].win_streak : 0}</span>
-                                                                                        </div>
-                                                                                    )}
-                                                                                </div>
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                    {(!match.team_b_id) && (
-                                                                        <div className="text-left"><p className="font-bold text-sm text-slate-500">พักรอบ</p></div>
-                                                                    )}
+                                                            {tournamentInfo.tournament_status === "ongoing" && !isCompleted && (
+                                                                <div className="mt-4 text-center">
+                                                                    <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 group-hover:text-[#3498db] transition-colors border border-transparent group-hover:border-[#3498db]/20 bg-transparent group-hover:bg-[#3498db]/10 px-2 py-0.5 rounded-full">
+                                                                        ✍️ คลิกเพื่อบันทึกคะแนน
+                                                                    </span>
                                                                 </div>
-                                                            </div>
+                                                            )}
                                                         </div>
-
-                                                        {tournamentInfo.tournament_status === "ongoing" && !isCompleted && (
-                                                            <div className="mt-4 text-center">
-                                                                <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 group-hover:text-[#3498db] transition-colors border border-transparent group-hover:border-[#3498db]/20 bg-transparent group-hover:bg-[#3498db]/10 px-2 py-0.5 rounded-full">
-                                                                    ✍️ คลิกเพื่อบันทึกคะแนน
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )
+                }
 
                 <div className="text-center text-xs text-slate-600 pb-4">
                     🏸 Badminton Club Management System · {new Date().getFullYear()}
                 </div>
-            </main>
+            </main >
 
             {/* QR Invite Modal */}
-            {showQR && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowQR(false)} />
-                    <div className="relative w-full max-w-sm bg-[#1a2535] border border-white/10 rounded-3xl shadow-2xl overflow-hidden p-8 animate-in animate-out fade-in zoom-in duration-200">
-                        <div className="flex flex-col items-center text-center">
-                            <div className="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center text-3xl mb-4">🔗</div>
-                            <h3 className="text-xl font-bold text-white mb-2">เชิญเพื่อนเข้าแข่งขัน</h3>
-                            <p className="text-sm text-slate-400 mb-6">แสกน QR Code ด้านล่างเพื่อเข้าร่วมรายการนี้</p>
+            {
+                showQR && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowQR(false)} />
+                        <div className="relative w-full max-w-sm bg-[#1a2535] border border-white/10 rounded-3xl shadow-2xl overflow-hidden p-8 animate-in animate-out fade-in zoom-in duration-200">
+                            <div className="flex flex-col items-center text-center">
+                                <div className="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center text-3xl mb-4">🔗</div>
+                                <h3 className="text-xl font-bold text-white mb-2">เชิญเพื่อนเข้าแข่งขัน</h3>
+                                <p className="text-sm text-slate-400 mb-6">แสกน QR Code ด้านล่างเพื่อเข้าร่วมรายการนี้</p>
 
-                            <div className="p-4 bg-white rounded-2xl shadow-inner mb-6">
-                                <QRCodeCanvas
-                                    value={shareUrl}
-                                    size={200}
-                                    level="H"
-                                    includeMargin={false}
-                                />
-                            </div>
+                                <div className="p-4 bg-white rounded-2xl shadow-inner mb-6">
+                                    <QRCodeCanvas
+                                        value={shareUrl}
+                                        size={200}
+                                        level="H"
+                                        includeMargin={false}
+                                    />
+                                </div>
 
-                            <div className="w-full space-y-3">
-                                <button
-                                    onClick={() => {
-                                        navigator.clipboard.writeText(shareUrl);
-                                        Swal.fire({
-                                            title: "คัดลอกลิงก์แล้ว!",
-                                            text: "คุณสามารถส่งลิงก์ให้เพื่อนได้ทันที",
-                                            icon: "success",
-                                            timer: 1500,
-                                            showConfirmButton: false,
-                                            background: "#1a2535",
-                                            color: "#fff"
-                                        });
-                                    }}
-                                    className="w-full py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold transition-all"
-                                >
-                                    คัดลอกลิงก์
-                                </button>
-                                <button
-                                    onClick={() => setShowQR(false)}
-                                    className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 font-bold transition-all"
-                                >
-                                    ปิด
-                                </button>
+                                <div className="w-full space-y-3">
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(shareUrl);
+                                            Swal.fire({
+                                                title: "คัดลอกลิงก์แล้ว!",
+                                                text: "คุณสามารถส่งลิงก์ให้เพื่อนได้ทันที",
+                                                icon: "success",
+                                                timer: 1500,
+                                                showConfirmButton: false,
+                                                background: "#1a2535",
+                                                color: "#fff"
+                                            });
+                                        }}
+                                        className="w-full py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold transition-all"
+                                    >
+                                        คัดลอกลิงก์
+                                    </button>
+                                    <button
+                                        onClick={() => setShowQR(false)}
+                                        className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 font-bold transition-all"
+                                    >
+                                        ปิด
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
         </div>
     );
 }

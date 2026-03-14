@@ -6,6 +6,7 @@ import Navbar from "@/components/Navbar";
 import { useAuth } from "@/lib/useAuth";
 import Swal from "sweetalert2";
 import { QRCodeCanvas } from "qrcode.react";
+import EndlessModeManager from "./EndlessModeManager";
 
 
 const STRAPI_BASE_URL =
@@ -416,10 +417,12 @@ export default function TournamentDetailPage() {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
     const shareUrl = `${appUrl}/tournament/${id}`;
 
-    const fetchMatches = (token = jwt) => {
+    const fetchMatches = (token = jwt, formatArg?: string) => {
         if (!token || !id) return;
+        const fmt = formatArg || tournamentInfo?.format;
+        const sortOrder = fmt === "endless_mode" ? "desc" : "asc";
         fetch(
-            `${STRAPI_BASE_URL}/api/matches?filters[tournament_id][documentId][$eq]=${id}&populate[team_a_id][populate][team_players][populate][user_id][populate][rankings][filters][season][is_active][$eq]=true&populate[team_a_id][populate][team_players][populate][user_id][populate][picture][fields][0]=url&populate[team_b_id][populate][team_players][populate][user_id][populate][rankings][filters][season][is_active][$eq]=true&populate[team_b_id][populate][team_players][populate][user_id][populate][picture][fields][0]=url&populate[match_histories][populate][users][fields]=*&sort=match_no:asc&pagination[pageSize]=100`,
+            `${STRAPI_BASE_URL}/api/matches?filters[tournament_id][documentId][$eq]=${id}&populate[team_a_id][populate][team_players][populate][user_id][populate][rankings][filters][season][is_active][$eq]=true&populate[team_a_id][populate][team_players][populate][user_id][populate][picture][fields][0]=url&populate[team_b_id][populate][team_players][populate][user_id][populate][rankings][filters][season][is_active][$eq]=true&populate[team_b_id][populate][team_players][populate][user_id][populate][picture][fields][0]=url&populate[match_histories][populate][users][fields]=*&sort=match_no:${sortOrder}&pagination[pageSize]=100`,
             { headers: { Authorization: `Bearer ${token}` } }
         )
             .then((r) => r.json())
@@ -494,6 +497,8 @@ export default function TournamentDetailPage() {
                         .map((tp) => ({ ...tp.user!, tpDocumentId: tp.documentId ?? "" })),
                     user_created: data.user_created || data.user_id,
                 } : null);
+                // Also refresh matches correctly
+                fetchMatches(jwt, data.format);
             })
             .catch(() => { /* silent */ });
     };
@@ -505,8 +510,9 @@ export default function TournamentDetailPage() {
     const myEntry = tournamentInfo?.players.find((p) => p.id === user?.id);
 
     const handleJoin = async () => {
-        if (!jwt || !user || joining || tournamentInfo?.tournament_status !== "upcoming") return;
-
+        const isEndless = tournamentInfo?.format === "endless_mode";
+        const canJoin = tournamentInfo?.tournament_status === "upcoming" || (isEndless && tournamentInfo?.tournament_status === "ongoing");
+        if (!jwt || !user || joining || !canJoin) return;
         // Final guard: check if already joined to prevent duplicates
         if (tournamentInfo.players.some(p => p.id === user.id)) {
             showToast("คุณเข้าร่วมการแข่งขันนี้แล้ว", "error");
@@ -534,7 +540,9 @@ export default function TournamentDetailPage() {
     };
 
     const handleLeave = async () => {
-        if (!jwt || !myEntry || leaving || tournamentInfo?.tournament_status !== "upcoming") return;
+        const isEndless = tournamentInfo?.format === "endless_mode";
+        const canLeave = tournamentInfo?.tournament_status === "upcoming" || (isEndless && tournamentInfo?.tournament_status === "ongoing");
+        if (!jwt || !myEntry || leaving || !canLeave) return;
         setLeaving(true);
         try {
             const res = await fetch(`${STRAPI_BASE_URL}/api/tournament-players/${myEntry.tpDocumentId}`, {
@@ -558,6 +566,7 @@ export default function TournamentDetailPage() {
     // teamA/teamB = 1 player (singles) or 2 players (doubles)
     interface DrawnPair { teamA: RegisteredPlayer[]; teamB: RegisteredPlayer[] | null; servingSide?: "A" | "B" }
     const [drawnPairs, setDrawnPairs] = useState<DrawnPair[] | null>(null);
+
 
     // Helper to count partner repeats (Total = History + Current Draw)
     const getPartnerRepeats = (playerIds: number[], currentMatchIdx: number, matches: ApiMatch[], drawn: DrawnPair[]) => {
@@ -832,10 +841,34 @@ export default function TournamentDetailPage() {
     };
 
     const handleStartTournament = async () => {
-        if (!jwt || !drawnPairs || starting) return;
+        if (!jwt || starting) return;
+        const isEndless = tournamentInfo?.format === "endless_mode";
+        if (!isEndless && !drawnPairs) return;
+
+        // For endless mode, we draw the first match if it doesn't exist
+        let matchesToCreate: DrawnPair[] = drawnPairs || [];
+        if (isEndless && matchesToCreate.length === 0) {
+            const pPerMatch = tournamentInfo?.type === "double" ? 4 : 2;
+            if (tournamentInfo!.players.length < pPerMatch) {
+                showToast("จำนวนผู้เล่นไม่เพียงพอ", "error");
+                return;
+            }
+            // Simple fair draw for first match
+            const shuffled = [...tournamentInfo!.players].sort(() => Math.random() - 0.5);
+            const teamA = tournamentInfo?.type === "double" ? [shuffled[0], shuffled[3]] : [shuffled[0]];
+            const teamB = tournamentInfo?.type === "double" ? [shuffled[1], shuffled[2]] : [shuffled[1]];
+            matchesToCreate = [{
+                teamA,
+                teamB,
+                servingSide: Math.random() > 0.5 ? "A" : "B"
+            }];
+        }
+
         const result = await Swal.fire({
-            title: "ยืนยันเริ่มการแข่งขัน?",
-            html: `จะสร้าง <b>${drawnPairs.length} แมตซ์</b> และเปลี่ยนสถานะเป็น <b>กำลังแข่ง</b><br/><span style="color:#ef4444;font-size:12px">ไม่สามารถย้อนกลับได้</span>`,
+            title: isEndless ? "เริ่มโหมดไร้สิ้นสุด?" : "ยืนยันเริ่มการแข่งขัน?",
+            html: isEndless
+                ? `จะเริ่มรายการและสร้าง <b>แมตซ์แรก</b> ให้ทันที<br/><span style="color:#6366f1;font-size:12px">คุณสามารถจัดคู่ถัดไปได้ตลอดเวลา</span>`
+                : `จะสร้าง <b>${matchesToCreate.length} แมตซ์</b> และเปลี่ยนสถานะเป็น <b>กำลังแข่ง</b><br/><span style="color:#ef4444;font-size:12px">ไม่สามารถย้อนกลับได้</span>`,
             icon: "warning",
             showCancelButton: true,
             confirmButtonText: "🏆 เริ่มเลย!",
@@ -856,8 +889,8 @@ export default function TournamentDetailPage() {
             const teamIds: { teamA: string; teamB: string | null }[] = [];
             const batchSize = 10;
 
-            for (let i = 0; i < drawnPairs.length; i += batchSize) {
-                const batch = drawnPairs.slice(i, i + batchSize);
+            for (let i = 0; i < matchesToCreate.length; i += batchSize) {
+                const batch = matchesToCreate.slice(i, i + batchSize);
                 const batchPromises = batch.map(async (pair) => {
                     const resA = await postJSON("/api/teams", {
                         data: { tournament_id: id, team_no: randTeamNo() },
@@ -879,8 +912,8 @@ export default function TournamentDetailPage() {
 
             // ── Step 2 & 3: Create Team Players and Matches with Batching ──
             setStartStep("บันทึกข้อมูลการแข่งขัน...");
-            for (let i = 0; i < drawnPairs.length; i += batchSize) {
-                const batchPairs = drawnPairs.slice(i, i + batchSize);
+            for (let i = 0; i < matchesToCreate.length; i += batchSize) {
+                const batchPairs = matchesToCreate.slice(i, i + batchSize);
                 const batchPromises = batchPairs.map(async (pair, batchIdx) => {
                     const globalIdx = i + batchIdx;
                     const { teamA: teamAId, teamB: teamBId } = teamIds[globalIdx];
@@ -1142,7 +1175,7 @@ export default function TournamentDetailPage() {
             // Check if all matches (including this one just updated) are done
             const isLastMatch = apiMatches.filter(m => m.match_status !== "done" && m.id !== scoreEditing.id).length === 0;
 
-            if (isLastMatch && tournamentInfo?.tournament_status !== "completed") {
+            if (isLastMatch && tournamentInfo?.tournament_status !== "completed" && tournamentInfo?.format !== "endless_mode") {
                 await fetch(`${STRAPI_BASE_URL}/api/tournaments/${id}`, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
@@ -1586,7 +1619,7 @@ export default function TournamentDetailPage() {
                                             <span>🎾 คาดการณ์: {drawnPairs.length} แมตซ์</span>
                                         </div>
                                     )}
-                                    {tournamentInfo.tournament_status === "upcoming" && (
+                                    {(tournamentInfo.tournament_status === "upcoming" || (tournamentInfo.format === "endless_mode" && tournamentInfo.tournament_status === "ongoing")) && (
                                         <>
                                             {isJoined ? (
                                                 <button onClick={handleLeave} disabled={leaving}
@@ -1657,14 +1690,14 @@ export default function TournamentDetailPage() {
                                                     )}
                                                 </div>
                                             </div>
-                                            {player.id === user?.id && tournamentInfo.tournament_status === "upcoming" && (
+                                            {player.id === user?.id && (tournamentInfo.tournament_status === "upcoming" || (tournamentInfo.format === "endless_mode" && tournamentInfo.tournament_status === "ongoing")) && (
                                                 <button onClick={handleLeave} disabled={leaving}
                                                     className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 shrink-0 transition-all disabled:opacity-50">
                                                     ออก
                                                 </button>
                                             )}
-                                            {/* Owner can remove anyone, but only before tournament starts */}
-                                            {tournamentInfo.user_created?.id === user?.id && player.id !== user?.id && tournamentInfo.tournament_status === "upcoming" && (
+                                            {/* Owner can remove anyone before start, or during Endless Mode matches */}
+                                            {tournamentInfo.user_created?.id === user?.id && player.id !== user?.id && (tournamentInfo.tournament_status === "upcoming" || (tournamentInfo.format === "endless_mode" && tournamentInfo.tournament_status === "ongoing")) && (
                                                 <button
                                                     onClick={async () => {
                                                         const result = await Swal.fire({
@@ -1702,8 +1735,8 @@ export default function TournamentDetailPage() {
                             )}
                         </div>
 
-                        {/* Draw Pairs Card (Owner only - Upcoming only) */}
-                        {tournamentInfo?.tournament_status === "upcoming" && tournamentInfo?.user_created?.id === user?.id && tournamentInfo?.players && tournamentInfo.players.length >= (tournamentInfo.type === "double" ? 4 : 2) && (
+                        {/* Draw Pairs Card (Owner only - Upcoming only - NOT for Endless Mode) */}
+                        {tournamentInfo?.tournament_status === "upcoming" && tournamentInfo?.user_created?.id === user?.id && tournamentInfo.format !== "endless_mode" && tournamentInfo?.players && tournamentInfo.players.length >= (tournamentInfo.type === "double" ? 4 : 2) && (
                             <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden mt-6">
                                 <div className="px-5 py-4 border-b border-white/8 flex items-center justify-between gap-3">
                                     <h2 className="font-semibold text-white flex items-center gap-2">
@@ -1794,7 +1827,7 @@ export default function TournamentDetailPage() {
                                     )}
                                 </div>
 
-                                {!drawnPairs ? (
+                                {!drawnPairs && tournamentInfo.format !== "endless_mode" ? (
                                     <div className="py-10 text-center text-slate-500">
                                         <p className="text-3xl mb-2">{drawMode === "mmr_balanced" ? "⚖️" : "🎲"}</p>
                                         <p className="text-sm">กดปุ่ม &quot;สุ่มคู่&quot; เพื่อจับคู่ผู้เล่น</p>
@@ -1812,7 +1845,7 @@ export default function TournamentDetailPage() {
                                     </div>
                                 ) : (
                                     <div className="divide-y divide-white/5">
-                                        {drawnPairs.map((pair, idx) => {
+                                        {drawnPairs?.map((pair, idx) => {
                                             const teamARepeats = getPartnerRepeats(pair.teamA.map(p => p.id), idx, apiMatches, drawnPairs);
                                             const teamBRepeats = pair.teamB ? getPartnerRepeats(pair.teamB.map(p => p.id), idx, apiMatches, drawnPairs) : 0;
 
@@ -1848,84 +1881,132 @@ export default function TournamentDetailPage() {
                                                                 </span>
                                                             )}
                                                             {drawMode === "mmr_balanced" && (
-                                                                <span className="text-[9px] text-yellow-400/40 font-medium">
-                                                                    MMR: {Math.round(pair.teamA.reduce((sum, p) => sum + (p.rankings?.[0]?.mmr || 1500), 0) / pair.teamA.length)}
-                                                                </span>
+                                                                <div className="mt-1 flex items-center gap-1.5">
+                                                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Avg MMR:</span>
+                                                                    <span className="text-[10px] font-black text-indigo-400">
+                                                                        {Math.round(pair.teamA.reduce((sum, p) => sum + (p.rankings?.[0]?.mmr ?? 1500), 0) / pair.teamA.length)}
+                                                                    </span>
+                                                                </div>
                                                             )}
                                                         </div>
 
-                                                        {/* VS Center */}
-                                                        <div className="flex flex-col items-center justify-center shrink-0">
-                                                            <div className="w-10 h-10 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.1)] relative">
-                                                                <span className="text-[10px] font-black text-indigo-400 uppercase">VS</span>
-                                                            </div>
+                                                        {/* VS Section */}
+                                                        <div className="flex flex-col items-center gap-1 shrink-0 relative px-2">
+                                                            <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-slate-800/80 border border-slate-700 flex items-center justify-center text-[10px] sm:text-xs font-black text-slate-500 z-10">VS</div>
+                                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-px h-full bg-gradient-to-b from-transparent via-slate-700/50 to-transparent" />
                                                         </div>
 
                                                         {/* Team B */}
-                                                        {pair.teamB ? (
-                                                            <div className="flex flex-col gap-2 flex-1 min-w-0 items-end text-right">
-                                                                <div className="flex flex-col gap-1.5 w-full">
-                                                                    {pair.teamB.map((p, pIdx) => {
-                                                                        const pUrl = p.picture?.url ? (p.picture.url.startsWith("http") ? p.picture.url : `${STRAPI_BASE_URL}${p.picture.url}`) : null;
-                                                                        return (
-                                                                            <div key={`${p.id}-${pIdx}`} className="flex items-center gap-2 min-w-0 justify-end">
-                                                                                <div className="min-w-0">
-                                                                                    <p className="text-xs sm:text-sm font-semibold text-white truncate">{p.username}</p>
-                                                                                    {p.id === user?.id && <span className="text-[9px] text-green-400 font-bold">คุณ</span>}
+                                                        <div className="flex flex-col gap-2 flex-1 min-w-0 items-end">
+                                                            {pair.teamB ? (
+                                                                <>
+                                                                    <div className="flex flex-col gap-1.5 items-end w-full">
+                                                                        {pair.teamB.map((p, pIdx) => {
+                                                                            const pUrl = p.picture?.url ? (p.picture.url.startsWith("http") ? p.picture.url : `${STRAPI_BASE_URL}${p.picture.url}`) : null;
+                                                                            return (
+                                                                                <div key={`${p.id}-${pIdx}`} className="flex items-center justify-end gap-2 min-w-0 w-full">
+                                                                                    <div className="min-w-0 text-right">
+                                                                                        <p className="text-xs sm:text-sm font-semibold text-white truncate">{p.username}</p>
+                                                                                        {p.id === user?.id && <span className="text-[9px] text-green-400 font-bold">คุณ</span>}
+                                                                                    </div>
+                                                                                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold text-[10px] sm:text-xs shrink-0 overflow-hidden border border-purple-500/20 shadow-sm">
+                                                                                        {pUrl ? <img src={pUrl} alt={p.username} className="w-full h-full object-cover" /> : p.username.charAt(0).toUpperCase()}
+                                                                                    </div>
                                                                                 </div>
-                                                                                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold text-[10px] sm:text-xs shrink-0 overflow-hidden border border-blue-500/20 shadow-sm relative order-none">
-                                                                                    {pUrl ? <img src={pUrl} alt={p.username} className="w-full h-full object-cover" /> : p.username.charAt(0).toUpperCase()}
-                                                                                </div>
-                                                                            </div>
-                                                                        );
-                                                                    })}
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                    {teamBRepeats > 0 && (
+                                                                        <span className="text-[9px] sm:text-[10px] text-yellow-500 font-bold bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20 w-fit">
+                                                                            คู่เดิม {teamBRepeats} ครั้ง
+                                                                        </span>
+                                                                    )}
+                                                                    {drawMode === "mmr_balanced" && (
+                                                                        <div className="mt-1 flex items-center gap-1.5">
+                                                                            <span className="text-[10px] font-bold text-slate-400 uppercase">Avg MMR:</span>
+                                                                            <span className="text-[10px] font-black text-indigo-400">
+                                                                                {Math.round(pair.teamB.reduce((sum, p) => sum + (p.rankings?.[0]?.mmr ?? 1500), 0) / pair.teamB.length)}
+                                                                            </span>
+                                                                        </div>
+                                                                    )}
+                                                                </>
+                                                            ) : (
+                                                                <div className="flex flex-col items-end gap-1">
+                                                                    <span className="text-xl sm:text-2xl">💤</span>
+                                                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">พักรอบพักผ่อน</span>
                                                                 </div>
-                                                                {teamBRepeats > 0 && (
-                                                                    <span className="text-[9px] sm:text-[10px] text-yellow-500 font-bold bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20 w-fit">
-                                                                        คู่เดิม {teamBRepeats} ครั้ง
-                                                                    </span>
-                                                                )}
-                                                                {drawMode === "mmr_balanced" && (
-                                                                    <span className="text-[9px] text-yellow-400/40 font-medium">
-                                                                        MMR: {Math.round(pair.teamB.reduce((sum, p) => sum + (p.rankings?.[0]?.mmr || 1500), 0) / pair.teamB.length)}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex-1 flex items-center justify-end">
-                                                                <div className="px-4 py-2 bg-slate-800/20 rounded-lg border border-slate-700/30">
-                                                                    <span className="text-xs text-slate-500 italic font-medium">พักรอบพักผ่อน 💤</span>
-                                                                </div>
-                                                            </div>
-                                                        )}
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             );
                                         })}
                                     </div>
                                 )}
-                                {/* Start tournament */}
-                                <div className="px-5 py-4 bg-white/3 space-y-2">
-                                    {/* Step progress */}
-                                    {starting && startStep && (
-                                        <div className="flex items-center gap-2 text-xs text-slate-400 justify-center">
-                                            <svg className="animate-spin w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                                            <span>⏳ {startStep}</span>
-                                        </div>
-                                    )}
-                                    <button onClick={handleStartTournament} disabled={starting}
-                                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-[#2ecc71] to-[#27ae60] hover:from-[#3de382] hover:to-[#2ecc71] text-white font-semibold text-sm transition-all shadow-lg shadow-green-900/30 disabled:opacity-60">
-                                        {starting
-                                            ? <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>กำลังดำเนินการ...</>
-                                            : "🏆 เริ่มการแข่งขัน"}
+                            </div>
+                        )}
+
+                        {/* Start Button Area for Endless Mode */}
+                        {tournamentInfo?.tournament_status === "upcoming" && tournamentInfo?.user_created?.id === user?.id && tournamentInfo.format === "endless_mode" && (
+                            <div className="mt-8 flex flex-col items-center gap-4">
+                                <div className="w-full bg-indigo-500/5 border border-indigo-500/10 rounded-2xl p-6 text-center">
+                                    <div className="w-12 h-12 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">♾️</div>
+                                    <h3 className="text-white font-bold mb-1">ยินดีต้อนรับสู่โหมดไร้สิ้นสุด</h3>
+                                    <p className="text-xs text-slate-400 mb-6">โหมดนี้จะเริ่มการแข่งโดยไม่ต้องสุ่มคู่ล่วงหน้าทั้งรายการ<br />ระบบจะสุ่มแมตซ์แรกให้ และคุณสามารถจัดคู่ถัดไปได้เรื่อยๆ</p>
+                                    <button
+                                        onClick={handleStartTournament}
+                                        disabled={starting}
+                                        className="w-full sm:w-auto px-10 py-3.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-black rounded-xl transition-all shadow-xl shadow-indigo-500/20 disabled:opacity-50"
+                                    >
+                                        {starting ? "กำลังเตรียมการ..." : "🚀 เริ่มโหมดไร้สิ้นสุด"}
                                     </button>
                                 </div>
                             </div>
                         )}
+
+                        {/* Start Button Area for Regular Modes */}
+                        {tournamentInfo?.tournament_status === "upcoming" && tournamentInfo?.user_created?.id === user?.id && tournamentInfo.format !== "endless_mode" && drawnPairs && (
+                            <div className="mt-8 flex justify-center">
+                                <button
+                                    onClick={handleStartTournament}
+                                    disabled={starting}
+                                    className="w-full sm:w-auto px-12 py-4 bg-gradient-to-br from-[#2ecc71] to-[#27ae60] hover:from-[#3de382] hover:to-[#2ecc71] text-white font-black rounded-2xl transition-all shadow-xl shadow-green-900/40 border border-green-400/20 active:scale-95 flex items-center justify-center gap-3 group"
+                                >
+                                    {starting ? (
+                                        <>
+                                            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                                            <span>{startStep || "กำลังสร้าง..."}</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="text-xl group-hover:scale-125 transition-transform">🏆</span>
+                                            <span>เริ่มการแข่งขัน</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        )}
                     </>
                 )}
+
+
+                {/* Endless Mode Manager (Owner Only) */}
+                {tournamentInfo?.tournament_status === "ongoing" &&
+                    tournamentInfo?.format === "endless_mode" &&
+                    tournamentInfo.user_created?.id === user?.id && (
+                        <div className="mb-8">
+                            <EndlessModeManager
+                                tournamentId={id as string}
+                                tournamentType={tournamentInfo.type as "single" | "double"}
+                                players={tournamentInfo.players}
+                                apiMatches={apiMatches}
+                                jwt={jwt!}
+                                STRAPI_BASE_URL={STRAPI_BASE_URL}
+                                refreshInfo={refreshInfo}
+                                showToast={showToast}
+                            />
+                        </div>
+                    )}
 
 
                 {/* ── MATCH SCHEDULE (ongoing/completed) ── */}

@@ -10,7 +10,7 @@ const STRAPI_BASE_URL =
     process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
 
 type PlayerType = "single" | "double";
-type Format = "round_robin" | "knockout" | "americano";
+type Format = "round_robin" | "endless_mode" | "knockout" | "americano";
 type Mode = "ranking" | "casual";
 
 interface FormData {
@@ -28,6 +28,7 @@ const typeOptions: { value: PlayerType; label: string; desc: string; icon: strin
 
 const formatOptions: { value: Format; label: string; desc: string; icon: string; disabled?: boolean }[] = [
     { value: "round_robin", label: "พบกันหมด (Round Robin)", desc: "ทุกคนแข่งกับทุกคน คิดคะแนนรวม", icon: "🔄" },
+    { value: "endless_mode", label: "โหมดไร้สิ้นสุด (Endless Mode)", desc: "สุ่มจบคู่แข่งทีละคู่ไปเรื่อยๆ โดยเฉลี่ยการเล่นให้เท่ากัน", icon: "♾️" },
     { value: "knockout", label: "แพ้คัดออก (Knockout)", desc: "แพ้ปุ๊บตกรอบทันที", icon: "⚡", disabled: true },
     { value: "americano", label: "อเมริกาโน (Americano)", desc: "สลับคู่แข่งทุกเซต คิดคะแนนสะสมส่วนตัว", icon: "🌀", disabled: true },
 ];

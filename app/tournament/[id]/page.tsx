@@ -465,7 +465,7 @@ export default function TournamentDetailPage() {
                                 return acc;
                             }
                         }, [] as RegisteredPlayer[]),
-                    user_created: data.user_created || data.user_id,
+                    user_created: data.user_created ? { id: data.user_created.id || data.user_created } : (data.user_id ? { id: data.user_id } : null),
                 });
             })
             .catch(() => { /* silent */ });
@@ -495,7 +495,7 @@ export default function TournamentDetailPage() {
                     players: tpArr
                         .filter((tp) => !!tp.user)
                         .map((tp) => ({ ...tp.user!, tpDocumentId: tp.documentId ?? "" })),
-                    user_created: data.user_created || data.user_id,
+                    user_created: data.user_created ? { id: data.user_created.id || data.user_created } : (data.user_id ? { id: data.user_id } : null),
                 } : null);
                 // Also refresh matches correctly
                 fetchMatches(jwt, data.format);
@@ -1197,7 +1197,7 @@ export default function TournamentDetailPage() {
     };
 
     const handleFinishTournament = async () => {
-        if (!jwt || !tournamentInfo || tournamentInfo.user_created?.id !== user?.id) return;
+        if (!jwt || !tournamentInfo || !user?.id || Number(tournamentInfo.user_created?.id) !== Number(user?.id)) return;
 
         const unfinishedMatches = apiMatches.filter(m => m.match_status !== 'done' && m.match_status !== 'cancelled');
 
@@ -1990,17 +1990,16 @@ export default function TournamentDetailPage() {
                 )}
 
 
-                {/* Endless Mode Manager (Owner Only) */}
+                {/* Endless Mode Manager (Public View / Logged-in Sync) */}
                 {tournamentInfo?.tournament_status === "ongoing" &&
-                    tournamentInfo?.format === "endless_mode" &&
-                    tournamentInfo.user_created?.id === user?.id && (
+                    tournamentInfo?.format === "endless_mode" && (
                         <div className="mb-8">
                             <EndlessModeManager
                                 tournamentId={id as string}
                                 tournamentType={tournamentInfo.type as "single" | "double"}
                                 players={tournamentInfo.players}
                                 apiMatches={apiMatches}
-                                jwt={jwt!}
+                                jwt={jwt || ""}
                                 STRAPI_BASE_URL={STRAPI_BASE_URL}
                                 refreshInfo={refreshInfo}
                                 showToast={showToast}
@@ -2028,7 +2027,7 @@ export default function TournamentDetailPage() {
                                     </svg>
                                     <span className="hidden sm:inline">รีเฟรช</span>
                                 </button>
-                                {tournamentInfo?.tournament_status === "ongoing" && tournamentInfo.user_created?.id === user?.id && (
+                                {tournamentInfo?.tournament_status === "ongoing" && !!user?.id && Number(tournamentInfo.user_created?.id) === Number(user?.id) && (
                                     <button
                                         onClick={handleFinishTournament}
                                         disabled={starting}

@@ -1,0 +1,61 @@
+import { TMatch, GroupPlayer } from "../TournamentTypes";
+
+export function calcStandings(players: string[], matches: TMatch[], round: string): GroupPlayer[] {
+    const map: Record<string, GroupPlayer> = {};
+    players.forEach((p) => { map[p] = { name: p, won: 0, lost: 0, pts: 0, sumFor: 0, sumAgainst: 0 }; });
+    matches.filter((m) => m.round === round && m.status === "done" && m.score1 !== null && m.score2 !== null).forEach((m) => {
+        const s1 = m.score1!, s2 = m.score2!;
+        if (s1 > s2) { map[m.player1].won++; map[m.player1].pts += 3; map[m.player2].lost++; }
+        else { map[m.player2].won++; map[m.player2].pts += 3; map[m.player1].lost++; }
+        map[m.player1].sumFor += s1; map[m.player1].sumAgainst += s2;
+        map[m.player2].sumFor += s2; map[m.player2].sumAgainst += s1;
+    });
+    return Object.values(map).sort((a, b) => b.pts - a.pts || (b.sumFor - b.sumAgainst) - (a.sumFor - a.sumAgainst));
+}
+
+export function calculateExpectedMmrChange(teamAMmr: number | null, teamBMmr: number | null): { aWins: number, aLoses: number, bWins: number, bLoses: number } {
+    const defaultMmr = 1500;
+    const aMmr = teamAMmr ?? defaultMmr;
+    const bMmr = teamBMmr ?? defaultMmr;
+    const K = 32;
+
+    const expectedAWins = 1 / (1 + Math.pow(10, (bMmr - aMmr) / 400));
+    const expectedBWins = 1 / (1 + Math.pow(10, (aMmr - bMmr) / 400));
+
+    const movMultiplier = Math.log(2);
+
+    const aWinChange = Math.round(K * movMultiplier * (1 - expectedAWins));
+    const aLoseChange = Math.round(K * movMultiplier * (1 - expectedBWins));
+
+    const bWinChange = Math.round(K * movMultiplier * (1 - expectedBWins));
+    const bLoseChange = Math.round(K * movMultiplier * (1 - expectedAWins));
+
+    return { aWins: aWinChange, aLoses: aLoseChange, bWins: bWinChange, bLoses: bLoseChange };
+}
+
+export function gcd(a: number, b: number): number {
+    return b === 0 ? a : gcd(b, a % b);
+}
+
+export function lcm(a: number, b: number): number {
+    if (a === 0 || b === 0) return 0;
+    return Math.abs(a * b) / gcd(a, b);
+}
+export function getPartnerRepeats(playerIds: number[], currentPairIdx: number, matches: any[], drawnPairs: any[]): number {
+    let count = 0;
+    // Check in past matches (API)
+    matches.filter(m => m.match_status !== 'cancelled').forEach(m => {
+        const teamAIds = m.team_a_id?.team_players.map((tp: any) => tp.user_id?.id).filter(Boolean) || [];
+        const teamBIds = m.team_b_id?.team_players.map((tp: any) => tp.user_id?.id).filter(Boolean) || [];
+        if (playerIds.every(id => teamAIds.includes(id)) && playerIds.length === teamAIds.length) count++;
+        if (playerIds.every(id => teamBIds.includes(id)) && playerIds.length === teamBIds.length) count++;
+    });
+    // Check in previously drawn pairs in this session
+    drawnPairs.slice(0, currentPairIdx).forEach(dp => {
+        const teamAIds = dp.teamA.map((p: any) => p.id);
+        const teamBIds = dp.teamB?.map((p: any) => p.id) || [];
+        if (playerIds.every(id => teamAIds.includes(id)) && playerIds.length === teamAIds.length) count++;
+        if (playerIds.every(id => teamBIds.includes(id)) && playerIds.length === teamBIds.length) count++;
+    });
+    return count;
+}

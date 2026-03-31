@@ -1,38 +1,16 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/lib/useAuth";
 import Footer from "@/components/Footer";
+import { ListTournament, TournamentStatus, PlayerType, TournamentFormat, TournamentMode } from "./TournamentTypes";
+import TournamentCard from "./TournamentCard";
 
 const STRAPI_BASE_URL =
     process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
-
-type PlayerType = "single" | "double";
-type Format = "round_robin" | "knockout" | "americano";
-type Status = "upcoming" | "ongoing" | "completed";
-type Mode = "ranking" | "casual";
-
-interface Tournament {
-    id: number;
-    documentId: string;
-    name: string;
-    type: PlayerType;
-    format: Format;
-    tournament_status: Status;
-    startDate: string;
-    createdAt: string;
-    playerCount: number;
-    isJoined: boolean;
-    mode: Mode;
-    user_created?: {
-        id: number;
-        username: string;
-        picture?: { url: string } | null;
-    } | null;
-}
 
 interface PaginationMeta {
     page: number;
@@ -41,29 +19,12 @@ interface PaginationMeta {
     total: number;
 }
 
-const statusConfig: Record<Status, { label: string; cls: string }> = {
-    ongoing: { label: "● กำลังแข่ง", cls: "bg-green-500/10 text-green-400 border-green-500/20 animate-pulse" },
-    upcoming: { label: "รอเริ่ม", cls: "bg-blue-500/10 text-blue-400 border-blue-500/20" },
-    completed: { label: "จบแล้ว", cls: "bg-white/5 text-slate-400 border-white/10" },
-};
-
-const formatLabel: Record<Format, string> = {
-    round_robin: "🔄 พบกันหมด",
-    knockout: "⚡ แพ้คัดออก",
-    americano: "🌀 อเมริกาโน",
-};
-
-const typeLabel: Record<PlayerType, string> = {
-    single: "🏸 เดี่ยว",
-    double: "👥 คู่",
-};
-
 export default function TournamentListPage() {
     const router = useRouter();
     const { user, jwt } = useAuth();
 
-    const [filter, setFilter] = useState<"all" | Status>("all");
-    const [tournaments, setTournaments] = useState<Tournament[]>([]);
+    const [filter, setFilter] = useState<"all" | TournamentStatus>("all");
+    const [tournaments, setTournaments] = useState<ListTournament[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [joiningId, setJoiningId] = useState<string | null>(null);
@@ -91,18 +52,18 @@ export default function TournamentListPage() {
             const json = await res.json();
             setMeta(json.meta.pagination);
 
-            const items: Tournament[] = (json.data ?? []).map((item: {
+            const items: ListTournament[] = (json.data ?? []).map((item: {
                 id: number;
                 documentId: string;
                 name?: string;
                 type?: PlayerType;
-                format?: Format;
-                tournament_status?: Status;
+                format?: TournamentFormat;
+                tournament_status?: TournamentStatus;
                 startDate?: string;
                 createdAt?: string;
                 tournament_players?: Array<{ user?: { id?: number } }> | null;
                 user_created?: { id: number; username: string; picture?: { url: string } | null } | null;
-                mode?: Mode;
+                mode?: TournamentMode;
             }) => {
                 const players = item.tournament_players ?? [];
                 return {
@@ -242,7 +203,7 @@ export default function TournamentListPage() {
                             ["ongoing", "กำลังแข่ง"],
                             ["upcoming", "รอเริ่ม"],
                             ["completed", "จบแล้ว"],
-                        ] as ["all" | Status, string][]).map(([val, label]) => (
+                        ] as ["all" | TournamentStatus, string][]).map(([val, label]) => (
                             <button
                                 key={val}
                                 onClick={() => {
@@ -283,94 +244,15 @@ export default function TournamentListPage() {
                 {/* Tournament cards */}
                 {!loading && !error && (
                     <div className="grid gap-4">
-                        {filtered.map((t) => {
-                            const sc = statusConfig[t.tournament_status];
-                            const isJoining = joiningId === t.documentId;
-                            return (
-                                <div
-                                    key={t.id}
-                                    className="group bg-white/5 border border-white/10 hover:border-white/20 rounded-2xl p-5 transition-all duration-200 hover:bg-white/[0.07] cursor-pointer"
-                                    onClick={() => router.push(`/tournament/${t.documentId}`)}
-                                >
-                                    <div className="flex items-start justify-between gap-4 flex-wrap">
-                                        {/* Left info */}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                                <h2 className="text-base font-semibold text-white group-hover:text-green-300 transition-colors truncate">
-                                                    {t.name}
-                                                </h2>
-                                                <span className={`shrink-0 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${sc.cls}`}>
-                                                    {sc.label}
-                                                </span>
-                                                <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${t.mode === "ranking" ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" : "bg-blue-500/10 text-blue-400 border-blue-500/20"}`}>
-                                                    {t.mode === "ranking" ? "🏆 Ranking" : "🎮 Casual"}
-                                                </span>
-                                            </div>
-
-                                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400 items-center">
-                                                <span className="flex items-center gap-1.5 text-[#2ecc71] font-bold">
-                                                    📅 {t.startDate ? new Date(t.startDate).toLocaleDateString("th-TH", { day: 'numeric', month: 'long', year: 'numeric' }) : "ไม่ระบุวันที่"}
-                                                </span>
-                                                <span className="w-px h-3 bg-white/10 hidden sm:block" />
-                                                <span>{typeLabel[t.type]}</span>
-                                                <span>{formatLabel[t.format]}</span>
-                                                <span>👥 {t.playerCount} ผู้เล่น</span>
-                                                <span className="w-px h-3 bg-white/10 hidden sm:block" />
-                                                <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-lg border border-white/5">
-                                                    {t.user_created?.picture?.url ? (
-                                                        <img
-                                                            src={t.user_created.picture.url.startsWith("http") ? t.user_created.picture.url : `${STRAPI_BASE_URL}${t.user_created.picture.url}`}
-                                                            alt={t.user_created.username}
-                                                            className="w-4 h-4 rounded-full object-cover border border-white/20"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-4 h-4 rounded-full bg-slate-700 flex items-center justify-center text-[8px] font-bold text-slate-300">
-                                                            {t.user_created?.username?.charAt(0).toUpperCase() || "?"}
-                                                        </div>
-                                                    )}
-                                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">BY: {t.user_created?.username || "ADMIN"}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Right: Join / Arrow */}
-                                        <div className="flex items-center gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                            {t.tournament_status === "upcoming" && (
-                                                t.isJoined ? (
-                                                    <span className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-semibold">
-                                                        ✓ เข้าร่วมแล้ว
-                                                    </span>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => handleJoin(t.documentId, t.isJoined)}
-                                                        disabled={isJoining}
-                                                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/20 text-blue-400 text-xs font-semibold transition-all disabled:opacity-50"
-                                                    >
-                                                        {isJoining ? (
-                                                            <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
-                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                                            </svg>
-                                                        ) : (
-                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                                            </svg>
-                                                        )}
-                                                        เข้าร่วม
-                                                    </button>
-                                                )
-                                            )}
-
-                                            <div onClick={() => router.push(`/tournament/${t.id}`)}>
-                                                <svg className="w-5 h-5 text-slate-600 group-hover:text-green-400 transition-colors cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                                </svg>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                        {filtered.map((t) => (
+                            <TournamentCard
+                                key={t.id}
+                                tournament={t}
+                                joiningId={joiningId}
+                                handleJoin={handleJoin}
+                                STRAPI_BASE_URL={STRAPI_BASE_URL}
+                            />
+                        ))}
 
                         {tournaments.length === 0 && (
                             <div className="py-20 text-center text-slate-500">

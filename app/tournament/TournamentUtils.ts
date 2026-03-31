@@ -1,4 +1,4 @@
-import { TMatch, GroupPlayer } from "../TournamentTypes";
+import { TMatch, GroupPlayer } from "./TournamentTypes";
 
 export function calcStandings(players: string[], matches: TMatch[], round: string): GroupPlayer[] {
     const map: Record<string, GroupPlayer> = {};

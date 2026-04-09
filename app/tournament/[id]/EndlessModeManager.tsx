@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Swal from "sweetalert2";
 
 interface ApiPlayer {
@@ -16,6 +16,14 @@ interface ApiMatch {
     team_b_id: { team_players: Array<{ user_id: { id: number } | null }> } | null;
 }
 
+type PairingMode = "auto" | "locked";
+
+interface PermanentTeam {
+    id: string; // local uuid for UI keying
+    label: string; // "ทีม 1", "ทีม 2", ...
+    players: ApiPlayer[];
+}
+
 interface EndlessModeManagerProps {
     tournamentId: string;
     tournamentType: "single" | "double";
@@ -26,6 +34,17 @@ interface EndlessModeManagerProps {
     refreshInfo: () => void;
     showToast: (msg: string, type?: "success" | "error") => void;
 }
+
+const TEAM_COLORS = [
+    { bg: "bg-blue-500/10", border: "border-blue-500/20", text: "text-blue-400" },
+    { bg: "bg-green-500/10", border: "border-green-500/20", text: "text-green-400" },
+    { bg: "bg-purple-500/10", border: "border-purple-500/20", text: "text-purple-400" },
+    { bg: "bg-rose-500/10", border: "border-rose-500/20", text: "text-rose-400" },
+    { bg: "bg-amber-500/10", border: "border-amber-500/20", text: "text-amber-400" },
+    { bg: "bg-cyan-500/10", border: "border-cyan-500/20", text: "text-cyan-400" },
+    { bg: "bg-pink-500/10", border: "border-pink-500/20", text: "text-pink-400" },
+    { bg: "bg-teal-500/10", border: "border-teal-500/20", text: "text-teal-400" },
+];
 
 export default function EndlessModeManager({
     tournamentId,
@@ -38,168 +57,207 @@ export default function EndlessModeManager({
     showToast
 }: EndlessModeManagerProps) {
     const [drawing, setDrawing] = useState(false);
+    const [pairingMode, setPairingMode] = useState<PairingMode>("auto");
+
+    // ── Permanent teams (persist across draws) ───────────────────────────
+    const [permanentTeams, setPermanentTeams] = useState<PermanentTeam[]>([]);
+    const [selectedForNew, setSelectedForNew] = useState<ApiPlayer[]>([]);
+    const [editingTeamId, setEditingTeamId] = useState<string | null>(null); // team being edited
+
+    const playersPerTeam = tournamentType === "double" ? 2 : 1;
+
+    // ── Compute busy & match counts ───────────────────────────────────────
+    const { busyPlayerIds, playerCounts } = useMemo(() => {
+        const counts = new Map<number, number>();
+        const busy = new Set<number>();
+        players.forEach(p => counts.set(p.id, 0));
+
+        apiMatches.forEach(m => {
+            if (m.match_status === "cancelled") return;
+            const pids = [
+                ...(m.team_a_id?.team_players.map(tp => tp.user_id?.id) || []),
+                ...(m.team_b_id?.team_players.map(tp => tp.user_id?.id) || [])
+            ].filter(Boolean) as number[];
+
+            pids.forEach(id => {
+                if (counts.has(id)) counts.set(id, counts.get(id)! + 1);
+            });
+
+            if (m.match_status === "live" || m.match_status === "upcoming") {
+                pids.forEach(id => busy.add(id));
+            }
+        });
+
+        return { busyPlayerIds: busy, playerCounts: counts };
+    }, [players, apiMatches]);
+
+    const availablePlayers = useMemo(
+        () => players.filter(p => !busyPlayerIds.has(p.id)),
+        [players, busyPlayerIds]
+    );
+
+    // Players already assigned to a permanent team
+    const assignedPlayerIds = useMemo(
+        () => {
+            const editingTeam = editingTeamId ? permanentTeams.find(t => t.id === editingTeamId) : null;
+            // When editing, exclude own members so they can be re-selected
+            const base = permanentTeams
+                .filter(t => t.id !== editingTeamId)
+                .flatMap(t => t.players.map(p => p.id));
+            return new Set(base);
+        },
+        [permanentTeams, editingTeamId]
+    );
+
+    // Team match counts (how many times this exact team composition has played)
+    const teamMatchCounts = useMemo(() => {
+        const counts = new Map<string, number>();
+        permanentTeams.forEach(team => {
+            const key = team.players.map(p => p.id).sort().join(",");
+            let c = 0;
+            apiMatches.forEach(m => {
+                if (m.match_status === "cancelled") return;
+                [m.team_a_id, m.team_b_id].forEach(t => {
+                    if (!t) return;
+                    const ids = t.team_players.map(tp => tp.user_id?.id).filter(Boolean).sort().join(",");
+                    if (ids === key) c++;
+                });
+            });
+            counts.set(team.id, c);
+        });
+        return counts;
+    }, [permanentTeams, apiMatches]);
+
+    // How many times each pair of permanent teams has faced each other
+    const teamFaceoffCounts = useMemo(() => {
+        const counts = new Map<string, number>();
+        permanentTeams.forEach(tA => {
+            permanentTeams.forEach(tB => {
+                if (tA.id >= tB.id) return;
+                const idsA = tA.players.map(p => p.id).sort().join(",");
+                const idsB = tB.players.map(p => p.id).sort().join(",");
+                let c = 0;
+                apiMatches.forEach(m => {
+                    if (m.match_status === "cancelled") return;
+                    const mA = m.team_a_id?.team_players.map(tp => tp.user_id?.id).filter(Boolean).sort().join(",");
+                    const mB = m.team_b_id?.team_players.map(tp => tp.user_id?.id).filter(Boolean).sort().join(",");
+                    if ((mA === idsA && mB === idsB) || (mA === idsB && mB === idsA)) c++;
+                });
+                counts.set(`${tA.id}|${tB.id}`, c);
+            });
+        });
+        return counts;
+    }, [permanentTeams, apiMatches]);
+
+    const getFaceoffCount = (idA: string, idB: string) => {
+        const key = idA < idB ? `${idA}|${idB}` : `${idB}|${idA}`;
+        return teamFaceoffCounts.get(key) ?? 0;
+    };
+
+    // ── Team management ────────────────────────────────────────────────────
+    const toggleSelectPlayer = (player: ApiPlayer) => {
+        setSelectedForNew(prev => {
+            const exists = prev.some(p => p.id === player.id);
+            if (exists) return prev.filter(p => p.id !== player.id);
+            if (prev.length >= playersPerTeam) return prev;
+            return [...prev, player];
+        });
+    };
+
+    const addOrUpdateTeam = () => {
+        if (selectedForNew.length !== playersPerTeam) return;
+
+        if (editingTeamId) {
+            // Update existing team
+            setPermanentTeams(prev =>
+                prev.map(t => t.id === editingTeamId ? { ...t, players: selectedForNew } : t)
+            );
+            setEditingTeamId(null);
+        } else {
+            // Create new team
+            const idx = permanentTeams.length;
+            const newTeam: PermanentTeam = {
+                id: Math.random().toString(36).slice(2),
+                label: `ทีม ${idx + 1}`,
+                players: selectedForNew,
+            };
+            setPermanentTeams(prev => [...prev, newTeam]);
+        }
+        setSelectedForNew([]);
+    };
+
+    const startEditTeam = (team: PermanentTeam) => {
+        setEditingTeamId(team.id);
+        setSelectedForNew([...team.players]);
+    };
+
+    const cancelEdit = () => {
+        setEditingTeamId(null);
+        setSelectedForNew([]);
+    };
+
+    const removeTeam = (id: string) => {
+        setPermanentTeams(prev => {
+            const filtered = prev.filter(t => t.id !== id);
+            // Re-label teams in order
+            return filtered.map((t, i) => ({ ...t, label: `ทีม ${i + 1}` }));
+        });
+        if (editingTeamId === id) cancelEdit();
+    };
+
+    // ── AUTO DRAW ──────────────────────────────────────────────────────────
+    const getPartnerHistory = (p1Id: number, p2Id: number) => {
+        let count = 0;
+        apiMatches.forEach(m => {
+            if (m.match_status === "cancelled") return;
+            [m.team_a_id, m.team_b_id].forEach(t => {
+                if (!t) return;
+                const ids = t.team_players.map(tp => tp.user_id?.id).filter(Boolean);
+                if (ids.length === 2 && ids.includes(p1Id) && ids.includes(p2Id)) count++;
+            });
+        });
+        return count;
+    };
+
+    const pickBestDouble = (pool4: ApiPlayer[]): [ApiPlayer[], ApiPlayer[]] => {
+        const opts = [
+            { a: [pool4[0], pool4[1]], b: [pool4[2], pool4[3]], score: getPartnerHistory(pool4[0].id, pool4[1].id) + getPartnerHistory(pool4[2].id, pool4[3].id) },
+            { a: [pool4[0], pool4[2]], b: [pool4[1], pool4[3]], score: getPartnerHistory(pool4[0].id, pool4[2].id) + getPartnerHistory(pool4[1].id, pool4[3].id) },
+            { a: [pool4[0], pool4[3]], b: [pool4[1], pool4[2]], score: getPartnerHistory(pool4[0].id, pool4[3].id) + getPartnerHistory(pool4[1].id, pool4[2].id) },
+        ];
+        opts.sort((a, b) => a.score - b.score);
+        return [opts[0].a, opts[0].b];
+    };
 
     const handleDrawNext = async () => {
-        if (players.length < (tournamentType === "double" ? 4 : 2)) {
-            showToast("จำนวนผู้เล่นไม่เพียงพอ", "error");
+        const pPerMatch = tournamentType === "double" ? 4 : 2;
+        if (availablePlayers.length < pPerMatch) {
+            showToast("ผู้เล่นที่ว่างอยู่มีไม่เพียงพอสำหรับการจัดคู่ถัดไป", "error");
             return;
         }
 
         setDrawing(true);
         try {
-            // 1. Calculate matches played for each player AND identify busy players
-            const playerCounts = new Map<number, number>();
-            const busyPlayerIds = new Set<number>();
-            players.forEach(p => playerCounts.set(p.id, 0));
-
-            apiMatches.forEach(m => {
-                if (m.match_status === "cancelled") return;
-
-                const pids = [
-                    ...(m.team_a_id?.team_players.map(tp => tp.user_id?.id) || []),
-                    ...(m.team_b_id?.team_players.map(tp => tp.user_id?.id) || [])
-                ].filter(Boolean) as number[];
-
-                // Add to total match counts (for fairness)
-                pids.forEach(id => {
-                    if (playerCounts.has(id)) {
-                        playerCounts.set(id, playerCounts.get(id)! + 1);
-                    }
-                });
-
-                // If match is active (live or upcoming), players are busy
-                if (m.match_status === "live" || m.match_status === "upcoming") {
-                    pids.forEach(id => busyPlayerIds.add(id));
-                }
-            });
-
-            // 2. Filter available players and sort by matches played
-            const availablePlayers = players.filter(p => !busyPlayerIds.has(p.id));
-
-            if (availablePlayers.length < (tournamentType === "double" ? 4 : 2)) {
-                showToast("ผู้เล่นที่ว่างอยู่มีไม่เพียงพอสำหรับการจัดคู่ถัดไป", "error");
-                setDrawing(false);
-                return;
-            }
-
             const sortedPlayers = [...availablePlayers].sort((a, b) => {
                 const countA = playerCounts.get(a.id) || 0;
                 const countB = playerCounts.get(b.id) || 0;
                 if (countA !== countB) return countA - countB;
-                return Math.random() - 0.5; // Randomize if equal
+                return Math.random() - 0.5;
             });
 
-            const pPerMatch = tournamentType === "double" ? 4 : 2;
             const pool = sortedPlayers.slice(0, pPerMatch);
 
-            // 3. Smart Mix: For doubles, try to find the best way to split these 4 players
-            let selectedTeamA: any[] = [];
-            let selectedTeamB: any[] = [];
+            let selectedTeamA: ApiPlayer[] = [];
+            let selectedTeamB: ApiPlayer[] = [];
 
             if (tournamentType === "double" && pool.length === 4) {
-                // Partner history helper
-                const getHistory = (p1Id: number, p2Id: number) => {
-                    let count = 0;
-                    apiMatches.forEach(m => {
-                        if (m.match_status === "cancelled") return;
-                        [m.team_a_id, m.team_b_id].forEach(t => {
-                            if (!t) return;
-                            const ids = t.team_players.map(tp => tp.user_id?.id).filter(Boolean);
-                            if (ids.length === 2 && ids.includes(p1Id) && ids.includes(p2Id)) {
-                                count++;
-                            }
-                        });
-                    });
-                    return count;
-                };
-
-                // 3 possible ways to split 4 players [0,1,2,3] into two teams:
-                // Option 1: (0,1) vs (2,3)
-                // Option 2: (0,2) vs (1,3)
-                // Option 3: (0,3) vs (1,2)
-                const options = [
-                    { a: [pool[0], pool[1]], b: [pool[2], pool[3]], score: getHistory(pool[0].id, pool[1].id) + getHistory(pool[2].id, pool[3].id) },
-                    { a: [pool[0], pool[2]], b: [pool[1], pool[3]], score: getHistory(pool[0].id, pool[2].id) + getHistory(pool[1].id, pool[3].id) },
-                    { a: [pool[0], pool[3]], b: [pool[1], pool[2]], score: getHistory(pool[0].id, pool[3].id) + getHistory(pool[1].id, pool[2].id) },
-                ];
-
-                // Sort by least repeat history
-                options.sort((o1, o2) => o1.score - o2.score);
-                selectedTeamA = options[0].a;
-                selectedTeamB = options[0].b;
+                [selectedTeamA, selectedTeamB] = pickBestDouble(pool);
             } else {
                 selectedTeamA = [pool[0]];
                 selectedTeamB = pool.length > 1 ? [pool[1]] : [];
             }
 
-            const result = await Swal.fire({
-                title: "สุ่มคู่ถัดไป",
-                html: `
-                    <div class="space-y-4 text-left">
-                        <div class="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                            <p class="text-xs text-blue-400 font-bold mb-2">TEAM A</p>
-                            <p class="text-white font-bold">${selectedTeamA.map(p => p.username).join(" / ")}</p>
-                        </div>
-                        <div class="flex justify-center text-xl font-black text-slate-500">VS</div>
-                        <div class="p-3 bg-green-500/10 border border-green-500/20 rounded-xl">
-                            <p class="text-xs text-green-400 font-bold mb-2">TEAM B</p>
-                            <p class="text-white font-bold">${selectedTeamB.length > 0 ? selectedTeamB.map(p => p.username).join(" / ") : "รอนักกีฬา"}</p>
-                        </div>
-                    </div>
-                `,
-                icon: "question",
-                showCancelButton: true,
-                confirmButtonText: "สร้างแมตซ์เลย!",
-                cancelButtonText: "สุ่มใหม่",
-                confirmButtonColor: "#2ecc71",
-                background: "#1a2535",
-                color: "#fff"
-            });
-
-            if (!result.isConfirmed) {
-                setDrawing(false);
-                return;
-            }
-
-            // 4. Create teams and match
-            const postJSON = async (url: string, body: any) => {
-                const res = await fetch(`${STRAPI_BASE_URL}${url}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
-                    body: JSON.stringify(body),
-                });
-                if (!res.ok) throw new Error("API Error");
-                return res.json();
-            };
-
-            const randNo = () => Math.random().toString(36).substring(2, 10).toUpperCase();
-
-            // Create Team A
-            const resA = await postJSON("/api/teams", { data: { tournament_id: tournamentId, team_no: randNo() } });
-            const teamAId = resA.data.documentId || resA.data.id;
-            await Promise.all(selectedTeamA.map(p => postJSON("/api/team-players", { data: { team_id: teamAId, user_id: p.id } })));
-
-            // Create Team B
-            const resB = await postJSON("/api/teams", { data: { tournament_id: tournamentId, team_no: randNo() } });
-            const teamBId = resB.data.documentId || resB.data.id;
-            await Promise.all(selectedTeamB.map(p => postJSON("/api/team-players", { data: { team_id: teamBId, user_id: p.id } })));
-
-            // Create Match
-            const matchNo = apiMatches.length + 1;
-            await postJSON("/api/matches", {
-                data: {
-                    tournament_id: tournamentId,
-                    round: 1, // Endless mode uses flat rounds or match_no
-                    match_no: matchNo,
-                    team_a_id: teamAId,
-                    team_b_id: teamBId,
-                    match_status: "upcoming",
-                    first_serve: Math.random() > 0.5 ? "A" : "B"
-                }
-            });
-
-            showToast("สร้างแมตซ์เรียบร้อย!", "success");
-            refreshInfo();
+            await confirmAndCreateMatch(selectedTeamA, selectedTeamB);
         } catch (e) {
             console.error(e);
             showToast("เกิดข้อผิดพลาด", "error");
@@ -208,65 +266,397 @@ export default function EndlessModeManager({
         }
     };
 
+    // ── LOCKED MODE: pick best matchup from permanent teams ───────────────
+    const handleLockedDraw = async () => {
+        if (permanentTeams.length < 2) {
+            showToast("ต้องมีทีมอย่างน้อย 2 ทีมก่อนสุ่ม", "error");
+            return;
+        }
+
+        // Filter out teams that have any busy player
+        const availableTeams = permanentTeams.filter(team =>
+            team.players.every(p => !busyPlayerIds.has(p.id))
+        );
+
+        if (availableTeams.length < 2) {
+            showToast("ทีมที่ว่างมีไม่พอ (ต้องการอย่างน้อย 2 ทีมที่ไม่มีผู้เล่นแข่งอยู่)", "error");
+            return;
+        }
+
+        // Build all possible matchups and score them
+        // Score = faceoff_count * 100 + (teamA_matches + teamB_matches) * 1 + random jitter
+        // Lower = better (prefer fresh matchups and rested teams)
+        const matchups: { tA: PermanentTeam; tB: PermanentTeam; score: number }[] = [];
+
+        for (let i = 0; i < availableTeams.length - 1; i++) {
+            for (let j = i + 1; j < availableTeams.length; j++) {
+                const tA = availableTeams[i];
+                const tB = availableTeams[j];
+                const faceoffs = getFaceoffCount(tA.id, tB.id);
+                const matchLoad = (teamMatchCounts.get(tA.id) || 0) + (teamMatchCounts.get(tB.id) || 0);
+                const score = faceoffs * 100 + matchLoad + Math.random();
+                matchups.push({ tA, tB, score });
+            }
+        }
+
+        matchups.sort((a, b) => a.score - b.score);
+        const best = matchups[0];
+
+        setDrawing(true);
+        try {
+            await confirmAndCreateMatch(best.tA.players, best.tB.players, best.tA.label, best.tB.label);
+        } catch (e) {
+            console.error(e);
+            showToast("เกิดข้อผิดพลาด", "error");
+        } finally {
+            setDrawing(false);
+        }
+    };
+
+    // ── Shared: confirm & create match ────────────────────────────────────
+    const confirmAndCreateMatch = async (
+        teamA: ApiPlayer[],
+        teamB: ApiPlayer[],
+        labelA = "TEAM A",
+        labelB = "TEAM B",
+        onConfirm?: () => void
+    ) => {
+        const faceCount = (() => {
+            const ptA = permanentTeams.find(t => t.label === labelA);
+            const ptB = permanentTeams.find(t => t.label === labelB);
+            if (ptA && ptB) return getFaceoffCount(ptA.id, ptB.id);
+            return null;
+        })();
+
+        const result = await Swal.fire({
+            title: "ยืนยันการจัดคู่",
+            html: `
+                <div class="space-y-3 text-left">
+                    <div class="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                        <p class="text-xs text-blue-400 font-bold mb-1">${labelA}</p>
+                        <p class="text-white font-bold">${teamA.map(p => p.username).join(" / ")}</p>
+                    </div>
+                    <div class="flex justify-center text-xl font-black text-slate-500">VS</div>
+                    <div class="p-3 bg-green-500/10 border border-green-500/20 rounded-xl">
+                        <p class="text-xs text-green-400 font-bold mb-1">${labelB}</p>
+                        <p class="text-white font-bold">${teamB.length > 0 ? teamB.map(p => p.username).join(" / ") : "รอนักกีฬา"}</p>
+                    </div>
+                    ${faceCount !== null ? `<p class="text-center text-xs text-slate-500 mt-1">เคยเจอกันแล้ว ${faceCount} ครั้ง</p>` : ""}
+                </div>
+            `,
+            icon: "question",
+            showCancelButton: true,
+            confirmButtonText: "สร้างแมตซ์เลย!",
+            cancelButtonText: "ยกเลิก",
+            confirmButtonColor: "#2ecc71",
+            background: "#1a2535",
+            color: "#fff"
+        });
+
+        if (!result.isConfirmed) return;
+
+        const postJSON = async (url: string, body: any) => {
+            const res = await fetch(`${STRAPI_BASE_URL}${url}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) throw new Error("API Error");
+            return res.json();
+        };
+
+        const randNo = () => Math.random().toString(36).substring(2, 10).toUpperCase();
+
+        const resA = await postJSON("/api/teams", { data: { tournament_id: tournamentId, team_no: randNo() } });
+        const teamAId = resA.data.documentId || resA.data.id;
+        await Promise.all(teamA.map(p => postJSON("/api/team-players", { data: { team_id: teamAId, user_id: p.id } })));
+
+        const resB = await postJSON("/api/teams", { data: { tournament_id: tournamentId, team_no: randNo() } });
+        const teamBId = resB.data.documentId || resB.data.id;
+        await Promise.all(teamB.map(p => postJSON("/api/team-players", { data: { team_id: teamBId, user_id: p.id } })));
+
+        const matchNo = apiMatches.length + 1;
+        await postJSON("/api/matches", {
+            data: {
+                tournament_id: tournamentId,
+                round: 1,
+                match_no: matchNo,
+                team_a_id: teamAId,
+                team_b_id: teamBId,
+                match_status: "upcoming",
+                first_serve: Math.random() > 0.5 ? "A" : "B"
+            }
+        });
+
+        showToast("สร้างแมตซ์เรียบร้อย!", "success");
+        onConfirm?.();
+        refreshInfo();
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // UI helpers
+    const spinnerSvg = (
+        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────
     return (
-        <div className="bg-gradient-to-br from-indigo-900/40 to-slate-900/60 border border-indigo-500/20 rounded-2xl p-6 shadow-xl relative overflow-hidden group">
+        <div className="bg-gradient-to-br from-indigo-900/40 to-slate-900/60 border border-indigo-500/20 rounded-2xl p-4 sm:p-6 shadow-xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-indigo-500/10 transition-colors" />
 
             <div className="relative z-10">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h2 className="text-xl font-black text-white flex items-center gap-2">
-                            <span className="text-2xl">♾️</span> โหมดไร้สิ้นสุด
-                        </h2>
-                        <p className="text-xs text-slate-400 mt-1">สุ่มจัดคู่ถัดไปโดยเน้นคนเล่นน้อยที่สุดให้ได้ลงสนาม</p>
-                    </div>
+                {/* Header */}
+                <div className="mb-5">
+                    <h2 className="text-xl font-black text-white flex items-center gap-2">
+                        <span className="text-2xl">♾️</span> โหมดไร้สิ้นสุด
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">สุ่มจัดคู่ถัดไปโดยเน้นคนเล่นน้อยที่สุดให้ได้ลงสนาม</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
+                {/* Mode Toggle */}
+                <div className="flex gap-2 mb-5 p-1 bg-black/30 rounded-xl border border-white/5">
+                    <button
+                        onClick={() => setPairingMode("auto")}
+                        className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 min-h-[44px] ${pairingMode === "auto"
+                            ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/20"
+                            : "text-slate-400 hover:text-white"}`}
+                    >
+                        🎲 สุ่มอัตโนมัติ
+                    </button>
+                    <button
+                        onClick={() => setPairingMode("locked")}
+                        className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 min-h-[44px] ${pairingMode === "locked"
+                            ? "bg-amber-500 text-white shadow-lg shadow-amber-500/20"
+                            : "text-slate-400 hover:text-white"}`}
+                    >
+                        🔒 ล็อคทีม
+                    </button>
+                </div>
+
+                {/* ── AUTO MODE ── */}
+                {pairingMode === "auto" && (
+                    <div className="flex flex-col gap-4">
+                        {/* Player status list — collapsible on mobile */}
                         <div className="bg-black/20 rounded-xl p-4 border border-white/5">
                             <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">สถานะผู้เล่นปัจจุบัน</h3>
-                            <div className="max-h-48 overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-white/10">
+                            <div className="max-h-36 sm:max-h-48 overflow-y-auto space-y-1 pr-1">
                                 {players.map(p => {
-                                    const count = apiMatches.filter(m =>
-                                        m.match_status !== 'cancelled' &&
-                                        ([m.team_a_id, m.team_b_id].some(t => t?.team_players.some(tp => tp.user_id?.id === p.id)))
-                                    ).length;
+                                    const count = playerCounts.get(p.id) || 0;
+                                    const isBusy = busyPlayerIds.has(p.id);
                                     return (
-                                        <div key={p.id} className="flex items-center justify-between text-xs py-1 border-b border-white/5 last:border-0">
-                                            <span className="text-slate-300 truncate mr-2">{p.username}</span>
+                                        <div key={p.id} className="flex items-center justify-between text-xs py-1.5 border-b border-white/5 last:border-0">
+                                            <span className={`truncate mr-2 ${isBusy ? "text-slate-500" : "text-slate-300"}`}>
+                                                {isBusy && <span className="mr-1">⏳</span>}{p.username}
+                                            </span>
                                             <span className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 font-bold shrink-0">{count} แมตซ์</span>
                                         </div>
                                     );
                                 })}
                             </div>
                         </div>
-                    </div>
 
-                    <div className="flex flex-col justify-center items-center p-6 bg-indigo-500/5 rounded-2xl border border-indigo-500/10">
-                        <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center mb-4 border border-indigo-500/20">
-                            <span className="text-3xl animate-pulse">🏸</span>
+                        <div className="flex flex-col items-center p-5 bg-indigo-500/5 rounded-2xl border border-indigo-500/10">
+                            <div className="w-14 h-14 rounded-full bg-indigo-500/10 flex items-center justify-center mb-3 border border-indigo-500/20">
+                                <span className="text-3xl animate-pulse">🏸</span>
+                            </div>
+                            <p className="text-sm text-center text-slate-300 mb-4">ระบบจะคำนวณผู้เล่นที่เหมาะสมที่สุด<br />สำหรับแมตซ์ถัดไปโดยอัตโนมัติ</p>
+                            <button
+                                onClick={handleDrawNext}
+                                disabled={drawing || !jwt}
+                                className="w-full min-h-[48px] rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-black text-sm transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 flex items-center justify-center gap-2 group"
+                            >
+                                {drawing ? <>{spinnerSvg} กำลังสุ่ม...</>
+                                    : !jwt ? <span>🔒 เข้าสู่ระบบเพื่อสุ่มคู่</span>
+                                        : <><span>🎲 สุ่มแมตซ์ถัดไป</span><span className="group-hover:translate-x-1 transition-transform">→</span></>}
+                            </button>
                         </div>
-                        <p className="text-sm text-center text-slate-300 mb-6">ระบบจะคำนวณผู้เล่นที่เหมาะสมที่สุด<br />สำหรับแมตซ์ถัดไปโดยอัตโนมัติ</p>
-
-                        <button
-                            onClick={handleDrawNext}
-                            disabled={drawing || !jwt}
-                            className="w-full py-4 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-black text-sm transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 flex items-center justify-center gap-2 group"
-                        >
-                            {drawing ? (
-                                <><svg className="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> กำลังสุ่ม...</>
-                            ) : !jwt ? (
-                                <><span>🔒 เข้าสู่ระบบเพื่อสุ่มคู่</span></>
-                            ) : (
-                                <>
-                                    <span>🎲 สุ่มแมตซ์ถัดไป</span>
-                                    <span className="group-hover:translate-x-1 transition-transform">→</span>
-                                </>
-                            )}
-                        </button>
                     </div>
-                </div>
+                )}
+
+                {/* ── LOCKED MODE ── */}
+                {pairingMode === "locked" && (
+                    <div className="space-y-4">
+                        {/* Info banner */}
+                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3 text-xs text-amber-300 leading-relaxed">
+                            <strong>โหมดทีมถาวร:</strong> สร้างทีมไว้ล่วงหน้า ทีมจะคงอยู่ตลอดการแข่งขัน
+                            กด <strong>"สุ่มคู่"</strong> เพื่อให้ระบบเลือกคู่ที่ยังไม่เคยเจอกัน (หรือเจอน้อยที่สุด)
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4">
+                            {/* Add / Edit team panel — shown first on mobile */}
+                            <div className="bg-black/20 rounded-xl p-4 border border-white/5 order-first">
+                                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">
+                                    {editingTeamId
+                                        ? `✏️ แก้ไข ${permanentTeams.find(t => t.id === editingTeamId)?.label}`
+                                        : `➕ เพิ่มทีมใหม่ (ทีม ${permanentTeams.length + 1})`}
+                                    {" "}
+                                    <span className="text-indigo-400 normal-case">— เลือก {playersPerTeam} คน</span>
+                                </h3>
+
+                                <div className="max-h-44 sm:max-h-56 overflow-y-auto space-y-1.5 pr-1 mb-3">
+                                    {players.length === 0 && (
+                                        <p className="text-xs text-slate-600 text-center py-4">ไม่มีผู้เล่น</p>
+                                    )}
+                                    {players.map(p => {
+                                        const isSelected = selectedForNew.some(s => s.id === p.id);
+                                        const isAssigned = assignedPlayerIds.has(p.id);
+                                        const isMaxed = selectedForNew.length >= playersPerTeam && !isSelected;
+                                        const isBusy = busyPlayerIds.has(p.id);
+                                        const disabled = isAssigned || isMaxed;
+
+                                        return (
+                                            <button
+                                                key={p.id}
+                                                onClick={() => !disabled && toggleSelectPlayer(p)}
+                                                disabled={disabled}
+                                                className={`w-full flex items-center justify-between px-3 py-2.5 min-h-[40px] rounded-lg text-xs transition-all border active:scale-[0.98] ${isSelected
+                                                    ? "bg-amber-500/20 border-amber-500/40 text-amber-200"
+                                                    : isAssigned
+                                                        ? "bg-black/10 border-white/5 text-slate-600 cursor-not-allowed"
+                                                        : disabled
+                                                            ? "bg-black/10 border-white/5 text-slate-600 cursor-not-allowed"
+                                                            : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:border-white/20 cursor-pointer"}`}
+                                            >
+                                                <span className="font-medium truncate">
+                                                    {isSelected ? "✓ " : isAssigned ? "🔒 " : ""}{p.username}
+                                                    {isBusy && <span className="ml-1 text-orange-400">⏳</span>}
+                                                </span>
+                                                <span className="text-slate-500 shrink-0 ml-2">
+                                                    {playerCounts.get(p.id) || 0} แมตซ์
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={addOrUpdateTeam}
+                                        disabled={selectedForNew.length !== playersPerTeam}
+                                        className="flex-1 min-h-[44px] py-2.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed border border-amber-500/30 text-amber-300 font-bold text-xs transition-all truncate px-3"
+                                    >
+                                        {editingTeamId
+                                            ? `💾 บันทึก${selectedForNew.length > 0 ? ` (${selectedForNew.map(p => p.username).join(", ")})` : ""}`
+                                            : `🔒 บันทึกทีม${selectedForNew.length > 0 ? ` (${selectedForNew.map(p => p.username).join(", ")})` : ""}`}
+                                    </button>
+                                    {(selectedForNew.length > 0 || editingTeamId) && (
+                                        <button
+                                            onClick={cancelEdit}
+                                            className="px-4 min-h-[44px] rounded-lg text-xs text-slate-500 hover:text-red-400 border border-white/5 hover:border-red-500/20 transition-all shrink-0"
+                                        >
+                                            ✕
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Permanent teams list */}
+                            <div className="space-y-3">
+                                <div className="bg-black/20 rounded-xl p-4 border border-white/5">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                            ทีมถาวร ({permanentTeams.length} ทีม)
+                                        </h3>
+                                    </div>
+
+                                    {permanentTeams.length === 0 ? (
+                                        <p className="text-xs text-slate-600 text-center py-5">ยังไม่มีทีม · เพิ่มทีมด้านบน</p>
+                                    ) : (
+                                        <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                                            {permanentTeams.map((team, idx) => {
+                                                const color = TEAM_COLORS[idx % TEAM_COLORS.length];
+                                                const isBusy = team.players.some(p => busyPlayerIds.has(p.id));
+                                                const matchCount = teamMatchCounts.get(team.id) || 0;
+                                                const isEditing = editingTeamId === team.id;
+
+                                                return (
+                                                    <div
+                                                        key={team.id}
+                                                        className={`flex items-center justify-between p-3 rounded-lg border transition-all ${isEditing
+                                                            ? "bg-amber-500/15 border-amber-500/40"
+                                                            : `${color.bg} ${color.border}`}`}
+                                                    >
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                                                                <p className={`text-[10px] font-bold ${isEditing ? "text-amber-400" : color.text}`}>
+                                                                    {team.label}{isEditing && " · กำลังแก้ไข"}
+                                                                </p>
+                                                                {isBusy && (
+                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 font-bold">⏳ กำลังแข่ง</span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-sm font-bold text-white truncate">
+                                                                {team.players.map(p => p.username).join(" / ")}
+                                                            </p>
+                                                            <p className="text-[10px] text-slate-500 mt-0.5">{matchCount} แมตซ์</p>
+                                                        </div>
+                                                        <div className="flex gap-1 ml-2 shrink-0">
+                                                            <button
+                                                                onClick={() => isEditing ? cancelEdit() : startEditTeam(team)}
+                                                                className="p-2 rounded text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 active:scale-90 transition-all text-sm"
+                                                                title="แก้ไขทีม"
+                                                            >
+                                                                {isEditing ? "✕" : "✏️"}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => removeTeam(team.id)}
+                                                                className="p-2 rounded text-slate-500 hover:text-red-400 hover:bg-red-500/10 active:scale-90 transition-all text-sm"
+                                                                title="ลบทีม"
+                                                            >
+                                                                🗑
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Draw matchup button */}
+                                {permanentTeams.length >= 2 && (
+                                    <button
+                                        onClick={handleLockedDraw}
+                                        disabled={drawing || !jwt}
+                                        className="w-full min-h-[52px] rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 active:scale-[0.98] text-white font-black text-sm transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                                    >
+                                        {drawing ? <>{spinnerSvg} กำลังสุ่ม...</>
+                                            : <><span>🎲 สุ่มคู่จากทีมถาวร</span><span>→</span></>}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+
+
+                        {/* Faceoff history summary (shows when ≥2 teams) */}
+                        {permanentTeams.length >= 2 && (
+                            <div className="bg-black/20 rounded-xl p-4 border border-white/5">
+                                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">ประวัติการเจอกัน</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {permanentTeams.flatMap((tA, i) =>
+                                        permanentTeams.slice(i + 1).map(tB => {
+                                            const count = getFaceoffCount(tA.id, tB.id);
+                                            return (
+                                                <div key={`${tA.id}-${tB.id}`} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 border border-white/5 text-xs">
+                                                    <span className="text-slate-300 truncate">
+                                                        {tA.label} vs {tB.label}
+                                                    </span>
+                                                    <span className={`ml-2 shrink-0 font-bold ${count === 0 ? "text-green-400" : count <= 2 ? "text-amber-400" : "text-red-400"}`}>
+                                                        {count}×
+                                                    </span>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -933,7 +933,7 @@ export default function TournamentDetailPage() {
 
             {/* Toast */}
             {toast && (
-                <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border text-sm font-medium ${toast.type === "success"
+                <div className={`fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-auto z-50 flex items-center gap-3 px-4 py-3.5 rounded-2xl shadow-2xl border text-sm font-medium ${toast.type === "success"
                     ? "bg-[#0f2a1a] border-green-500/30 text-green-300"
                     : "bg-[#2a0f0f] border-red-500/30 text-red-300"
                     }`}>
@@ -973,7 +973,7 @@ export default function TournamentDetailPage() {
                 </div>
             )}
 
-            <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+            <main className="max-w-5xl mx-auto px-3 sm:px-4 pt-4 sm:pt-8 pb-8 space-y-4 sm:space-y-6">
                 {/* Header */}
                 <TournamentHeader
                     id={id as string}
@@ -1036,23 +1036,21 @@ export default function TournamentDetailPage() {
                 {/* Endless Mode Manager (Public View / Logged-in Sync) */}
                 {tournamentInfo?.tournament_status === "ongoing" &&
                     tournamentInfo?.format === "endless_mode" && (
-                        <div className="mb-8">
-                            <EndlessModeManager
-                                tournamentId={id as string}
-                                tournamentType={tournamentInfo.type as "single" | "double"}
-                                players={tournamentInfo.players}
-                                apiMatches={apiMatches}
-                                jwt={jwt!}
-                                STRAPI_BASE_URL={STRAPI_BASE_URL}
-                                refreshInfo={refreshInfo}
-                                showToast={showToast}
-                                pausedPlayerIds={pausedPlayerIds}
-                                setPausedPlayerIds={setPausedPlayerIds}
-                                tournamentStatus={tournamentInfo.tournament_status}
-                                userId={user?.id}
-                                ownerId={tournamentInfo.user_created?.id}
-                            />
-                        </div>
+                        <EndlessModeManager
+                            tournamentId={id as string}
+                            tournamentType={tournamentInfo.type as "single" | "double"}
+                            players={tournamentInfo.players}
+                            apiMatches={apiMatches}
+                            jwt={jwt!}
+                            STRAPI_BASE_URL={STRAPI_BASE_URL}
+                            refreshInfo={refreshInfo}
+                            showToast={showToast}
+                            pausedPlayerIds={pausedPlayerIds}
+                            setPausedPlayerIds={setPausedPlayerIds}
+                            tournamentStatus={tournamentInfo.tournament_status}
+                            userId={user?.id}
+                            ownerId={tournamentInfo.user_created?.id}
+                        />
                     )}
 
 

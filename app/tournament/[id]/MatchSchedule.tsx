@@ -36,30 +36,32 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
             {/* Background Decoration */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-[80px] pointer-events-none" />
 
-            <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between gap-3 relative z-10 bg-white/5">
-                <h2 className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 flex items-center gap-2.5 text-lg cursor-default">
-                    <span className="p-2 bg-gradient-to-br from-[#3498db] to-[#2980b9] rounded-xl shadow-lg shadow-blue-900/20 text-white shrink-0">📋</span>
-                    ตารางการแข่งขัน
+            <div className="px-4 py-3.5 border-b border-white/10 flex items-center justify-between gap-2 relative z-10 bg-white/5 flex-wrap">
+                <h2 className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 flex items-center gap-2 text-base cursor-default">
+                    <span className="p-1.5 bg-gradient-to-br from-[#3498db] to-[#2980b9] rounded-xl shadow-lg shadow-blue-900/20 text-white shrink-0">📋</span>
+                    ตารางแมตซ์
                 </h2>
-                <button onClick={() => fetchMatches()}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-semibold transition-all">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <span className="hidden sm:inline">รีเฟรช</span>
-                </button>
-                {tournamentInfo.tournament_status === "ongoing" && isOwner && (
-                    <button
-                        onClick={handleFinishTournament}
-                        disabled={starting}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-400 text-xs font-bold transition-all disabled:opacity-50"
-                    >
+                <div className="flex items-center gap-2 ml-auto">
+                    <button onClick={() => fetchMatches()}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-slate-300 text-xs font-semibold transition-all">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
-                        <span>จบการแข่งขัน</span>
+                        <span className="hidden sm:inline">รีเฟรช</span>
                     </button>
-                )}
+                    {tournamentInfo.tournament_status === "ongoing" && isOwner && (
+                        <button
+                            onClick={handleFinishTournament}
+                            disabled={starting}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 active:scale-95 border border-orange-500/30 text-orange-400 text-xs font-bold transition-all disabled:opacity-50"
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>จบการแข่งขัน</span>
+                        </button>
+                    )}
+                </div>
             </div>
 
             {apiMatches.length === 0 ? (
@@ -106,7 +108,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
 
                                     return (
                                         <div key={match.id}
-                                            className={`group relative overflow-hidden bg-black/20 border border-white/5 rounded-2xl p-4 transition-all duration-300 ${match.match_status !== "cancelled" ? "hover:bg-black/40 hover:border-white/10 hover:-translate-y-0.5 hover:shadow-xl cursor-pointer" : ""} ${match.match_status === "cancelled" ? "opacity-60 grayscale" : ""}`}
+                                            className={`group relative overflow-hidden bg-black/20 border border-white/5 rounded-2xl transition-all duration-300 ${match.match_status !== "cancelled" ? "hover:bg-black/40 hover:border-white/10 hover:-translate-y-0.5 hover:shadow-xl cursor-pointer active:scale-[0.99]" : ""} ${match.match_status === "cancelled" ? "opacity-60 grayscale" : ""}`}
                                             onClick={() => {
                                                 if (match.match_status === "cancelled") return;
                                                 setScoreEditing(match);
@@ -114,32 +116,32 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                 setScoreB(match.score_b ?? 0);
                                             }}>
 
-                                            {/* Status Badge */}
-                                            <div className="absolute top-3 left-4">
+                                            {/* Top info row: match no + status badge */}
+                                            <div className="flex items-center justify-between px-4 pt-3 pb-0">
                                                 <span className="text-[10px] font-bold text-slate-500 bg-white/5 border border-white/10 px-2 py-0.5 rounded-md">
                                                     แมตซ์ #{match.match_no}
                                                 </span>
-                                            </div>
-                                            <div className="absolute top-3 right-4">
-                                                {match.match_status === "cancelled" ? (
-                                                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-bold flex items-center gap-1">
-                                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
-                                                        ยกเลิกแล้ว
-                                                    </span>
-                                                ) : isCompleted ? (
-                                                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 font-bold shadow-[0_0_10px_rgba(46,204,113,0.15)] flex items-center gap-1">
-                                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                                        จบเต็มเวลา
-                                                    </span>
-                                                ) : tournamentInfo.tournament_status === "ongoing" ? (
-                                                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-[#3498db]/20 text-[#3498db] border border-[#3498db]/30 font-bold animate-pulse flex items-center gap-1">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-[#3498db]" />
-                                                        กำลังแข่ง
-                                                    </span>
-                                                ) : null}
+                                                <div>
+                                                    {match.match_status === "cancelled" ? (
+                                                        <span className="text-[10px] px-2.5 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-bold flex items-center gap-1">
+                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                                                            ยกเลิกแล้ว
+                                                        </span>
+                                                    ) : isCompleted ? (
+                                                        <span className="text-[10px] px-2.5 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 font-bold shadow-[0_0_10px_rgba(46,204,113,0.15)] flex items-center gap-1">
+                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                            จบแล้ว
+                                                        </span>
+                                                    ) : tournamentInfo.tournament_status === "ongoing" ? (
+                                                        <span className="text-[10px] px-2.5 py-1 rounded-full bg-[#3498db]/20 text-[#3498db] border border-[#3498db]/30 font-bold animate-pulse flex items-center gap-1">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-[#3498db]" />
+                                                            อยู่ระหว่าง
+                                                        </span>
+                                                    ) : null}
+                                                </div>
                                             </div>
 
-                                            <div className="mt-8 sm:mt-6 flex items-center justify-between gap-4">
+                                            <div className="mt-3 flex items-center justify-between gap-2 sm:gap-4 px-4 pb-4">
                                                 {/* Team A */}
                                                 <div className={`flex-1 min-w-0 transition-colors ${winnerA ? "text-green-400" : isCompleted && !winnerA ? "text-slate-500" : "text-white"}`}>
                                                     <div className="flex flex-col gap-3 justify-center h-full">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Swal from "sweetalert2";
 
 interface ApiPlayer {
@@ -33,6 +33,11 @@ interface EndlessModeManagerProps {
     STRAPI_BASE_URL: string;
     refreshInfo: () => void;
     showToast: (msg: string, type?: "success" | "error") => void;
+    pausedPlayerIds: Set<number>;
+    setPausedPlayerIds: React.Dispatch<React.SetStateAction<Set<number>>>;
+    tournamentStatus: string;
+    userId?: number;
+    ownerId?: number;
 }
 
 const TEAM_COLORS = [
@@ -54,23 +59,55 @@ export default function EndlessModeManager({
     jwt,
     STRAPI_BASE_URL,
     refreshInfo,
-    showToast
+    showToast,
+    pausedPlayerIds,
+    setPausedPlayerIds,
+    tournamentStatus,
+    userId,
+    ownerId
 }: EndlessModeManagerProps) {
     const [drawing, setDrawing] = useState(false);
     const [pairingMode, setPairingMode] = useState<PairingMode>("auto");
 
     // ── Permanent teams (persist across draws) ───────────────────────────
-    const [permanentTeams, setPermanentTeams] = useState<PermanentTeam[]>([]);
+    const [permanentTeams, setPermanentTeams] = useState<PermanentTeam[]>(() => {
+        if (typeof window !== "undefined") {
+            const saved = localStorage.getItem(`permanentTeams_${tournamentId}`);
+            if (saved) {
+                try {
+                    return JSON.parse(saved);
+                } catch (e) {
+                    return [];
+                }
+            }
+        }
+        return [];
+    });
+
+    // Save teams whenever they change
+    useEffect(() => {
+        localStorage.setItem(`permanentTeams_${tournamentId}`, JSON.stringify(permanentTeams));
+    }, [permanentTeams, tournamentId]);
+
     const [selectedForNew, setSelectedForNew] = useState<ApiPlayer[]>([]);
     const [editingTeamId, setEditingTeamId] = useState<string | null>(null); // team being edited
 
     const playersPerTeam = tournamentType === "double" ? 2 : 1;
 
+    // Clear cache if tournament is completed
+    useEffect(() => {
+        if (tournamentStatus === "completed") {
+            localStorage.removeItem(`permanentTeams_${tournamentId}`);
+            // Note: we don't clear the state immediately to allow viewing, 
+            // but next refresh will be empty.
+        }
+    }, [tournamentStatus, tournamentId]);
+
     // ── Compute busy & match counts ───────────────────────────────────────
-    const { busyPlayerIds, playerCounts } = useMemo(() => {
-        const counts = new Map<number, number>();
+    const { busyPlayerIds, actualPlayerCounts, effectivePlayerCounts } = useMemo(() => {
+        const actualCounts = new Map<number, number>();
         const busy = new Set<number>();
-        players.forEach(p => counts.set(p.id, 0));
+        players.forEach(p => actualCounts.set(p.id, 0));
 
         apiMatches.forEach(m => {
             if (m.match_status === "cancelled") return;
@@ -80,7 +117,7 @@ export default function EndlessModeManager({
             ].filter(Boolean) as number[];
 
             pids.forEach(id => {
-                if (counts.has(id)) counts.set(id, counts.get(id)! + 1);
+                if (actualCounts.has(id)) actualCounts.set(id, actualCounts.get(id)! + 1);
             });
 
             if (m.match_status === "live" || m.match_status === "upcoming") {
@@ -88,12 +125,25 @@ export default function EndlessModeManager({
             }
         });
 
-        return { busyPlayerIds: busy, playerCounts: counts };
+        // Apply Catch-up Offset (แต้มบุญ): 
+        // New players start with the minimum match count of established players.
+        const effectiveCounts = new Map(actualCounts);
+        const playedCounts = Array.from(actualCounts.values()).filter(c => c > 0);
+        if (playedCounts.length > 0) {
+            const minPlayed = Math.min(...playedCounts);
+            players.forEach(p => {
+                if (actualCounts.get(p.id) === 0) {
+                    effectiveCounts.set(p.id, minPlayed);
+                }
+            });
+        }
+
+        return { busyPlayerIds: busy, actualPlayerCounts: actualCounts, effectivePlayerCounts: effectiveCounts };
     }, [players, apiMatches]);
 
     const availablePlayers = useMemo(
-        () => players.filter(p => !busyPlayerIds.has(p.id)),
-        [players, busyPlayerIds]
+        () => players.filter(p => !busyPlayerIds.has(p.id) && !pausedPlayerIds.has(p.id)),
+        [players, busyPlayerIds, pausedPlayerIds]
     );
 
     // Players already assigned to a permanent team
@@ -123,6 +173,8 @@ export default function EndlessModeManager({
                     if (ids === key) c++;
                 });
             });
+            // Also apply effective logic to teams? 
+            // For now, teams use the average effective counts of their players.
             counts.set(team.id, c);
         });
         return counts;
@@ -149,9 +201,31 @@ export default function EndlessModeManager({
         return counts;
     }, [permanentTeams, apiMatches]);
 
-    const getFaceoffCount = (idA: string, idB: string) => {
-        const key = idA < idB ? `${idA}|${idB}` : `${idB}|${idA}`;
-        return teamFaceoffCounts.get(key) ?? 0;
+    const getFaceoffCount = (pidsA: number[], pidsB: number[]) => {
+        const keyA = [...pidsA].sort((a, b) => a - b).join(",");
+        const keyB = [...pidsB].sort((a, b) => a - b).join(",");
+        const matchKey = keyA < keyB ? `${keyA}|${keyB}` : `${keyB}|${keyA}`;
+        
+        let count = 0;
+        apiMatches.forEach(m => {
+            if (m.match_status === "cancelled") return;
+            const mA = m.team_a_id?.team_players.map(tp => tp.user_id?.id).filter(Boolean).sort((a, b) => a! - b!).join(",");
+            const mB = m.team_b_id?.team_players.map(tp => tp.user_id?.id).filter(Boolean).sort((a, b) => a! - b!).join(",");
+            if ((mA === keyA && mB === keyB) || (mA === keyB && mB === keyA)) count++;
+        });
+        return count;
+    };
+
+    const handleTogglePause = (player: ApiPlayer) => {
+        const newPaused = new Set(pausedPlayerIds);
+        if (newPaused.has(player.id)) {
+            newPaused.delete(player.id);
+            showToast(`ให้ ${player.username} กลับมาเล่นแล้ว`, "success");
+        } else {
+            newPaused.add(player.id);
+            showToast(`ให้ ${player.username} พักการเล่น`, "success");
+        }
+        setPausedPlayerIds(newPaused);
     };
 
     // ── Team management ────────────────────────────────────────────────────
@@ -229,35 +303,71 @@ export default function EndlessModeManager({
         return [opts[0].a, opts[0].b];
     };
 
-    const handleDrawNext = async () => {
-        const pPerMatch = tournamentType === "double" ? 4 : 2;
-        if (availablePlayers.length < pPerMatch) {
-            showToast("ผู้เล่นที่ว่างอยู่มีไม่เพียงพอสำหรับการจัดคู่ถัดไป", "error");
+    // ── HYBRID DRAW LOGIC: respects permanent teams and individuals ──────
+    const performHybridDraw = async () => {
+        const pPerTeam = tournamentType === "double" ? 2 : 1;
+
+        // 1. Available players
+        const freePlayers = players.filter(p => !busyPlayerIds.has(p.id) && !pausedPlayerIds.has(p.id));
+        const freePlayerIds = new Set(freePlayers.map(p => p.id));
+
+        // 2. Available permanent teams
+        const availTeams = permanentTeams.filter(t => t.players.every(p => freePlayerIds.has(p.id)));
+        const allTeamPlayerIds = new Set(permanentTeams.flatMap(t => t.players.map(p => p.id)));
+
+        // 3. Available individuals (not in ANY permanent team)
+        const availIndividuals = freePlayers.filter(p => !allTeamPlayerIds.has(p.id));
+
+        // 4. Build all possible "Sides"
+        const possibleSides: Array<{ players: ApiPlayer[]; label: string; matchCount: number }> = [];
+
+        // Add all available permanent teams
+        availTeams.forEach(t => {
+            // Use average EFFECTIVE count for teams
+            const avgCount = t.players.reduce((sum, p) => sum + (effectivePlayerCounts.get(p.id) || 0), 0) / t.players.length;
+            possibleSides.push({ players: t.players, label: t.label, matchCount: avgCount });
+        });
+
+        // Form sides from individuals
+        const sortedIndivs = [...availIndividuals].sort((a, b) => (effectivePlayerCounts.get(a.id) || 0) - (effectivePlayerCounts.get(b.id) || 0));
+        let i = 0;
+        while (i + pPerTeam <= sortedIndivs.length) {
+            const slice = sortedIndivs.slice(i, i + pPerTeam);
+            // Use average EFFECTIVE count for individual sides
+            const avgCount = slice.reduce((sum, p) => sum + (effectivePlayerCounts.get(p.id) || 0), 0) / slice.length;
+            possibleSides.push({
+                players: slice,
+                label: slice.length > 1 ? "กลุ่มอิสระ" : slice[0].username,
+                matchCount: avgCount
+            });
+            i += pPerTeam;
+        }
+
+        if (possibleSides.length < 2) {
+            showToast("ทรัพยากรไม่เพียงพอสำหรับจัดแมตซ์ (ต้องการทีมหรือกลุ่มผู้เล่นอิสระอย่างน้อย 2 ฝั่ง)", "error");
             return;
         }
 
+        // 5. Pick the best matchup
+        possibleSides.sort((a, b) => a.matchCount - b.matchCount);
+
+        // Pick most rested side
+        const sideA = possibleSides[0];
+        const otherSides = possibleSides.slice(1);
+
+        // Find best opponent for sideA
+        const scoredOpponents = otherSides.map(sideB => {
+            const faceoffs = getFaceoffCount(sideA.players.map(p => p.id), sideB.players.map(p => p.id));
+            const score = faceoffs * 100 + sideB.matchCount + Math.random();
+            return { sideB, score };
+        });
+
+        scoredOpponents.sort((a, b) => a.score - b.score);
+        const sideB = scoredOpponents[0].sideB;
+
         setDrawing(true);
         try {
-            const sortedPlayers = [...availablePlayers].sort((a, b) => {
-                const countA = playerCounts.get(a.id) || 0;
-                const countB = playerCounts.get(b.id) || 0;
-                if (countA !== countB) return countA - countB;
-                return Math.random() - 0.5;
-            });
-
-            const pool = sortedPlayers.slice(0, pPerMatch);
-
-            let selectedTeamA: ApiPlayer[] = [];
-            let selectedTeamB: ApiPlayer[] = [];
-
-            if (tournamentType === "double" && pool.length === 4) {
-                [selectedTeamA, selectedTeamB] = pickBestDouble(pool);
-            } else {
-                selectedTeamA = [pool[0]];
-                selectedTeamB = pool.length > 1 ? [pool[1]] : [];
-            }
-
-            await confirmAndCreateMatch(selectedTeamA, selectedTeamB);
+            await confirmAndCreateMatch(sideA.players, sideB.players, sideA.label, sideB.label);
         } catch (e) {
             console.error(e);
             showToast("เกิดข้อผิดพลาด", "error");
@@ -266,51 +376,12 @@ export default function EndlessModeManager({
         }
     };
 
-    // ── LOCKED MODE: pick best matchup from permanent teams ───────────────
+    const handleDrawNext = async () => {
+        await performHybridDraw();
+    };
+
     const handleLockedDraw = async () => {
-        if (permanentTeams.length < 2) {
-            showToast("ต้องมีทีมอย่างน้อย 2 ทีมก่อนสุ่ม", "error");
-            return;
-        }
-
-        // Filter out teams that have any busy player
-        const availableTeams = permanentTeams.filter(team =>
-            team.players.every(p => !busyPlayerIds.has(p.id))
-        );
-
-        if (availableTeams.length < 2) {
-            showToast("ทีมที่ว่างมีไม่พอ (ต้องการอย่างน้อย 2 ทีมที่ไม่มีผู้เล่นแข่งอยู่)", "error");
-            return;
-        }
-
-        // Build all possible matchups and score them
-        // Score = faceoff_count * 100 + (teamA_matches + teamB_matches) * 1 + random jitter
-        // Lower = better (prefer fresh matchups and rested teams)
-        const matchups: { tA: PermanentTeam; tB: PermanentTeam; score: number }[] = [];
-
-        for (let i = 0; i < availableTeams.length - 1; i++) {
-            for (let j = i + 1; j < availableTeams.length; j++) {
-                const tA = availableTeams[i];
-                const tB = availableTeams[j];
-                const faceoffs = getFaceoffCount(tA.id, tB.id);
-                const matchLoad = (teamMatchCounts.get(tA.id) || 0) + (teamMatchCounts.get(tB.id) || 0);
-                const score = faceoffs * 100 + matchLoad + Math.random();
-                matchups.push({ tA, tB, score });
-            }
-        }
-
-        matchups.sort((a, b) => a.score - b.score);
-        const best = matchups[0];
-
-        setDrawing(true);
-        try {
-            await confirmAndCreateMatch(best.tA.players, best.tB.players, best.tA.label, best.tB.label);
-        } catch (e) {
-            console.error(e);
-            showToast("เกิดข้อผิดพลาด", "error");
-        } finally {
-            setDrawing(false);
-        }
+        await performHybridDraw();
     };
 
     // ── Shared: confirm & create match ────────────────────────────────────
@@ -321,12 +392,7 @@ export default function EndlessModeManager({
         labelB = "TEAM B",
         onConfirm?: () => void
     ) => {
-        const faceCount = (() => {
-            const ptA = permanentTeams.find(t => t.label === labelA);
-            const ptB = permanentTeams.find(t => t.label === labelB);
-            if (ptA && ptB) return getFaceoffCount(ptA.id, ptB.id);
-            return null;
-        })();
+        const faceCount = getFaceoffCount(teamA.map(p => p.id), teamB.map(p => p.id));
 
         const result = await Swal.fire({
             title: "ยืนยันการจัดคู่",
@@ -390,7 +456,10 @@ export default function EndlessModeManager({
 
         showToast("สร้างแมตซ์เรียบร้อย!", "success");
         onConfirm?.();
-        refreshInfo();
+        // Wait a bit for the toast and then reload
+        setTimeout(() => {
+            window.location.reload();
+        }, 800);
     };
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -444,14 +513,31 @@ export default function EndlessModeManager({
                             <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">สถานะผู้เล่นปัจจุบัน</h3>
                             <div className="max-h-36 sm:max-h-48 overflow-y-auto space-y-1 pr-1">
                                 {players.map(p => {
-                                    const count = playerCounts.get(p.id) || 0;
+                                    const count = actualPlayerCounts.get(p.id) || 0;
                                     const isBusy = busyPlayerIds.has(p.id);
                                     return (
-                                        <div key={p.id} className="flex items-center justify-between text-xs py-1.5 border-b border-white/5 last:border-0">
-                                            <span className={`truncate mr-2 ${isBusy ? "text-slate-500" : "text-slate-300"}`}>
-                                                {isBusy && <span className="mr-1">⏳</span>}{p.username}
-                                            </span>
-                                            <span className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 font-bold shrink-0">{count} แมตซ์</span>
+                                        <div key={p.id} className="flex items-center justify-between text-xs py-1.5 border-b border-white/5 last:border-0 group/p">
+                                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                <span className={`truncate ${isBusy || pausedPlayerIds.has(p.id) ? "text-slate-500" : "text-slate-300"}`}>
+                                                    {isBusy && <span className="mr-1">⏳</span>}
+                                                    {pausedPlayerIds.has(p.id) && <span className="mr-1">⏸️</span>}
+                                                    {p.username}
+                                                </span>
+                                                {(userId === p.id || userId === ownerId) && (
+                                                    <button 
+                                                        onClick={() => handleTogglePause(p as ApiPlayer)}
+                                                        className={`opacity-0 group-hover/p:opacity-100 transition-opacity text-[9px] px-1.5 py-0.5 rounded border ${pausedPlayerIds.has(p.id) ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'}`}
+                                                    >
+                                                        {pausedPlayerIds.has(p.id) ? "ให้เล่น" : "ให้พัก"}
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {pausedPlayerIds.has(p.id) && (
+                                                    <span className="text-[10px] text-yellow-500 font-bold">พัก</span>
+                                                )}
+                                                <span className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 font-bold shrink-0">{count} แมตซ์</span>
+                                            </div>
                                         </div>
                                     );
                                 })}
@@ -525,7 +611,7 @@ export default function EndlessModeManager({
                                                     {isBusy && <span className="ml-1 text-orange-400">⏳</span>}
                                                 </span>
                                                 <span className="text-slate-500 shrink-0 ml-2">
-                                                    {playerCounts.get(p.id) || 0} แมตซ์
+                                                    {actualPlayerCounts.get(p.id) || 0} แมตซ์
                                                 </span>
                                             </button>
                                         );
@@ -639,7 +725,7 @@ export default function EndlessModeManager({
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     {permanentTeams.flatMap((tA, i) =>
                                         permanentTeams.slice(i + 1).map(tB => {
-                                            const count = getFaceoffCount(tA.id, tB.id);
+                                            const count = getFaceoffCount(tA.players.map(p => p.id), tB.players.map(p => p.id));
                                             return (
                                                 <div key={`${tA.id}-${tB.id}`} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 border border-white/5 text-xs">
                                                     <span className="text-slate-300 truncate">

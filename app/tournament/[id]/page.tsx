@@ -99,6 +99,7 @@ export default function TournamentDetailPage() {
     const [showScoreEdit, setShowScoreEdit] = useState(false);
     const [courtInput, setCourtInput] = useState("");
     const [timeInput, setTimeInput] = useState("");
+    const [pausedPlayerIds, setPausedPlayerIds] = useState<Set<number>>(new Set());
 
     const [showQR, setShowQR] = useState(false);
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
@@ -281,7 +282,7 @@ export default function TournamentDetailPage() {
 
         // Ensure unique players for draw to prevent duplicates in matches
         const uniquePlayers = Array.from(new Map(tournamentInfo.players.map(p => [p.id, p])).values());
-        const playersForDraw = [...uniquePlayers];
+        const playersForDraw = uniquePlayers.filter(p => !pausedPlayerIds.has(p.id));
         const pCount = playersForDraw.length;
 
         if (pCount < pPerMatch) {
@@ -505,7 +506,8 @@ export default function TournamentDetailPage() {
                 return;
             }
             // Simple fair draw for first match
-            const shuffled = [...tournamentInfo!.players].sort(() => Math.random() - 0.5);
+            const activePlayers = tournamentInfo!.players.filter(p => !pausedPlayerIds.has(p.id));
+            const shuffled = [...activePlayers].sort(() => Math.random() - 0.5);
             const teamA = tournamentInfo?.type === "double" ? [shuffled[0], shuffled[3]] : [shuffled[0]];
             const teamB = tournamentInfo?.type === "double" ? [shuffled[1], shuffled[2]] : [shuffled[1]];
             matchesToCreate = [{
@@ -1004,6 +1006,8 @@ export default function TournamentDetailPage() {
                             refreshInfo={refreshInfo}
                             showToast={showToast}
                             router={router}
+                            pausedPlayerIds={pausedPlayerIds}
+                            setPausedPlayerIds={setPausedPlayerIds}
                         />
 
                         <DrawSection
@@ -1038,10 +1042,15 @@ export default function TournamentDetailPage() {
                                 tournamentType={tournamentInfo.type as "single" | "double"}
                                 players={tournamentInfo.players}
                                 apiMatches={apiMatches}
-                                jwt={jwt || ""}
+                                jwt={jwt!}
                                 STRAPI_BASE_URL={STRAPI_BASE_URL}
                                 refreshInfo={refreshInfo}
                                 showToast={showToast}
+                                pausedPlayerIds={pausedPlayerIds}
+                                setPausedPlayerIds={setPausedPlayerIds}
+                                tournamentStatus={tournamentInfo.tournament_status}
+                                userId={user?.id}
+                                ownerId={tournamentInfo.user_created?.id}
                             />
                         </div>
                     )}

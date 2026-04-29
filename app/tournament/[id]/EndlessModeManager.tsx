@@ -8,6 +8,7 @@ interface ApiPlayer {
     username: string;
     picture?: { url: string } | null;
     rankings?: Array<{ mmr: number }> | null;
+    tpDocumentId?: string;
 }
 
 interface ApiMatch {
@@ -27,11 +28,12 @@ interface PermanentTeam {
 interface EndlessModeManagerProps {
     tournamentId: string;
     tournamentType: "single" | "double";
-    players: Array<{ id: number; username: string; picture?: { url: string } | null; rankings?: any }>;
+    players: Array<{ id: number; username: string; picture?: { url: string } | null; rankings?: any; tpDocumentId?: string }>;
+    permanentTeamsData?: any[];
     apiMatches: ApiMatch[];
     jwt: string;
     STRAPI_BASE_URL: string;
-    refreshInfo: () => void;
+    refreshInfo: () => any;
     showToast: (msg: string, type?: "success" | "error") => void;
     pausedPlayerIds: Set<number>;
     setPausedPlayerIds: React.Dispatch<React.SetStateAction<Set<number>>>;
@@ -55,6 +57,7 @@ export default function EndlessModeManager({
     tournamentId,
     tournamentType,
     players,
+    permanentTeamsData,
     apiMatches,
     jwt,
     STRAPI_BASE_URL,
@@ -70,36 +73,18 @@ export default function EndlessModeManager({
     const [pairingMode, setPairingMode] = useState<PairingMode>("auto");
 
     // ── Permanent teams (persist across draws) ───────────────────────────
-    const [permanentTeams, setPermanentTeams] = useState<PermanentTeam[]>(() => {
-        if (typeof window !== "undefined") {
-            const saved = localStorage.getItem(`permanentTeams_${tournamentId}`);
-            if (saved) {
-                try {
-                    return JSON.parse(saved);
-                } catch (e) {
-                    return [];
-                }
-            }
-        }
-        return [];
-    });
+    const [permanentTeams, setPermanentTeams] = useState<PermanentTeam[]>(permanentTeamsData || []);
 
-    // localStorage key helper
-    const storageKey = `permanentTeams_${tournamentId}`;
+    useEffect(() => {
+        if (permanentTeamsData) {
+            setPermanentTeams(permanentTeamsData);
+        }
+    }, [permanentTeamsData]);
 
     const [selectedForNew, setSelectedForNew] = useState<ApiPlayer[]>([]);
     const [editingTeamId, setEditingTeamId] = useState<string | null>(null); // team being edited
 
     const playersPerTeam = tournamentType === "double" ? 2 : 1;
-
-    // Clear cache if tournament is completed
-    useEffect(() => {
-        if (tournamentStatus === "completed") {
-            localStorage.removeItem(`permanentTeams_${tournamentId}`);
-            // Note: we don't clear the state immediately to allow viewing, 
-            // but next refresh will be empty.
-        }
-    }, [tournamentStatus, tournamentId]);
 
     // ── Compute busy & match counts ───────────────────────────────────────
     const { busyPlayerIds, actualPlayerCounts, effectivePlayerCounts } = useMemo(() => {
@@ -214,16 +199,43 @@ export default function EndlessModeManager({
         return count;
     };
 
-    const handleTogglePause = (player: ApiPlayer) => {
+    const handleTogglePause = async (player: ApiPlayer) => {
+        console.log("=== Toggle Pause Clicked ===");
+        console.log("Player Data:", player);
+        if (!player.tpDocumentId) {
+            showToast("ไม่สามารถพักผู้เล่นได้: ไม่พบรหัส Tournament Player", "error");
+            return;
+        }
         const newPaused = new Set(pausedPlayerIds);
-        if (newPaused.has(player.id)) {
-            newPaused.delete(player.id);
-            showToast(`ให้ ${player.username} กลับมาเล่นแล้ว`, "success");
-        } else {
+        const isNowPaused = !newPaused.has(player.id);
+        
+        if (isNowPaused) {
             newPaused.add(player.id);
             showToast(`ให้ ${player.username} พักการเล่น`, "success");
+        } else {
+            newPaused.delete(player.id);
+            showToast(`ให้ ${player.username} กลับมาเล่นแล้ว`, "success");
         }
         setPausedPlayerIds(newPaused);
+        
+        try {
+            const res = await fetch(`${STRAPI_BASE_URL}/api/tournament-players/${player.tpDocumentId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+                body: JSON.stringify({ data: { is_paused: isNowPaused } })
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(json.error?.message || `HTTP Error ${res.status}`);
+            }
+            refreshInfo();
+        } catch (e: any) {
+            console.error(e);
+            showToast(`อัปเดตสถานะไม่สำเร็จ: ${e.message}`, "error");
+            // Revert state if failed
+            const reverted = new Set(pausedPlayerIds);
+            setPausedPlayerIds(reverted);
+        }
     };
 
     // ── Team management ────────────────────────────────────────────────────
@@ -236,30 +248,40 @@ export default function EndlessModeManager({
         });
     };
 
-    const addOrUpdateTeam = () => {
+    const saveTeamsToDB = async (teams: PermanentTeam[]) => {
+        try {
+            await fetch(`${STRAPI_BASE_URL}/api/tournaments/${tournamentId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+                body: JSON.stringify({ data: { permanent_teams: teams } })
+            });
+            refreshInfo();
+        } catch (e) {
+            showToast("บันทึกทีมไม่สำเร็จ", "error");
+        }
+    };
+
+    const addOrUpdateTeam = async () => {
         if (selectedForNew.length !== playersPerTeam) return;
 
+        let updated: PermanentTeam[];
         if (editingTeamId) {
-            // Update only this team in cache
-            const updated = permanentTeams.map(t =>
+            updated = permanentTeams.map(t =>
                 t.id === editingTeamId ? { ...t, players: selectedForNew } : t
             );
-            setPermanentTeams(updated);
-            localStorage.setItem(storageKey, JSON.stringify(updated));
             setEditingTeamId(null);
         } else {
-            // Create new team — append to cache
             const idx = permanentTeams.length;
             const newTeam: PermanentTeam = {
                 id: Math.random().toString(36).slice(2),
                 label: `ทีม ${idx + 1}`,
                 players: selectedForNew,
             };
-            const updated = [...permanentTeams, newTeam];
-            setPermanentTeams(updated);
-            localStorage.setItem(storageKey, JSON.stringify(updated));
+            updated = [...permanentTeams, newTeam];
         }
+        setPermanentTeams(updated);
         setSelectedForNew([]);
+        await saveTeamsToDB(updated);
     };
 
     const startEditTeam = (team: PermanentTeam) => {
@@ -272,18 +294,13 @@ export default function EndlessModeManager({
         setSelectedForNew([]);
     };
 
-    const removeTeam = (id: string) => {
+    const removeTeam = async (id: string) => {
         const filtered = permanentTeams
             .filter(t => t.id !== id)
             .map((t, i) => ({ ...t, label: `ทีม ${i + 1}` }));
         setPermanentTeams(filtered);
-        // Update cache: save remaining teams (clear if none left)
-        if (filtered.length > 0) {
-            localStorage.setItem(storageKey, JSON.stringify(filtered));
-        } else {
-            localStorage.removeItem(storageKey);
-        }
         if (editingTeamId === id) cancelEdit();
+        await saveTeamsToDB(filtered);
     };
 
     // ── AUTO DRAW ──────────────────────────────────────────────────────────
@@ -300,269 +317,44 @@ export default function EndlessModeManager({
         return count;
     };
 
-    const pickBestDouble = (pool4: ApiPlayer[]): [ApiPlayer[], ApiPlayer[]] => {
-        const opts = [
-            { a: [pool4[0], pool4[1]], b: [pool4[2], pool4[3]], score: getPartnerHistory(pool4[0].id, pool4[1].id) + getPartnerHistory(pool4[2].id, pool4[3].id) },
-            { a: [pool4[0], pool4[2]], b: [pool4[1], pool4[3]], score: getPartnerHistory(pool4[0].id, pool4[2].id) + getPartnerHistory(pool4[1].id, pool4[3].id) },
-            { a: [pool4[0], pool4[3]], b: [pool4[1], pool4[2]], score: getPartnerHistory(pool4[0].id, pool4[3].id) + getPartnerHistory(pool4[1].id, pool4[2].id) },
-        ];
-        opts.sort((a, b) => a.score - b.score);
-        return [opts[0].a, opts[0].b];
-    };
-
-    // ── HYBRID DRAW LOGIC: respects permanent teams and individuals ──────
-    const performHybridDraw = async () => {
-        const pPerTeam = tournamentType === "double" ? 2 : 1;
-
-        // 1. Available players
-        const freePlayers = players.filter(p => !busyPlayerIds.has(p.id) && !pausedPlayerIds.has(p.id));
-        const freePlayerIds = new Set(freePlayers.map(p => p.id));
-
-        // 2. Available permanent teams
-        const availTeams = permanentTeams.filter(t => t.players.every(p => freePlayerIds.has(p.id)));
-        const allTeamPlayerIds = new Set(permanentTeams.flatMap(t => t.players.map(p => p.id)));
-
-        // 3. Available individuals (not in ANY permanent team)
-        const availIndividuals = freePlayers.filter(p => !allTeamPlayerIds.has(p.id));
-
-        // 4. Build all possible "Sides"
-        const possibleSides: Array<{ players: ApiPlayer[]; label: string; matchCount: number }> = [];
-
-        // Add all available permanent teams
-        availTeams.forEach(t => {
-            const avgCount = t.players.reduce((sum, p) => sum + (effectivePlayerCounts.get(p.id) || 0), 0) / t.players.length;
-            possibleSides.push({ players: t.players, label: t.label, matchCount: avgCount });
-        });
-
-        // Form sides from individuals — try many random permutations, pick the one with fewest partner repeats
-        const sortedIndivs = [...availIndividuals].sort(
-            (a, b) => (effectivePlayerCounts.get(a.id) || 0) - (effectivePlayerCounts.get(b.id) || 0)
-        );
-
-        if (pPerTeam === 2 && sortedIndivs.length >= 4) {
-            // Try up to 200 random groupings of all available individuals, pick best
-            const shuffle = (arr: ApiPlayer[]) => {
-                const a = [...arr];
-                for (let i = a.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [a[i], a[j]] = [a[j], a[i]];
-                }
-                return a;
-            };
-
-            let bestSides: Array<{ players: ApiPlayer[]; label: string; matchCount: number }> = [];
-            let bestScore = Infinity;
-
-            for (let attempt = 0; attempt < 200; attempt++) {
-                const shuffled = attempt === 0 ? sortedIndivs : shuffle(sortedIndivs);
-                const candidateSides: typeof bestSides = [];
-                let score = 0;
-                let i = 0;
-                while (i + 4 <= shuffled.length) {
-                    const [tA, tB] = pickBestDouble(shuffled.slice(i, i + 4));
-                    const avgA = tA.reduce((s, p) => s + (effectivePlayerCounts.get(p.id) || 0), 0) / tA.length;
-                    const avgB = tB.reduce((s, p) => s + (effectivePlayerCounts.get(p.id) || 0), 0) / tB.length;
-                    candidateSides.push({ players: tA, label: tA.map(p => p.username).join(" / "), matchCount: avgA });
-                    candidateSides.push({ players: tB, label: tB.map(p => p.username).join(" / "), matchCount: avgB });
-                    score += getPartnerHistory(tA[0].id, tA[1].id) + getPartnerHistory(tB[0].id, tB[1].id);
-                    i += 4;
-                }
-                // Handle leftover pair
-                if (shuffled.length - i === 2) {
-                    const slice = shuffled.slice(i, i + 2);
-                    const avg = slice.reduce((s, p) => s + (effectivePlayerCounts.get(p.id) || 0), 0) / slice.length;
-                    candidateSides.push({ players: slice, label: slice.map(p => p.username).join(" / "), matchCount: avg });
-                    score += getPartnerHistory(slice[0].id, slice[1].id);
-                }
-                if (score < bestScore) {
-                    bestScore = score;
-                    bestSides = candidateSides;
-                    if (score === 0) break; // Perfect — no repeats
-                }
-            }
-            bestSides.forEach(s => possibleSides.push(s));
-
-        } else if (pPerTeam === 2 && sortedIndivs.length === 2) {
-            // Only 2 individuals — must use them
-            const avg = sortedIndivs.reduce((s, p) => s + (effectivePlayerCounts.get(p.id) || 0), 0) / sortedIndivs.length;
-            possibleSides.push({ players: sortedIndivs, label: sortedIndivs.map(p => p.username).join(" / "), matchCount: avg });
-
-        } else {
-            // Single mode: pick in match-count order
-            let i = 0;
-            while (i + pPerTeam <= sortedIndivs.length) {
-                const slice = sortedIndivs.slice(i, i + pPerTeam);
-                const avg = slice.reduce((s, p) => s + (effectivePlayerCounts.get(p.id) || 0), 0) / slice.length;
-                possibleSides.push({ players: slice, label: slice[0].username, matchCount: avg });
-                i += pPerTeam;
-            }
-        }
-
-        if (possibleSides.length < 2) {
-            showToast("ทรัพยากรไม่เพียงพอสำหรับจัดแมตซ์ (ต้องการทีมหรือกลุ่มผู้เล่นอิสระอย่างน้อย 2 ฝั่ง)", "error");
-            return;
-        }
-
-        // 5. Pick the best matchup — lowest matchCount plays first
-        possibleSides.sort((a, b) => a.matchCount - b.matchCount);
-        const sideA = possibleSides[0];
-        const otherSides = possibleSides.slice(1);
-
-        // Score opponents: penalise faceoff repeats + partner repeats within each side
-        const partnerPenalty = (side: typeof sideA) =>
-            pPerTeam === 2 && side.players.length === 2
-                ? getPartnerHistory(side.players[0].id, side.players[1].id) * 80
-                : 0;
-
-        const scoredOpponents = otherSides.map(sideB => {
-            const faceoffs = getFaceoffCount(sideA.players.map(p => p.id), sideB.players.map(p => p.id));
-            const score = faceoffs * 100 + partnerPenalty(sideB) + sideB.matchCount + Math.random();
-            return { sideB, score };
-        });
-
-        scoredOpponents.sort((a, b) => a.score - b.score);
-        const sideB = scoredOpponents[0].sideB;
-
+    const handleDraw = async (mode: PairingMode) => {
         setDrawing(true);
         try {
-            await confirmAndCreateMatch(sideA.players, sideB.players, sideA.label, sideB.label);
-        } catch (e) {
-            console.error(e);
-            showToast("เกิดข้อผิดพลาด", "error");
-        } finally {
-            setDrawing(false);
-        }
-    };
-
-    const handleDrawNext = async () => {
-        await performHybridDraw();
-    };
-
-    const handleLockedDraw = async () => {
-        // Only use permanent teams — ignore all individual players
-        const freePlayerIds = new Set(
-            players
-                .filter(p => !busyPlayerIds.has(p.id) && !pausedPlayerIds.has(p.id))
-                .map(p => p.id)
-        );
-
-        // Teams where every player is free (not busy / not paused)
-        const availTeams = permanentTeams.filter(t =>
-            t.players.every(p => freePlayerIds.has(p.id))
-        );
-
-        if (availTeams.length < 2) {
-            showToast("ต้องการทีมถาวรที่พร้อมเล่นอย่างน้อย 2 ทีม", "error");
-            return;
-        }
-
-        // Score each team: lower match load = plays first
-        const teamMatchLoad = (team: typeof permanentTeams[0]) =>
-            team.players.reduce((sum, p) => sum + (effectivePlayerCounts.get(p.id) || 0), 0) / team.players.length;
-
-        const sorted = [...availTeams].sort((a, b) => teamMatchLoad(a) - teamMatchLoad(b));
-
-        // Pick most-rested team as sideA
-        const sideA = sorted[0];
-        const rest = sorted.slice(1);
-
-        // Score opponents: penalise faceoff repeats heavily, then match load
-        const scored = rest.map(sideB => {
-            const faceoffs = getFaceoffCount(sideA.players.map(p => p.id), sideB.players.map(p => p.id));
-            const score = faceoffs * 100 + teamMatchLoad(sideB) + Math.random();
-            return { sideB, score };
-        });
-        scored.sort((a, b) => a.score - b.score);
-        const sideB = scored[0].sideB;
-
-        setDrawing(true);
-        try {
-            await confirmAndCreateMatch(sideA.players, sideB.players, sideA.label, sideB.label);
-        } catch (e) {
-            console.error(e);
-            showToast("เกิดข้อผิดพลาด", "error");
-        } finally {
-            setDrawing(false);
-        }
-    };
-
-    // ── Shared: confirm & create match ────────────────────────────────────
-    const confirmAndCreateMatch = async (
-        teamA: ApiPlayer[],
-        teamB: ApiPlayer[],
-        labelA = "TEAM A",
-        labelB = "TEAM B",
-        onConfirm?: () => void
-    ) => {
-        const faceCount = getFaceoffCount(teamA.map(p => p.id), teamB.map(p => p.id));
-
-        const result = await Swal.fire({
-            title: "ยืนยันการจัดคู่",
-            html: `
-                <div class="space-y-3 text-left">
-                    <div class="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                        <p class="text-xs text-blue-400 font-bold mb-1">${labelA}</p>
-                        <p class="text-white font-bold">${teamA.map(p => p.username).join(" / ")}</p>
-                    </div>
-                    <div class="flex justify-center text-xl font-black text-slate-500">VS</div>
-                    <div class="p-3 bg-green-500/10 border border-green-500/20 rounded-xl">
-                        <p class="text-xs text-green-400 font-bold mb-1">${labelB}</p>
-                        <p class="text-white font-bold">${teamB.length > 0 ? teamB.map(p => p.username).join(" / ") : "รอนักกีฬา"}</p>
-                    </div>
-                    ${faceCount !== null ? `<p class="text-center text-xs text-slate-500 mt-1">เคยเจอกันแล้ว ${faceCount} ครั้ง</p>` : ""}
-                </div>
-            `,
-            icon: "question",
-            showCancelButton: true,
-            confirmButtonText: "สร้างแมตซ์เลย!",
-            cancelButtonText: "ยกเลิก",
-            confirmButtonColor: "#2ecc71",
-            background: "#1a2535",
-            color: "#fff"
-        });
-
-        if (!result.isConfirmed) return;
-
-        const postJSON = async (url: string, body: any) => {
-            const res = await fetch(`${STRAPI_BASE_URL}${url}`, {
+            const res = await fetch(`${STRAPI_BASE_URL}/api/tournaments/${tournamentId}/draw-next`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
-                body: JSON.stringify(body),
+                body: JSON.stringify({ data: { pairingMode: mode } })
             });
-            if (!res.ok) throw new Error("API Error");
-            return res.json();
-        };
-
-        const randNo = () => Math.random().toString(36).substring(2, 10).toUpperCase();
-
-        const resA = await postJSON("/api/teams", { data: { tournament_id: tournamentId, team_no: randNo() } });
-        const teamAId = resA.data.documentId || resA.data.id;
-        await Promise.all(teamA.map(p => postJSON("/api/team-players", { data: { team_id: teamAId, user_id: p.id } })));
-
-        const resB = await postJSON("/api/teams", { data: { tournament_id: tournamentId, team_no: randNo() } });
-        const teamBId = resB.data.documentId || resB.data.id;
-        await Promise.all(teamB.map(p => postJSON("/api/team-players", { data: { team_id: teamBId, user_id: p.id } })));
-
-        const matchNo = apiMatches.length + 1;
-        await postJSON("/api/matches", {
-            data: {
-                tournament_id: tournamentId,
-                round: 1,
-                match_no: matchNo,
-                team_a_id: teamAId,
-                team_b_id: teamBId,
-                match_status: "upcoming",
-                first_serve: Math.random() > 0.5 ? "A" : "B"
-            }
-        });
-
-        showToast("สร้างแมตซ์เรียบร้อย!", "success");
-        onConfirm?.();
-        // Wait a bit for the toast and then reload
-        setTimeout(() => {
-            window.location.reload();
-        }, 800);
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error?.message || "Error drawing match");
+            
+            Swal.fire({
+                title: "สำเร็จ!",
+                text: "สุ่มแมตซ์ถัดไปเรียบร้อยแล้ว",
+                icon: "success",
+                timer: 1500,
+                showConfirmButton: false
+            });
+            await refreshInfo();
+            // Scroll to Match Schedule
+            setTimeout(() => {
+                document.getElementById("match-schedule")?.scrollIntoView({ behavior: "smooth" });
+            }, 300);
+        } catch (e: any) {
+            console.error(e);
+            Swal.fire({
+                title: "ไม่สามารถสุ่มคู่ได้",
+                text: e.message || "เกิดข้อผิดพลาด",
+                icon: "warning",
+                confirmButtonColor: "#6366f1"
+            });
+        } finally {
+            setDrawing(false);
+        }
     };
+
+    const handleDrawNext = () => handleDraw("auto");
+    const handleLockedDraw = () => handleDraw("locked");
 
     // ─────────────────────────────────────────────────────────────────────────
     // UI helpers
@@ -637,7 +429,9 @@ export default function EndlessModeManager({
                     <div className="px-4 pb-4 pt-1 space-y-2">
                         {/* Player roster */}
                         <div className="space-y-1">
-                            {players.map(p => {
+                            {[...players]
+                                .sort((a, b) => (busyPlayerIds.has(b.id) ? 1 : 0) - (busyPlayerIds.has(a.id) ? 1 : 0))
+                                .map(p => {
                                 const count = actualPlayerCounts.get(p.id) || 0;
                                 const isBusy = busyPlayerIds.has(p.id);
                                 const isPaused = pausedPlayerIds.has(p.id);
@@ -714,7 +508,9 @@ export default function EndlessModeManager({
                                     <span className="text-[10px] text-slate-600">{permanentTeams.length} ทีม</span>
                                 </div>
                                 <div className="space-y-1.5">
-                                    {permanentTeams.map((team, idx) => {
+                                    {[...permanentTeams]
+                                        .sort((a, b) => (a.players.some(p => busyPlayerIds.has(p.id)) ? 1 : 0) - (b.players.some(p => busyPlayerIds.has(p.id)) ? 1 : 0))
+                                        .map((team, idx) => {
                                         const color = TEAM_COLORS[idx % TEAM_COLORS.length];
                                         const isBusy = team.players.some(p => busyPlayerIds.has(p.id));
                                         const matchCount = teamMatchCounts.get(team.id) || 0;

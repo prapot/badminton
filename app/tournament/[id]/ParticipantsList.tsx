@@ -39,16 +39,41 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
     pausedPlayerIds,
     setPausedPlayerIds,
 }) => {
-    const handleTogglePause = (player: any) => {
+    const handleTogglePause = async (player: any) => {
+        if (!player.tpDocumentId) {
+            showToast("ไม่สามารถพักผู้เล่นได้: ไม่พบรหัส Tournament Player", "error");
+            return;
+        }
+
         const newPaused = new Set(pausedPlayerIds);
-        if (newPaused.has(player.id)) {
-            newPaused.delete(player.id);
-            showToast("กลับมาเล่นแล้ว", "success");
-        } else {
+        const isNowPaused = !newPaused.has(player.id);
+
+        if (isNowPaused) {
             newPaused.add(player.id);
             showToast("พักการเล่นชั่วคราว", "success");
+        } else {
+            newPaused.delete(player.id);
+            showToast("กลับมาเล่นแล้ว", "success");
         }
         setPausedPlayerIds(newPaused);
+
+        try {
+            const res = await fetch(`${STRAPI_BASE_URL}/api/tournament-players/${player.tpDocumentId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+                body: JSON.stringify({ data: { is_paused: isNowPaused } })
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(json.error?.message || `HTTP Error ${res.status}`);
+            }
+            refreshInfo();
+        } catch (e: any) {
+            console.error(e);
+            showToast(`อัปเดตสถานะไม่สำเร็จ: ${e.message}`, "error");
+            const reverted = new Set(pausedPlayerIds);
+            setPausedPlayerIds(reverted);
+        }
     };
 
     const myPlayerEntry = tournamentInfo.players.find(p => p.id === user?.id);

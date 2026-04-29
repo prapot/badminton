@@ -32,7 +32,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
     if (tournamentInfo.tournament_status !== "ongoing" && tournamentInfo.tournament_status !== "completed") return null;
 
     return (
-        <div className="bg-gradient-to-br from-[#1a2535] to-[#0f1923] border border-white/10 rounded-3xl overflow-hidden shadow-2xl relative">
+        <div id="match-schedule" className="bg-gradient-to-br from-[#1a2535] to-[#0f1923] border border-white/10 rounded-3xl overflow-hidden shadow-2xl relative">
             {/* Background Decoration */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-[80px] pointer-events-none" />
 
@@ -83,7 +83,21 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                             </div>
 
                             <div className="grid gap-3">
-                                {apiMatches.filter(m => m.round === round).map(match => {
+                                {apiMatches
+                                    .filter(m => m.round === round)
+                                    .sort((a, b) => {
+                                        const getStatusScore = (s: string) => {
+                                            if (s === "upcoming") return 1;
+                                            if (s === "done") return 2;
+                                            if (s === "cancelled") return 3;
+                                            return 4;
+                                        };
+                                        const scoreA = getStatusScore(a.match_status);
+                                        const scoreB = getStatusScore(b.match_status);
+                                        if (scoreA !== scoreB) return scoreA - scoreB;
+                                        return (b.match_no ?? 0) - (a.match_no ?? 0);
+                                    })
+                                    .map(match => {
                                     const isCompleted = match.match_status === "done";
                                     const winnerA = isCompleted && match.score_a > match.score_b;
                                     const winnerB = isCompleted && match.score_b > match.score_a;

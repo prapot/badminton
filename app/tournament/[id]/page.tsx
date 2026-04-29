@@ -100,16 +100,16 @@ export default function TournamentDetailPage() {
     const [courtInput, setCourtInput] = useState("");
     const [timeInput, setTimeInput] = useState("");
     const [pausedPlayerIds, setPausedPlayerIds] = useState<Set<number>>(new Set());
-
+    
     const [showQR, setShowQR] = useState(false);
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
     const shareUrl = `${appUrl}/tournament/${id}`;
 
     const fetchMatches = (token = jwt, formatArg?: string) => {
-        if (!token || !id) return;
+        if (!token || !id) return Promise.resolve();
         const fmt = formatArg || tournamentInfo?.format;
         const sortOrder = fmt === "endless_mode" ? "desc" : "asc";
-        fetch(
+        return fetch(
             `${STRAPI_BASE_URL}/api/matches?filters[tournament_id][documentId][$eq]=${id}&populate[team_a_id][populate][team_players][populate][user_id][populate][rankings][filters][season][is_active][$eq]=true&populate[team_a_id][populate][team_players][populate][user_id][populate][picture][fields][0]=url&populate[team_b_id][populate][team_players][populate][user_id][populate][rankings][filters][season][is_active][$eq]=true&populate[team_b_id][populate][team_players][populate][user_id][populate][picture][fields][0]=url&populate[match_histories][populate][users][fields]=*&sort=match_no:${sortOrder}&pagination[pageSize]=100`,
             { headers: { Authorization: `Bearer ${token}` } }
         )
@@ -126,6 +126,17 @@ export default function TournamentDetailPage() {
     // Tournament info from API
     const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo | null>(null);
 
+    // Sync paused state from DB
+    useEffect(() => {
+        if (tournamentInfo?.players) {
+            const paused = new Set<number>();
+            tournamentInfo.players.forEach(p => {
+                if (p.is_paused) paused.add(p.id);
+            });
+            setPausedPlayerIds(paused);
+        }
+    }, [tournamentInfo?.players]);
+
     useEffect(() => {
         if (!jwt || !id) return;
         fetch(
@@ -135,7 +146,7 @@ export default function TournamentDetailPage() {
             .then((r) => r.json())
             .then((json) => {
                 const data = json.data ?? json;
-                const tpArr: Array<{ documentId?: string; user?: Omit<RegisteredPlayer, "tpDocumentId"> }> = data.tournament_players ?? [];
+                const tpArr: Array<{ documentId?: string; id?: number | string; is_paused?: boolean; user?: Omit<RegisteredPlayer, "tpDocumentId" | "is_paused"> }> = data.tournament_players ?? [];
                 setTournamentInfo({
                     name: data.name ?? "",
                     tournament_status: data.tournament_status ?? "upcoming",
@@ -148,11 +159,12 @@ export default function TournamentDetailPage() {
                         .reduce((acc, current) => {
                             const x = acc.find(item => item.id === current.user!.id);
                             if (!x) {
-                                return acc.concat([{ ...current.user!, tpDocumentId: current.documentId ?? "" }]);
+                                return acc.concat([{ ...current.user!, tpDocumentId: String(current.documentId || current.id || ""), is_paused: current.is_paused || false }]);
                             } else {
                                 return acc;
                             }
                         }, [] as RegisteredPlayer[]),
+                    permanent_teams: data.permanent_teams || [],
                     user_created: data.user_created ? { id: data.user_created.id || data.user_created } : (data.user_id ? { id: data.user_id } : null),
                 });
             })
@@ -167,26 +179,27 @@ export default function TournamentDetailPage() {
     }, [tournamentInfo?.tournament_status]);
 
     const refreshInfo = () => {
-        if (!jwt || !id) return;
-        fetch(
+        if (!jwt || !id) return Promise.resolve();
+        return fetch(
             `${STRAPI_BASE_URL}/api/tournaments/${id}?populate[tournament_players][populate][user][populate][picture][fields][0]=url&populate[tournament_players][populate][user][populate][rankings][filters][season][is_active][$eq]=true&populate[user_created][populate][picture][fields][0]=url&populate[user_created][populate][rankings][filters][season][is_active][$eq]=true`,
             { headers: { Authorization: `Bearer ${jwt}` } }
         )
             .then((r) => r.json())
             .then((json) => {
                 const data = json.data ?? json;
-                const tpArr: Array<{ documentId?: string; user?: Omit<RegisteredPlayer, "tpDocumentId"> }> = data.tournament_players ?? [];
+                const tpArr: Array<{ documentId?: string; id?: number | string; is_paused?: boolean; user?: Omit<RegisteredPlayer, "tpDocumentId" | "is_paused"> }> = data.tournament_players ?? [];
                 setTournamentInfo((prev) => prev ? {
                     ...prev,
                     startDate: data.startDate ?? prev.startDate,
                     mode: data.mode ?? prev.mode,
                     players: tpArr
                         .filter((tp) => !!tp.user)
-                        .map((tp) => ({ ...tp.user!, tpDocumentId: tp.documentId ?? "" })),
+                        .map((tp) => ({ ...tp.user!, tpDocumentId: String(tp.documentId || tp.id || ""), is_paused: tp.is_paused || false })),
+                    permanent_teams: data.permanent_teams || [],
                     user_created: data.user_created ? { id: data.user_created.id || data.user_created } : (data.user_id ? { id: data.user_id } : null),
                 } : null);
                 // Also refresh matches correctly
-                fetchMatches(jwt, data.format);
+                return fetchMatches(jwt, data.format);
             })
             .catch(() => { /* silent */ });
     };
@@ -1040,6 +1053,7 @@ export default function TournamentDetailPage() {
                             tournamentId={id as string}
                             tournamentType={tournamentInfo.type as "single" | "double"}
                             players={tournamentInfo.players}
+                            permanentTeamsData={tournamentInfo.permanent_teams || []}
                             apiMatches={apiMatches}
                             jwt={jwt!}
                             STRAPI_BASE_URL={STRAPI_BASE_URL}

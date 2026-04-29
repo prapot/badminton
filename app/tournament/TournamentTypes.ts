@@ -36,6 +36,7 @@ export interface RegisteredPlayer {
     tpDocumentId: string;
     picture?: { url: string } | null;
     rankings?: ApiRanking[] | null;
+    is_paused?: boolean;
 }
 
 export interface TournamentInfo {
@@ -47,6 +48,7 @@ export interface TournamentInfo {
     mode: "ranking" | "casual";
     players: RegisteredPlayer[];
     user_created?: { id: number; username?: string } | null;
+    permanent_teams?: any[];
 }
 
 export interface ApiRanking {

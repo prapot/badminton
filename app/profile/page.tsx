@@ -50,15 +50,18 @@ export default function ProfilePage() {
                 setPreviewObjUrl(user.picture.url.startsWith("http") ? user.picture.url : `${STRAPI_BASE_URL}${user.picture.url}`);
             }
 
-            // Fetch ranking data
+            // Fetch ranking data for CURRENT ACTIVE SEASON
             const fetchRanking = async () => {
                 try {
-                    const res = await fetch(`${STRAPI_BASE_URL}/api/rankings?filters[user_id]=${user.id}&populate=*`, {
+                    const res = await fetch(`${STRAPI_BASE_URL}/api/rankings?filters[user_id]=${user.id}&filters[season][is_active]=true&populate=*`, {
                         headers: { Authorization: `Bearer ${jwt}` }
                     });
                     const data = await res.json();
                     if (data.data && data.data.length > 0) {
                         setUserRanking(data.data[0]);
+                    } else {
+                        // Fallback if no active season ranking exists yet
+                        setUserRanking({ rank: "Unranked", stars: 0, mmr: 1500, win: 0, lose: 0 });
                     }
                 } catch (err) {
                     console.error("Failed to fetch ranking", err);

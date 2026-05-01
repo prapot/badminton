@@ -72,21 +72,6 @@ interface PlayerRow {
     rankings?: any[]; // For RankBadge consistency
 }
 
-const levelColors: Record<string, string> = {
-    "A+": "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",
-    "A": "bg-orange-500/20 text-orange-300 border-orange-500/30",
-    "B+": "bg-blue-500/20 text-blue-300 border-blue-500/30",
-    "B": "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
-    "C+": "bg-slate-500/20 text-slate-300 border-slate-500/30",
-};
-
-function getPlayerLevel(mmr: number): string {
-    if (mmr >= 2200) return "A+";
-    if (mmr >= 1900) return "A";
-    if (mmr >= 1700) return "B+";
-    if (mmr >= 1500) return "B";
-    return "C+";
-}
 
 const podiumColors = [
     { bg: "from-yellow-500/30 to-yellow-600/10", border: "border-yellow-500/40", ring: "ring-yellow-400/50", text: "text-yellow-300", icon: "🥇", glow: "shadow-yellow-500/20" },
@@ -328,7 +313,6 @@ export default function RankingPage() {
                         {[top3[1], top3[0], top3[2]].map((p, idx) => {
                             if (!p) return <div key={idx} />;
                             const podiumIdx = idx === 0 ? 1 : idx === 1 ? 0 : 2;
-                            const level = getPlayerLevel(p.mmr);
                             const c = podiumColors[podiumIdx];
                             const pUrl = p.picture?.url ? (p.picture.url.startsWith("http") ? p.picture.url : `${STRAPI_BASE_URL}${p.picture.url}`) : null;
                             const heights = ["h-24 sm:h-32", "h-36 sm:h-48", "h-16 sm:h-24"];
@@ -405,7 +389,6 @@ export default function RankingPage() {
                             </thead>
                             <tbody className="divide-y divide-white/5">
                                 {currentPagePlayers.map((p, idx) => {
-                                    const level = getPlayerLevel(p.mmr);
                                     const pUrl = p.picture?.url ? (p.picture.url.startsWith("http") ? p.picture.url : `${STRAPI_BASE_URL}${p.picture.url}`) : null;
                                     const rank = (page - 1) * 10 + idx + 1;
 
@@ -529,27 +512,54 @@ export default function RankingPage() {
                     </div>
                 )}
 
-                {/* Legend */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-5 shadow-inner">
-                        <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">ระดับผู้เล่น (Rank Tier)</h4>
-                        <div className="flex flex-wrap gap-x-6 gap-y-3">
-                            {Object.entries(levelColors).map(([level, cls]) => (
-                                <div key={level} className="flex items-center gap-2.5">
-                                    <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${cls}`}>{level}</span>
-                                    <span className="text-[11px] text-slate-400 font-bold">
-                                        {level === "A+" ? "Professional" : level === "A" ? "Advenced" : level === "B+" ? "Intermediate" : level === "B" ? "Casual" : "Newbie"}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
+                {/* Refined Rank Guide Section */}
+                <div className="mt-8 mb-12">
+                    <div className="text-center mb-10">
+                        <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-[0.2em] mb-2 drop-shadow-lg">
+                            Rank Progression Guide
+                        </h2>
+                        <p className="text-slate-500 text-sm font-medium uppercase tracking-widest">เส้นทางการไต่เต้าสู่ความเป็นหนึ่ง</p>
                     </div>
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-5 shadow-inner flex flex-col justify-center">
-                        <div className="flex items-center gap-4 mb-2">
-                            <span className="w-10 h-10 rounded-xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center text-xl shadow-lg shadow-orange-900/20">🔥</span>
-                            <div>
-                                <h4 className="text-xs font-black text-white uppercase tracking-wider">Win Streak</h4>
-                                <p className="text-[11px] text-slate-500 font-medium">คะแนนโบนัสจากการชนะติดต่อกัน</p>
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        {[
+                            { name: 'Bronze', stars: 3, color: 'from-[#cd7f32]/20 to-orange-950/40', border: 'border-orange-500/20', icon: '🥉', textColor: 'text-orange-200' },
+                            { name: 'Silver', stars: 3, color: 'from-slate-400/20 to-slate-800/40', border: 'border-slate-400/20', icon: '🥈', textColor: 'text-slate-200' },
+                            { name: 'Gold', stars: 4, color: 'from-yellow-500/20 to-yellow-900/40', border: 'border-yellow-500/20', icon: '🥇', textColor: 'text-yellow-100' },
+                            { name: 'Platinum', stars: 5, color: 'from-cyan-400/20 to-cyan-900/40', border: 'border-cyan-400/20', icon: '💎', textColor: 'text-cyan-100' },
+                            { name: 'Diamond', stars: 5, color: 'from-blue-500/20 to-blue-900/40', border: 'border-blue-500/20', icon: '💠', textColor: 'text-blue-100' },
+                            { name: 'Master', stars: '∞', color: 'from-red-500/20 to-red-950/40', border: 'border-red-500/20', icon: '🏆', textColor: 'text-red-100' },
+                        ].map((r) => (
+                            <div key={r.name} className={`group relative bg-gradient-to-br ${r.color} backdrop-blur-md border ${r.border} rounded-[2rem] p-6 flex flex-col items-center text-center transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-${r.name.toLowerCase()}-500/20 overflow-hidden`}>
+                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <div className="text-4xl mb-4 transform transition-transform duration-500 group-hover:scale-125 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
+                                    {r.icon}
+                                </div>
+                                <p className={`font-black ${r.textColor} text-base uppercase mb-1 tracking-tighter`}>{r.name}</p>
+                                <div className="h-px w-8 bg-white/10 mb-2" />
+                                <p className="text-[9px] text-slate-500 font-black uppercase tracking-[0.2em] opacity-60 group-hover:opacity-100 transition-opacity">
+                                    {r.stars === '∞' ? 'Infinite' : `${r.stars} Stars`}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Rules Note */}
+                    <div className="mt-10 relative overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8 group">
+                        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-transparent pointer-events-none" />
+                        <div className="relative flex flex-col sm:flex-row gap-6 items-center">
+                            <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-3xl shadow-lg shadow-orange-600/20 animate-pulse">
+                                🔥
+                            </div>
+                            <div className="text-center sm:text-left">
+                                <h3 className="text-white font-black text-lg sm:text-xl uppercase tracking-tighter mb-1">
+                                    Win Streak <span className="text-orange-500">Bonus</span>
+                                </h3>
+                                <p className="text-slate-400 text-xs sm:text-sm leading-relaxed max-w-xl">
+                                    ทะยานสู่อันดับสูงสุดให้ไวขึ้น! เมื่อชนะติดต่อกันครบ <span className="text-white font-bold underline decoration-orange-500 underline-offset-4">3 แมตซ์</span> 
+                                    รับดาวโบนัสเพิ่มทันที <span className="text-yellow-400 font-bold">+1 ดวง</span> 
+                                    <span className="block mt-1 text-[10px] opacity-50 uppercase tracking-widest">(Available for Bronze to Platinum only)</span>
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -561,4 +571,3 @@ export default function RankingPage() {
         </div>
     );
 }
-

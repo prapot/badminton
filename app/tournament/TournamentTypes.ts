@@ -57,6 +57,8 @@ export interface ApiRanking {
     lose: number;
     win_streak: number;
     mmr: number;
+    rank?: string;
+    stars?: number;
 }
 
 export interface ApiPlayer {

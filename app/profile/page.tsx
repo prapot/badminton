@@ -5,6 +5,7 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/lib/useAuth";
 import Swal from "sweetalert2";
+import RankBadge from "../tournament/RankBadge";
 
 const STRAPI_BASE_URL =
     process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
@@ -34,6 +35,8 @@ export default function ProfilePage() {
     const [error, setError] = useState<string | null>(null);
     const [file, setFile] = useState<File | null>(null);
     const [previewObjUrl, setPreviewObjUrl] = useState<string | null>(null);
+    const [userRanking, setUserRanking] = useState<any>(null);
+    const [loadingRank, setLoadingRank] = useState(true);
 
     // Populate form when user loads
     useEffect(() => {
@@ -46,6 +49,24 @@ export default function ProfilePage() {
             if (user.picture?.url) {
                 setPreviewObjUrl(user.picture.url.startsWith("http") ? user.picture.url : `${STRAPI_BASE_URL}${user.picture.url}`);
             }
+
+            // Fetch ranking data
+            const fetchRanking = async () => {
+                try {
+                    const res = await fetch(`${STRAPI_BASE_URL}/api/rankings?filters[user_id]=${user.id}&populate=*`, {
+                        headers: { Authorization: `Bearer ${jwt}` }
+                    });
+                    const data = await res.json();
+                    if (data.data && data.data.length > 0) {
+                        setUserRanking(data.data[0]);
+                    }
+                } catch (err) {
+                    console.error("Failed to fetch ranking", err);
+                } finally {
+                    setLoadingRank(false);
+                }
+            };
+            fetchRanking();
         }
     }, [user]);
 
@@ -188,10 +209,32 @@ export default function ProfilePage() {
                             }} />
                         </label>
                     </div>
-                    <div className="text-center sm:text-left mt-2 sm:mt-0">
-                        <p className="text-white font-semibold text-lg">{user.username}</p>
-                        <p className="text-slate-400 text-sm">{user.email}</p>
-                        <p className="text-slate-600 text-xs mt-0.5">ID: {user.id}</p>
+                    <div className="text-center sm:text-left mt-2 sm:mt-0 flex flex-col gap-2 flex-1">
+                        <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+                            <p className="text-white font-black text-2xl sm:text-3xl tracking-tight">{user.username}</p>
+                            <RankBadge 
+                                rank={userRanking?.rank || "Unranked"} 
+                                stars={userRanking?.stars || 0} 
+                                size="md"
+                            />
+                        </div>
+                        <div className="flex flex-wrap justify-center sm:justify-start items-center gap-3 text-sm">
+                            <div className="flex items-center gap-1.5 bg-black/30 px-2.5 py-1 rounded-lg border border-white/5">
+                                <span className="text-yellow-500 font-black">MMR: {userRanking?.mmr ?? 1500}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-slate-400 font-medium">
+                                <span className="flex items-center gap-1">
+                                    <span className="text-green-500">W:</span> {userRanking?.win ?? 0}
+                                </span>
+                                <span className="w-px h-3 bg-white/10" />
+                                <span className="flex items-center gap-1">
+                                    <span className="text-red-500">L:</span> {userRanking?.lose ?? 0}
+                                </span>
+                            </div>
+                        </div>
+                        <p className="text-slate-500 text-xs mt-1">
+                            <span className="opacity-50">Email:</span> {user.email} <span className="mx-2 opacity-20">|</span> <span className="opacity-50">UID:</span> {user.id}
+                        </p>
                     </div>
                 </div>
 

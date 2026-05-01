@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/lib/useAuth";
+import RankBadge from "../tournament/RankBadge";
 
 interface User {
     id: number;
@@ -36,6 +37,8 @@ interface TRanking {
     lose: number;
     win_streak: number;
     match_played: number;
+    rank?: string;
+    stars?: number;
     user_id: ApiUser | null;
 }
 
@@ -66,6 +69,7 @@ interface PlayerRow {
     match_played: number;
     hasRanking: boolean;
     rankingId?: number;
+    rankings?: any[]; // For RankBadge consistency
 }
 
 const levelColors: Record<string, string> = {
@@ -180,6 +184,7 @@ export default function RankingPage() {
                     match_played: r.match_played,
                     hasRanking: true,
                     rankingId: r.id,
+                    rankings: [{ rank: r.rank, stars: r.stars, mmr: r.mmr }]
                 });
             });
 
@@ -343,18 +348,15 @@ export default function RankingPage() {
 
                                         <div className="text-center relative z-10 min-w-0 w-full">
                                             <p className="font-black text-white text-xs sm:text-base leading-tight truncate px-1">{p.username}</p>
-                                            <p className={`text-[10px] sm:text-sm mt-1 sm:mt-2 font-black tracking-tighter sm:tracking-normal ${c.text}`}>{p.mmr.toLocaleString()} MMR</p>
-                                        </div>
-
-                                        <div className={`text-[8px] sm:text-[10px] font-black px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border relative z-10 ${levelColors[level]}`}>
-                                            {level}
                                         </div>
 
                                         <div className="text-xl sm:text-3xl relative z-10 filter drop-shadow-md">{c.icon}</div>
-
-                                        <div className="flex gap-2 sm:gap-4 text-[9px] sm:text-xs text-slate-400 font-bold relative z-10">
-                                            <span className="text-green-400">{p.win}W</span>
-                                            <span className="text-red-400">{p.lose}L</span>
+                                        <div className="flex flex-col items-center gap-1.5 relative z-10">
+                                            <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} size="sm" />
+                                            <div className="flex gap-2 sm:gap-4 text-[9px] sm:text-xs text-slate-400 font-bold">
+                                                <span className="text-green-400">{p.win}W</span>
+                                                <span className="text-red-400">{p.lose}L</span>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -395,11 +397,10 @@ export default function RankingPage() {
                                 <tr className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] border-b border-white/5 bg-black/20">
                                     <th className="px-6 py-4 text-left w-16">Rank</th>
                                     <th className="px-6 py-4 text-left">Player</th>
-                                    <th className="px-6 py-4 text-center md:table-cell">Level</th>
+                                    <th className="px-6 py-4 text-center">Tier</th>
                                     <th className="px-6 py-4 text-center">Played</th>
                                     <th className="px-6 py-4 text-center">W / L</th>
                                     <th className="px-6 py-4 text-center sm:table-cell">Streak</th>
-                                    <th className="px-6 py-4 text-right">MMR</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
@@ -452,10 +453,12 @@ export default function RankingPage() {
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-center md:table-cell">
-                                                <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border shadow-sm ${p.hasRanking ? levelColors[level] : "bg-white/5 text-slate-500 border-white/10"}`}>
-                                                    {p.hasRanking ? level : "-"}
-                                                </span>
+                                            <td className="px-6 py-4 text-center">
+                                                {p.hasRanking ? (
+                                                    <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} size="sm" />
+                                                ) : (
+                                                    <span className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">-</span>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <span className="text-xs sm:text-sm font-bold text-slate-300">{p.match_played}</span>
@@ -475,14 +478,6 @@ export default function RankingPage() {
                                                 ) : (
                                                     <span className="text-slate-700 font-bold">─</span>
                                                 )}
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex flex-col items-end">
-                                                    <span className={`text-sm sm:text-lg font-black tracking-tight ${rank <= 3 && p.hasRanking ? "text-white" : p.hasRanking ? "text-slate-200" : "text-slate-500"}`}>
-                                                        {p.hasRanking ? p.mmr.toLocaleString() : "-"}
-                                                    </span>
-                                                    <span className="text-[8px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5 sm:mt-0">Points</span>
-                                                </div>
                                             </td>
                                         </tr>
                                     );

@@ -1,6 +1,7 @@
 import React from 'react';
 import { TournamentInfo, User } from '../TournamentTypes';
 import Swal from 'sweetalert2';
+import RankBadge from '../RankBadge';
 
 interface ParticipantsListProps {
     tournamentInfo: TournamentInfo;
@@ -195,16 +196,24 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
 
                                     {/* Ranking stats - compact single line */}
                                     {tournamentInfo.mode === "ranking" && (
-                                        <div className="flex items-center gap-1.5 mt-0.5 text-[9px] font-medium">
-                                            <span className="text-yellow-500 font-bold">
-                                                {player.rankings?.[0]?.mmr ?? 1500}
-                                            </span>
-                                            <span className="text-slate-600">MMR</span>
-                                            <span className="text-green-400">W{player.rankings?.[0]?.win ?? 0}</span>
-                                            <span className="text-red-400">L{player.rankings?.[0]?.lose ?? 0}</span>
-                                            {(player.rankings?.[0]?.win_streak ?? 0) > 0 && (
-                                                <span className="text-orange-400">🔥{player.rankings?.[0]?.win_streak}</span>
-                                            )}
+                                        <div className="flex items-center gap-2 mt-1.5">
+                                            <RankBadge 
+                                                rank={player.rankings?.[0]?.rank} 
+                                                stars={player.rankings?.[0]?.stars} 
+                                                size="sm"
+                                            />
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] text-yellow-500/80 font-bold leading-none">
+                                                    {player.rankings?.[0]?.mmr ?? 1500} MMR
+                                                </span>
+                                                <div className="flex items-center gap-1 text-[8px] text-slate-400 font-medium">
+                                                    <span className="text-green-400">W{player.rankings?.[0]?.win ?? 0}</span>
+                                                    <span className="text-red-400">L{player.rankings?.[0]?.lose ?? 0}</span>
+                                                    {(player.rankings?.[0]?.win_streak ?? 0) > 0 && (
+                                                        <span className="text-orange-400">🔥{player.rankings?.[0]?.win_streak}</span>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
                                 </div>

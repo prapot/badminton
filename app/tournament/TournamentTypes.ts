@@ -37,6 +37,7 @@ export interface RegisteredPlayer {
     picture?: { url: string } | null;
     rankings?: ApiRanking[] | null;
     is_paused?: boolean;
+    match_offset?: number;
 }
 
 export interface TournamentInfo {

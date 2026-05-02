@@ -102,7 +102,8 @@ export default function RankingPage() {
     const fetchSeasons = async () => {
         try {
             const res = await fetch(`${STRAPI_BASE_URL}/api/seasons?sort=createdAt:desc`, {
-                headers: { Authorization: `Bearer ${jwt}` }
+                headers: { Authorization: `Bearer ${jwt}` },
+                cache: 'no-store'
             });
             if (res.ok) {
                 const json = await res.json();
@@ -126,12 +127,23 @@ export default function RankingPage() {
         setLoading(true);
         try {
             // 1. Fetch rankings for selected season
+            if (!selectedSeason && seasons.length > 0) return; // Wait for season selection if seasons exist
+
             let url = `${STRAPI_BASE_URL}/api/rankings?populate[user_id][populate][0]=picture&sort[0]=mmr:desc&pagination[pageSize]=1000`;
+            
+            // If no season is selected but we are on initial load, we might want to skip until fetchSeasons sets it
+            // OR if we want to show current active season specifically
             if (selectedSeason) {
                 url += `&filters[season][documentId][$eq]=${selectedSeason}`;
+            } else {
+                // If really no season selected (initial), default to active=true in API
+                url += `&filters[season][is_active][$eq]=true`;
             }
 
-            const rankingsRes = await fetch(url, { headers: { Authorization: `Bearer ${jwt}` } });
+            const rankingsRes = await fetch(url, { 
+                headers: { Authorization: `Bearer ${jwt}` },
+                cache: 'no-store' // Disable caching to always get fresh data
+            });
 
             if (!rankingsRes.ok) throw new Error("ไม่สามารถโหลดอันดับได้");
             const rankingsJson = await rankingsRes.json();

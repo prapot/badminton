@@ -39,6 +39,7 @@ import ParticipantsList from "./ParticipantsList";
 import DrawSection from "./DrawSection";
 import MatchSchedule from "./MatchSchedule";
 import QRInviteModal from "./QRInviteModal";
+import KnockoutManager from "./KnockoutManager";
 
 
 const STRAPI_BASE_URL =
@@ -75,23 +76,6 @@ export default function TournamentDetailPage() {
     const { id } = useParams<{ id: string }>();
     const { user, jwt } = useAuth();
     const [apiMatches, setApiMatches] = useState<ApiMatch[]>([]);
-    const playerMatchCounts = useMemo(() => {
-        const counts: Record<number, number> = {};
-
-        // Count only matches that are completed (scored)
-        apiMatches.forEach(match => {
-            if (match.match_status !== "done") return;
-            [match.team_a_id, match.team_b_id].forEach(team => {
-                team?.team_players.forEach(tp => {
-                    if (tp.user_id) {
-                        counts[tp.user_id.id] = (counts[tp.user_id.id] || 0) + 1;
-                    }
-                });
-            });
-        });
-
-        return counts;
-    }, [apiMatches]);
     const [scoreEditing, setScoreEditing] = useState<ApiMatch | null>(null);
     const [scoreA, setScoreA] = useState(0);
     const [scoreB, setScoreB] = useState(0);
@@ -110,7 +94,7 @@ export default function TournamentDetailPage() {
         const fmt = formatArg || tournamentInfo?.format;
         const sortOrder = fmt === "endless_mode" ? "desc" : "asc";
         return fetch(
-            `${STRAPI_BASE_URL}/api/matches?filters[tournament_id][documentId][$eq]=${id}&populate[team_a_id][populate][team_players][populate][user_id][populate][rankings][filters][season][is_active][$eq]=true&populate[team_a_id][populate][team_players][populate][user_id][populate][picture][fields][0]=url&populate[team_b_id][populate][team_players][populate][user_id][populate][rankings][filters][season][is_active][$eq]=true&populate[team_b_id][populate][team_players][populate][user_id][populate][picture][fields][0]=url&populate[match_histories][populate][users][fields]=*&sort=match_no:${sortOrder}&pagination[pageSize]=100`,
+            `${STRAPI_BASE_URL}/api/matches?filters[tournament_id][documentId][$eq]=${id}&populate[team_a_id][populate][team_players][populate][user_id][populate][rankings][filters][season][is_active][$eq]=true&populate[team_a_id][populate][team_players][populate][user_id][populate][picture][fields][0]=url&populate[team_b_id][populate][team_players][populate][user_id][populate][rankings][filters][season][is_active][$eq]=true&populate[team_b_id][populate][team_players][populate][user_id][populate][picture][fields][0]=url&populate[match_histories][populate][users][fields]=*&populate[team_winner][fields][0]=id&populate[team_winner][fields][1]=documentId&sort=match_no:${sortOrder}&pagination[pageSize]=100`,
             { headers: { Authorization: `Bearer ${token}` } }
         )
             .then((r) => r.json())
@@ -125,6 +109,46 @@ export default function TournamentDetailPage() {
 
     // Tournament info from API
     const [tournamentInfo, setTournamentInfo] = useState<TournamentInfo | null>(null);
+
+    const playerMatchCounts = useMemo(() => {
+        const counts: Record<number, number> = {};
+
+        // Add manual offsets first
+        tournamentInfo?.players.forEach(p => {
+             counts[p.id] = p.match_offset || 0;
+        });
+
+        // Count only matches that are completed (scored)
+        apiMatches.forEach(match => {
+            if (match.match_status !== "done") return;
+            [match.team_a_id, match.team_b_id].forEach(team => {
+                team?.team_players.forEach(tp => {
+                    if (tp.user_id) {
+                        counts[tp.user_id.id] = (counts[tp.user_id.id] || 0) + 1;
+                    }
+                });
+            });
+        });
+
+        if (tournamentInfo?.format === "endless_mode") {
+            const played = Object.values(counts).filter(c => c > 0).sort((a, b) => a - b);
+            if (played.length > 0) {
+                // Find true minimum of the main group (excluding recent joiners who drag the minimum down)
+                const median = played[Math.floor(played.length / 2)];
+                const mainGroup = played.filter(c => c >= median - 1);
+                const trueMin = mainGroup.length > 0 ? Math.min(...mainGroup) : median;
+                
+                Object.keys(counts).forEach(idStr => {
+                    const id = Number(idStr);
+                    if ((counts[id] || 0) < trueMin) {
+                        counts[id] = trueMin;
+                    }
+                });
+            }
+        }
+
+        return counts;
+    }, [apiMatches, tournamentInfo]);
 
     // Sync paused state from DB
     useEffect(() => {
@@ -187,14 +211,14 @@ export default function TournamentDetailPage() {
             .then((r) => r.json())
             .then((json) => {
                 const data = json.data ?? json;
-                const tpArr: Array<{ documentId?: string; id?: number | string; is_paused?: boolean; user?: Omit<RegisteredPlayer, "tpDocumentId" | "is_paused"> }> = data.tournament_players ?? [];
+                const tpArr: Array<{ documentId?: string; id?: number | string; is_paused?: boolean; match_offset?: number; user?: Omit<RegisteredPlayer, "tpDocumentId" | "is_paused" | "match_offset"> }> = data.tournament_players ?? [];
                 setTournamentInfo((prev) => prev ? {
                     ...prev,
                     startDate: data.startDate ?? prev.startDate,
                     mode: data.mode ?? prev.mode,
                     players: tpArr
                         .filter((tp) => !!tp.user)
-                        .map((tp) => ({ ...tp.user!, tpDocumentId: String(tp.documentId || tp.id || ""), is_paused: tp.is_paused || false })),
+                        .map((tp) => ({ ...tp.user!, tpDocumentId: String(tp.documentId || tp.id || ""), is_paused: tp.is_paused || false, match_offset: tp.match_offset || 0 })),
                     permanent_teams: data.permanent_teams || [],
                     user_created: data.user_created ? { id: data.user_created.id || data.user_created } : (data.user_id ? { id: data.user_id } : null),
                 } : null);
@@ -780,64 +804,6 @@ export default function TournamentDetailPage() {
                 throw new Error(err?.error?.message || `HTTP ${res.status}`);
             }
 
-            // Record match for ranking update (ranking mode only)
-            if (tournamentInfo?.mode === "ranking") {
-                const wasAlreadyDone = scoreEditing.match_status === "done";
-
-                try {
-                    // 1. If it was already done, revert the previous stats first
-                    if (wasAlreadyDone) {
-                        await fetch(`${STRAPI_BASE_URL}/api/rankings/revert-match`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
-                            body: JSON.stringify({
-                                data: {
-                                    match_id: scoreEditing.documentId,
-                                }
-                            }),
-                        });
-                    }
-
-                    // 2. Record the NEW stats (regardless of whether it was new or edited)
-                    const isTeamAWinner = scoreA > scoreB;
-                    const isTeamBWinner = scoreB > scoreA;
-
-                    let winners: number[] = [];
-                    let losers: number[] = [];
-
-                    if (isTeamAWinner) {
-                        winners = scoreEditing.team_a_id?.team_players.map(tp => tp.user_id?.id).filter((id): id is number => id !== undefined) || [];
-                        losers = scoreEditing.team_b_id?.team_players.map(tp => tp.user_id?.id).filter((id): id is number => id !== undefined) || [];
-                    } else if (isTeamBWinner) {
-                        winners = scoreEditing.team_b_id?.team_players.map(tp => tp.user_id?.id).filter((id): id is number => id !== undefined) || [];
-                        losers = scoreEditing.team_a_id?.team_players.map(tp => tp.user_id?.id).filter((id): id is number => id !== undefined) || [];
-                    }
-
-                    if (winners.length > 0 && losers.length > 0) {
-                        await fetch(`${STRAPI_BASE_URL}/api/rankings/record-match`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
-                            body: JSON.stringify({
-                                data: {
-                                    winners,
-                                    losers,
-                                    winner_score: isTeamAWinner ? scoreA : scoreB,
-                                    loser_score: isTeamAWinner ? scoreB : scoreA,
-                                    match_id: scoreEditing.documentId,
-                                }
-                            }),
-                        });
-                    }
-
-                    showToast(wasAlreadyDone ? "แก้ไขและอัปเดตอันดับเรียบร้อย ✨" : "บันทึกผลการแข่งเรียบร้อย ✅", "success");
-                } catch (err) {
-                    console.error("Failed to sync ranking", err);
-                    showToast("บันทึกสำเร็จแต่การอัปเดตอันดับขัดข้อง", "error");
-                }
-            } else {
-                showToast("บันทึกผลการแข่งเรียบร้อย ✅", "success");
-            }
-
             // Check if all matches (including this one just updated) are done
             const isLastMatch = apiMatches.filter(m => m.match_status !== "done" && m.id !== scoreEditing.id).length === 0;
 
@@ -850,7 +816,7 @@ export default function TournamentDetailPage() {
                 setTournamentInfo(prev => prev ? { ...prev, tournament_status: "completed" } : null);
                 showToast("บันทึกสำเร็จ และจบการแข่งขันทั้งหมดแล้ว! 🎉", "success");
             } else {
-                showToast("บันทึกคะแนนสำเร็จ ✅", "success");
+                showToast("บันทึกคะแนนสำเร็จเรียบร้อย ✅", "success");
             }
 
             setScoreEditing(null);
@@ -1023,25 +989,27 @@ export default function TournamentDetailPage() {
                             setPausedPlayerIds={setPausedPlayerIds}
                         />
 
-                        <DrawSection
-                            tournamentInfo={tournamentInfo}
-                            user={user}
-                            drawnPairs={drawnPairs}
-                            drawMode={drawMode}
-                            setDrawMode={setDrawMode}
-                            setDrawnPairs={setDrawnPairs}
-                            roundsPerPlayer={roundsPerPlayer}
-                            setRoundsPerPlayer={setRoundsPerPlayer}
-                            numCourts={numCourts}
-                            setNumCourts={setNumCourts}
-                            handleDrawFair={handleDrawFair}
-                            totalRepeatsCount={totalRepeatsCount}
-                            apiMatches={apiMatches}
-                            STRAPI_BASE_URL={STRAPI_BASE_URL}
-                            starting={starting}
-                            startStep={startStep || ""}
-                            handleStartTournament={handleStartTournament}
-                        />
+                        {tournamentInfo.format !== "knockout" && (
+                            <DrawSection
+                                tournamentInfo={tournamentInfo}
+                                user={user}
+                                drawnPairs={drawnPairs}
+                                drawMode={drawMode}
+                                setDrawMode={setDrawMode}
+                                setDrawnPairs={setDrawnPairs}
+                                roundsPerPlayer={roundsPerPlayer}
+                                setRoundsPerPlayer={setRoundsPerPlayer}
+                                numCourts={numCourts}
+                                setNumCourts={setNumCourts}
+                                handleDrawFair={handleDrawFair}
+                                totalRepeatsCount={totalRepeatsCount}
+                                apiMatches={apiMatches}
+                                STRAPI_BASE_URL={STRAPI_BASE_URL}
+                                starting={starting}
+                                startStep={startStep || ""}
+                                handleStartTournament={handleStartTournament}
+                            />
+                        )}
                     </>
                 )}
 
@@ -1067,9 +1035,26 @@ export default function TournamentDetailPage() {
                         />
                     )}
 
+                {/* Knockout Manager (Bracket View) */}
+                {tournamentInfo?.format === "knockout" && (
+                        <KnockoutManager
+                            tournamentId={id as string}
+                            tournamentInfo={tournamentInfo}
+                            apiMatches={apiMatches}
+                            jwt={jwt!}
+                            STRAPI_BASE_URL={STRAPI_BASE_URL}
+                            refreshInfo={refreshInfo}
+                            showToast={showToast}
+                            userId={user?.id}
+                            setScoreEditing={setScoreEditing}
+                            setScoreA={setScoreA}
+                            setScoreB={setScoreB}
+                        />
+                    )}
+
 
                 {/* ── MATCH SCHEDULE (ongoing/completed) ── */}
-                {tournamentInfo && (
+                {tournamentInfo && tournamentInfo.format !== "knockout" && (
                     <MatchSchedule
                         tournamentInfo={tournamentInfo}
                         user={user}

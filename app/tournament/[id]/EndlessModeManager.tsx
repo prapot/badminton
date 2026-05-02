@@ -9,6 +9,7 @@ interface ApiPlayer {
     picture?: { url: string } | null;
     rankings?: Array<{ mmr: number }> | null;
     tpDocumentId?: string;
+    match_offset?: number;
 }
 
 interface ApiMatch {
@@ -71,6 +72,7 @@ export default function EndlessModeManager({
 }: EndlessModeManagerProps) {
     const [drawing, setDrawing] = useState(false);
     const [pairingMode, setPairingMode] = useState<PairingMode>("auto");
+    const [previewMatch, setPreviewMatch] = useState<{ teamA: ApiPlayer[], teamB: ApiPlayer[] } | null>(null);
 
     // ── Permanent teams (persist across draws) ───────────────────────────
     const [permanentTeams, setPermanentTeams] = useState<PermanentTeam[]>(permanentTeamsData || []);
@@ -90,7 +92,7 @@ export default function EndlessModeManager({
     const { busyPlayerIds, actualPlayerCounts, effectivePlayerCounts } = useMemo(() => {
         const actualCounts = new Map<number, number>();
         const busy = new Set<number>();
-        players.forEach(p => actualCounts.set(p.id, 0));
+        players.forEach(p => actualCounts.set(p.id, p.match_offset || 0));
 
         apiMatches.forEach(m => {
             if (m.match_status === "cancelled") return;
@@ -108,14 +110,16 @@ export default function EndlessModeManager({
             }
         });
 
-        // Apply Catch-up Offset (แต้มบุญ): 
-        // New players start with the minimum match count of established players.
         const effectiveCounts = new Map(actualCounts);
-        const playedCounts = Array.from(actualCounts.values()).filter(c => c > 0);
+        const playedCounts = Array.from(actualCounts.values()).filter(c => c > 0).sort((a, b) => a - b);
         if (playedCounts.length > 0) {
-            const minPlayed = Math.min(...playedCounts);
+            const median = playedCounts[Math.floor(playedCounts.length / 2)];
+            const mainGroup = playedCounts.filter(c => c >= median - 1);
+            const minPlayed = mainGroup.length > 0 ? Math.min(...mainGroup) : median;
+            
             players.forEach(p => {
-                if (actualCounts.get(p.id) === 0) {
+                const actual = actualCounts.get(p.id) || 0;
+                if (actual < minPlayed) {
                     effectiveCounts.set(p.id, minPlayed);
                 }
             });
@@ -132,8 +136,6 @@ export default function EndlessModeManager({
     // Players already assigned to a permanent team
     const assignedPlayerIds = useMemo(
         () => {
-            const editingTeam = editingTeamId ? permanentTeams.find(t => t.id === editingTeamId) : null;
-            // When editing, exclude own members so they can be re-selected
             const base = permanentTeams
                 .filter(t => t.id !== editingTeamId)
                 .flatMap(t => t.players.map(p => p.id));
@@ -142,7 +144,7 @@ export default function EndlessModeManager({
         [permanentTeams, editingTeamId]
     );
 
-    // Team match counts (how many times this exact team composition has played)
+    // Team match counts
     const teamMatchCounts = useMemo(() => {
         const counts = new Map<string, number>();
         permanentTeams.forEach(team => {
@@ -156,52 +158,39 @@ export default function EndlessModeManager({
                     if (ids === key) c++;
                 });
             });
-            // Also apply effective logic to teams? 
-            // For now, teams use the average effective counts of their players.
             counts.set(team.id, c);
         });
         return counts;
     }, [permanentTeams, apiMatches]);
 
-    // How many times each pair of permanent teams has faced each other
-    const teamFaceoffCounts = useMemo(() => {
-        const counts = new Map<string, number>();
-        permanentTeams.forEach(tA => {
-            permanentTeams.forEach(tB => {
-                if (tA.id >= tB.id) return;
-                const idsA = tA.players.map(p => p.id).sort().join(",");
-                const idsB = tB.players.map(p => p.id).sort().join(",");
-                let c = 0;
-                apiMatches.forEach(m => {
-                    if (m.match_status === "cancelled") return;
-                    const mA = m.team_a_id?.team_players.map(tp => tp.user_id?.id).filter(Boolean).sort().join(",");
-                    const mB = m.team_b_id?.team_players.map(tp => tp.user_id?.id).filter(Boolean).sort().join(",");
-                    if ((mA === idsA && mB === idsB) || (mA === idsB && mB === idsA)) c++;
-                });
-                counts.set(`${tA.id}|${tB.id}`, c);
-            });
-        });
-        return counts;
-    }, [permanentTeams, apiMatches]);
-
-    const getFaceoffCount = (pidsA: number[], pidsB: number[]) => {
-        const keyA = [...pidsA].sort((a, b) => a - b).join(",");
-        const keyB = [...pidsB].sort((a, b) => a - b).join(",");
-        const matchKey = keyA < keyB ? `${keyA}|${keyB}` : `${keyB}|${keyA}`;
+    const getFaceoffCount = (pids1: number[], pids2: number[]) => {
+        const key1 = [...pids1].sort((a, b) => a - b).join(",");
+        const key2 = [...pids2].sort((a, b) => a - b).join(",");
         
         let count = 0;
         apiMatches.forEach(m => {
             if (m.match_status === "cancelled") return;
             const mA = m.team_a_id?.team_players.map(tp => tp.user_id?.id).filter(Boolean).sort((a, b) => a! - b!).join(",");
             const mB = m.team_b_id?.team_players.map(tp => tp.user_id?.id).filter(Boolean).sort((a, b) => a! - b!).join(",");
-            if ((mA === keyA && mB === keyB) || (mA === keyB && mB === keyA)) count++;
+            if ((mA === key1 && mB === key2) || (mA === key2 && mB === key1)) count++;
+        });
+        return count;
+    };
+
+    const getPartnerHistory = (p1Id: number, p2Id: number) => {
+        let count = 0;
+        apiMatches.forEach(m => {
+            if (m.match_status === "cancelled") return;
+            [m.team_a_id, m.team_b_id].forEach(t => {
+                if (!t) return;
+                const ids = t.team_players.map(tp => tp.user_id?.id).filter(Boolean);
+                if (ids.length === 2 && ids.includes(p1Id) && ids.includes(p2Id)) count++;
+            });
         });
         return count;
     };
 
     const handleTogglePause = async (player: ApiPlayer) => {
-        console.log("=== Toggle Pause Clicked ===");
-        console.log("Player Data:", player);
         if (!player.tpDocumentId) {
             showToast("ไม่สามารถพักผู้เล่นได้: ไม่พบรหัส Tournament Player", "error");
             return;
@@ -224,15 +213,10 @@ export default function EndlessModeManager({
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
                 body: JSON.stringify({ data: { is_paused: isNowPaused } })
             });
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                throw new Error(json.error?.message || `HTTP Error ${res.status}`);
-            }
+            if (!res.ok) throw new Error("Failed to update status");
             refreshInfo();
         } catch (e: any) {
-            console.error(e);
             showToast(`อัปเดตสถานะไม่สำเร็จ: ${e.message}`, "error");
-            // Revert state if failed
             const reverted = new Set(pausedPlayerIds);
             setPausedPlayerIds(reverted);
         }
@@ -303,40 +287,145 @@ export default function EndlessModeManager({
         await saveTeamsToDB(filtered);
     };
 
-    // ── AUTO DRAW ──────────────────────────────────────────────────────────
-    const getPartnerHistory = (p1Id: number, p2Id: number) => {
-        let count = 0;
-        apiMatches.forEach(m => {
-            if (m.match_status === "cancelled") return;
-            [m.team_a_id, m.team_b_id].forEach(t => {
-                if (!t) return;
-                const ids = t.team_players.map(tp => tp.user_id?.id).filter(Boolean);
-                if (ids.length === 2 && ids.includes(p1Id) && ids.includes(p2Id)) count++;
+    // ── FRONTEND MATCHMAKING ────────────────────────────────────────────────
+    const calculateNextMatch = () => {
+        if (pairingMode === "auto") {
+            const requiredCount = tournamentType === "double" ? 4 : 2;
+            if (availablePlayers.length < requiredCount) {
+                showToast(`ผู้เล่นไม่พอ (ต้องการ ${requiredCount} คน)`, "error");
+                return;
+            }
+
+            // 1. Sort available players by effective match count
+            const sortedByCount = [...availablePlayers].sort((a, b) => {
+                const effA = effectivePlayerCounts.get(a.id) || 0;
+                const effB = effectivePlayerCounts.get(b.id) || 0;
+                if (effA !== effB) return effA - effB;
+                // If effective counts are equal, prioritize newbies (lower actual count)
+                const actA = actualPlayerCounts.get(a.id) || 0;
+                const actB = actualPlayerCounts.get(b.id) || 0;
+                return actA - actB;
             });
-        });
-        return count;
+
+            // 2. Take top pool of players with same/similar low counts (to have some variation)
+            const poolSize = Math.min(sortedByCount.length, requiredCount + 4);
+            const pool = sortedByCount.slice(0, poolSize);
+
+            let bestScore = Infinity;
+            let bestPairing: { teamA: ApiPlayer[], teamB: ApiPlayer[] } | null = null;
+
+            // 3. Try random combinations to find the best one
+            for (let i = 0; i < 200; i++) {
+                const shuffled = [...pool].sort(() => Math.random() - 0.5);
+                const p1 = shuffled[0];
+                const p2 = shuffled[1];
+                let teamA: ApiPlayer[] = [p1];
+                let teamB: ApiPlayer[] = [p2];
+
+                if (tournamentType === "double") {
+                    teamA.push(shuffled[2]);
+                    teamB.push(shuffled[3]);
+                }
+
+                // Calculate Score (Lower is better)
+                let score = 0;
+                [...teamA, ...teamB].forEach(p => {
+                    score += (effectivePlayerCounts.get(p.id) || 0) * 10000;
+                });
+
+                if (tournamentType === "double") {
+                    // Penalty for repeat partners
+                    score += getPartnerHistory(teamA[0].id, teamA[1].id) * 1000;
+                    score += getPartnerHistory(teamB[0].id, teamB[1].id) * 1000;
+                    
+                    // Penalty for repeat faceoffs
+                    const faceoffCount = getFaceoffCount(teamA.map(p => p.id), teamB.map(p => p.id));
+                    score += faceoffCount * 500;
+                } else {
+                    const faceoffCount = getFaceoffCount([teamA[0].id], [teamB[0].id]);
+                    score += faceoffCount * 500;
+                }
+
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestPairing = { teamA, teamB };
+                }
+            }
+
+            if (bestPairing) {
+                setPreviewMatch(bestPairing);
+                setTimeout(() => {
+                    document.getElementById("endless-manager")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 100);
+            }
+
+        } else {
+            // Locked Mode Pairing
+            const availableTeams = permanentTeams.filter(t => 
+                t.players.every(p => !busyPlayerIds.has(p.id) && !pausedPlayerIds.has(p.id))
+            );
+
+            if (availableTeams.length < 2) {
+                showToast("ทีมถาวรไม่พอ (ต้องการอย่างน้อย 2 ทีมที่ว่าง)", "error");
+                return;
+            }
+
+            // Pick 2 teams with lowest average match counts
+            const sortedTeams = [...availableTeams].sort((a, b) => {
+                const countA = teamMatchCounts.get(a.id) || 0;
+                const countB = teamMatchCounts.get(b.id) || 0;
+                if (countA !== countB) return countA - countB;
+                // If same match count, pick least faceoff
+                return 0;
+            });
+
+            // Find best pair of teams
+            let bestScore = Infinity;
+            let bestPair: { teamA: ApiPlayer[], teamB: ApiPlayer[] } | null = null;
+
+            for (let i = 0; i < sortedTeams.length; i++) {
+                for (let j = i + 1; j < Math.min(sortedTeams.length, 5); j++) {
+                    const t1 = sortedTeams[i];
+                    const t2 = sortedTeams[j];
+                    const faceoffCount = getFaceoffCount(t1.players.map(p => p.id), t2.players.map(p => p.id));
+                    const score = (teamMatchCounts.get(t1.id)! + teamMatchCounts.get(t2.id)!) * 100 + faceoffCount * 500;
+                    
+                    if (score < bestScore) {
+                        bestScore = score;
+                        bestPair = { teamA: t1.players, teamB: t2.players };
+                    }
+                }
+            }
+            if (bestPair) {
+                setPreviewMatch(bestPair);
+                setTimeout(() => {
+                    document.getElementById("endless-manager")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 100);
+            }
+        }
     };
 
-    const handleDraw = async (mode: PairingMode) => {
+    const handleConfirmMatch = async () => {
+        if (!previewMatch) return;
         setDrawing(true);
         try {
-            const res = await fetch(`${STRAPI_BASE_URL}/api/tournaments/${tournamentId}/draw-next`, {
+            // Create teams and match manually
+            const res = await fetch(`${STRAPI_BASE_URL}/api/tournaments/${tournamentId}/create-endless-match`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
-                body: JSON.stringify({ data: { pairingMode: mode } })
+                body: JSON.stringify({ 
+                    data: { 
+                        playerIdsA: previewMatch.teamA.map(p => p.id),
+                        playerIdsB: previewMatch.teamB.map(p => p.id)
+                    } 
+                })
             });
             const json = await res.json();
-            if (!res.ok) throw new Error(json.error?.message || "Error drawing match");
+            if (!res.ok) throw new Error(json.error?.message || "Error creating match");
             
-            Swal.fire({
-                title: "สำเร็จ!",
-                text: "สุ่มแมตซ์ถัดไปเรียบร้อยแล้ว",
-                icon: "success",
-                timer: 1500,
-                showConfirmButton: false
-            });
+            showToast("สร้างแมตซ์เรียบร้อยแล้ว", "success");
+            setPreviewMatch(null);
             await refreshInfo();
-            // Scroll to Match Schedule
             setTimeout(() => {
                 document.getElementById("match-schedule")?.scrollIntoView({ behavior: "smooth" });
             }, 300);
@@ -368,9 +457,46 @@ export default function EndlessModeManager({
     const availableCount = availablePlayers.length;
     const totalCount = players.length;
 
+    const handleEditOffset = async (player: ApiPlayer, currentCount: number) => {
+        if (!jwt || !player.tpDocumentId) return;
+        
+        const { value } = await Swal.fire({
+            title: `ปรับรอบการเล่นของ ${player.username}`,
+            input: 'number',
+            inputLabel: 'จำนวนแมตช์ที่ต้องการให้เป็น',
+            inputValue: currentCount,
+            showCancelButton: true,
+            confirmButtonText: 'บันทึก',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#6366f1'
+        });
+
+        if (value !== undefined && value !== "") {
+            const newTotal = parseInt(value, 10);
+            if (isNaN(newTotal)) return;
+            
+            const currentOffset = player.match_offset || 0;
+            const baseMatches = currentCount - currentOffset;
+            const newOffset = newTotal - baseMatches;
+            
+            try {
+                const res = await fetch(`${STRAPI_BASE_URL}/api/tournament-players/${player.tpDocumentId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+                    body: JSON.stringify({ data: { match_offset: newOffset } })
+                });
+                if (!res.ok) throw new Error("Failed to update offset");
+                showToast("อัปเดตจำนวนแมตช์แล้ว", "success");
+                refreshInfo();
+            } catch (e: any) {
+                showToast(`อัปเดตไม่สำเร็จ: ${e.message}`, "error");
+            }
+        }
+    };
+
     // ─────────────────────────────────────────────────────────────────────────
     return (
-        <div className="bg-gradient-to-br from-indigo-950/70 to-slate-900/90 border border-indigo-500/20 rounded-2xl overflow-hidden shadow-xl relative">
+        <div id="endless-manager" className="bg-gradient-to-br from-indigo-950/70 to-slate-900/90 border border-indigo-500/20 rounded-2xl overflow-hidden shadow-xl relative">
             {/* Decorative glow */}
             <div className="pointer-events-none absolute top-0 right-0 w-48 h-48 bg-indigo-500/5 rounded-full blur-3xl -mr-24 -mt-24" />
 
@@ -427,10 +553,77 @@ export default function EndlessModeManager({
                 {/* ══════════════════ AUTO MODE ══════════════════ */}
                 {pairingMode === "auto" && (
                     <div className="px-4 pb-4 pt-1 space-y-2">
+                        {/* Preview Match Card */}
+                        {previewMatch && (
+                            <div className="mb-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                                <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-2xl overflow-hidden shadow-lg shadow-indigo-500/10">
+                                    <div className="px-4 py-2 bg-indigo-500/20 border-b border-indigo-500/20 flex justify-between items-center">
+                                        <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">คู่แข่งขันถัดไป</span>
+                                        <button onClick={() => setPreviewMatch(null)} className="text-slate-400 hover:text-white transition-all text-sm">✕</button>
+                                    </div>
+                                    <div className="p-4 space-y-4">
+                                        <div className="flex items-center justify-between gap-4">
+                                            {/* Team A */}
+                                            <div className="flex-1 text-center">
+                                                <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">ทีม A</div>
+                                                <div className="space-y-1">
+                                                    {previewMatch.teamA.map(p => (
+                                                        <div key={p.id} className="text-xs font-black text-white bg-white/5 py-1.5 px-2 rounded-lg border border-white/5 truncate">
+                                                            {p.username}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* VS */}
+                                            <div className="shrink-0 flex flex-col items-center">
+                                                <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-[10px] font-black text-white shadow-lg shadow-indigo-500/30">VS</div>
+                                            </div>
+
+                                            {/* Team B */}
+                                            <div className="flex-1 text-center">
+                                                <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">ทีม B</div>
+                                                <div className="space-y-1">
+                                                    {previewMatch.teamB.map(p => (
+                                                        <div key={p.id} className="text-xs font-black text-white bg-white/5 py-1.5 px-2 rounded-lg border border-white/5 truncate">
+                                                            {p.username}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Action Buttons */}
+                                        <div className="flex gap-2 pt-1">
+                                            <button
+                                                onClick={handleConfirmMatch}
+                                                disabled={drawing}
+                                                className="flex-1 h-10 rounded-xl bg-green-500 hover:bg-green-400 active:scale-95 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20"
+                                            >
+                                                {drawing ? spinnerSvg : "✅ ตกลงและเริ่มแข่ง"}
+                                            </button>
+                                            <button
+                                                onClick={() => calculateNextMatch()}
+                                                className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all"
+                                                title="สุ่มใหม่"
+                                            >
+                                                🔄
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Player roster */}
                         <div className="space-y-1">
                             {[...players]
-                                .sort((a, b) => (busyPlayerIds.has(b.id) ? 1 : 0) - (busyPlayerIds.has(a.id) ? 1 : 0))
+                                .sort((a, b) => {
+                                    // Busy players last, then by match count (ascending)
+                                    if (busyPlayerIds.has(a.id) && !busyPlayerIds.has(b.id)) return 1;
+                                    if (!busyPlayerIds.has(a.id) && busyPlayerIds.has(b.id)) return -1;
+                                    return (actualPlayerCounts.get(a.id) || 0) - (actualPlayerCounts.get(b.id) || 0);
+                                })
                                 .map(p => {
                                 const count = actualPlayerCounts.get(p.id) || 0;
                                 const isBusy = busyPlayerIds.has(p.id);
@@ -485,15 +678,18 @@ export default function EndlessModeManager({
                         </div>
 
                         {/* Draw button */}
-                        <button
-                            onClick={handleDrawNext}
-                            disabled={drawing || !jwt}
-                            className="w-full min-h-[52px] mt-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 active:scale-[0.98] text-white font-black text-sm transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
-                        >
-                            {drawing ? <>{spinnerSvg}<span>กำลังสุ่ม...</span></>
-                                : !jwt ? <span>🔒 เข้าสู่ระบบเพื่อสุ่ม</span>
-                                    : <><span>🎲 สุ่มแมตซ์ถัดไป</span></>}
-                        </button>
+                        {!previewMatch && (
+                            <button
+                                onClick={calculateNextMatch}
+                                disabled={drawing || !jwt || availablePlayers.length < (tournamentType === "double" ? 4 : 2)}
+                                className="w-full min-h-[52px] mt-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 active:scale-[0.98] text-white font-black text-sm transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {drawing ? <>{spinnerSvg}<span>กำลังสุ่ม...</span></>
+                                    : !jwt ? <span>🔒 เข้าสู่ระบบเพื่อสุ่ม</span>
+                                        : availablePlayers.length < (tournamentType === "double" ? 4 : 2) ? <span>⏳ รอผู้เล่นว่าง...</span>
+                                        : <><span>🎲 สุ่มแมตซ์ถัดไป</span></>}
+                            </button>
+                        )}
                     </div>
                 )}
 
@@ -635,7 +831,13 @@ export default function EndlessModeManager({
                                                 {isBusy && <span className="ml-1.5 text-[9px] text-orange-400 font-bold">แข่งอยู่</span>}
                                             </span>
 
-                                            <span className="text-[10px] text-slate-600 shrink-0">{actualPlayerCounts.get(p.id) || 0}แมตซ์</span>
+                                            <button 
+                                                onClick={() => canManage && handleEditOffset(p as ApiPlayer, actualPlayerCounts.get(p.id) || 0)}
+                                                className={`text-[10px] shrink-0 ${canManage ? "text-indigo-400 hover:text-indigo-300 underline underline-offset-2" : "text-slate-600"}`}
+                                                title={canManage ? "ปรับจำนวนแมตช์" : undefined}
+                                            >
+                                                {actualPlayerCounts.get(p.id) || 0}แมตซ์ {canManage && "✏️"}
+                                            </button>
                                         </button>
                                     );
                                 })}
@@ -666,14 +868,70 @@ export default function EndlessModeManager({
                             <>
                                 <div className="mx-4 border-t border-white/5" />
                                 <div className="px-4 pt-3 pb-4 space-y-3">
-                                    <button
-                                        onClick={handleLockedDraw}
-                                        disabled={drawing || !jwt}
-                                        className="w-full min-h-[52px] rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 active:scale-[0.98] text-white font-black text-sm transition-all shadow-lg shadow-amber-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
-                                    >
-                                        {drawing ? <>{spinnerSvg}<span>กำลังสุ่ม...</span></>
-                                            : <><span>🎲 สุ่มคู่จากทีมถาวร</span></>}
-                                    </button>
+                                    {/* Preview Match Card for Locked Mode */}
+                                    {previewMatch && (
+                                        <div className="mb-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                                            <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl overflow-hidden shadow-lg shadow-amber-500/10">
+                                                <div className="px-4 py-2 bg-amber-500/20 border-b border-amber-500/20 flex justify-between items-center">
+                                                    <span className="text-[10px] font-black text-amber-300 uppercase tracking-widest">คู่แข่งขันทีมถาวร</span>
+                                                    <button onClick={() => setPreviewMatch(null)} className="text-slate-400 hover:text-white transition-all text-sm">✕</button>
+                                                </div>
+                                                <div className="p-4 space-y-4">
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <div className="flex-1 text-center">
+                                                            <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">ทีม A</div>
+                                                            <div className="space-y-1">
+                                                                {previewMatch.teamA.map(p => (
+                                                                    <div key={p.id} className="text-xs font-black text-white bg-white/5 py-1.5 px-2 rounded-lg border border-white/5 truncate">
+                                                                        {p.username}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                        <div className="shrink-0 flex flex-col items-center">
+                                                            <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center text-[10px] font-black text-white shadow-lg shadow-amber-500/30">VS</div>
+                                                        </div>
+                                                        <div className="flex-1 text-center">
+                                                            <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">ทีม B</div>
+                                                            <div className="space-y-1">
+                                                                {previewMatch.teamB.map(p => (
+                                                                    <div key={p.id} className="text-xs font-black text-white bg-white/5 py-1.5 px-2 rounded-lg border border-white/5 truncate">
+                                                                        {p.username}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-2 pt-1">
+                                                        <button
+                                                            onClick={handleConfirmMatch}
+                                                            disabled={drawing}
+                                                            className="flex-1 h-10 rounded-xl bg-green-500 hover:bg-green-400 active:scale-95 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20"
+                                                        >
+                                                            {drawing ? spinnerSvg : "✅ เริ่มแข่งคู่นี้"}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => calculateNextMatch()}
+                                                            className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all"
+                                                        >
+                                                            🔄
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {!previewMatch && (
+                                        <button
+                                            onClick={calculateNextMatch}
+                                            disabled={drawing || !jwt}
+                                            className="w-full min-h-[52px] rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 active:scale-[0.98] text-white font-black text-sm transition-all shadow-lg shadow-amber-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
+                                        >
+                                            {drawing ? <>{spinnerSvg}<span>กำลังสุ่ม...</span></>
+                                                : <><span>🎲 สุ่มคู่จากทีมถาวร</span></>}
+                                        </button>
+                                    )}
 
                                     {/* Faceoff history — wrap chips */}
                                     <div>

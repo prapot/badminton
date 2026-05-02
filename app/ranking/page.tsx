@@ -207,7 +207,28 @@ export default function RankingPage() {
             merged.sort((a, b) => {
                 if (a.hasRanking && !b.hasRanking) return -1;
                 if (!a.hasRanking && b.hasRanking) return 1;
-                if (a.hasRanking && b.hasRanking) return b.mmr - a.mmr;
+                if (a.hasRanking && b.hasRanking) {
+                    const getRankScore = (rankStr?: string) => {
+                        if (!rankStr) return 0;
+                        const r = rankStr.toLowerCase();
+                        if (r.includes('master')) return 6000;
+                        if (r.includes('diamond')) return 5000;
+                        if (r.includes('platinum')) return 4000;
+                        if (r.includes('gold')) return 3000;
+                        if (r.includes('silver')) return 2000;
+                        if (r.includes('bronze')) return 1000;
+                        return 0;
+                    };
+                    const rankA = getRankScore(a.rankings?.[0]?.rank);
+                    const rankB = getRankScore(b.rankings?.[0]?.rank);
+                    if (rankA !== rankB) return rankB - rankA;
+
+                    const starsA = a.rankings?.[0]?.stars ?? 0;
+                    const starsB = b.rankings?.[0]?.stars ?? 0;
+                    if (starsA !== starsB) return starsB - starsA;
+
+                    return b.mmr - a.mmr;
+                }
                 return a.username.localeCompare(b.username);
             });
 

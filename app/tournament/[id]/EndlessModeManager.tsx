@@ -29,7 +29,7 @@ interface PermanentTeam {
 interface EndlessModeManagerProps {
     tournamentId: string;
     tournamentType: "single" | "double";
-    players: Array<{ id: number; username: string; picture?: { url: string } | null; rankings?: any; tpDocumentId?: string }>;
+    players: Array<{ id: number; username: string; picture?: { url: string } | null; rankings?: any; tpDocumentId?: string; match_offset?: number }>;
     permanentTeamsData?: any[];
     apiMatches: ApiMatch[];
     jwt: string;
@@ -116,7 +116,7 @@ export default function EndlessModeManager({
             const median = playedCounts[Math.floor(playedCounts.length / 2)];
             const mainGroup = playedCounts.filter(c => c >= median - 1);
             const minPlayed = mainGroup.length > 0 ? Math.min(...mainGroup) : median;
-            
+
             players.forEach(p => {
                 const actual = actualCounts.get(p.id) || 0;
                 if (actual < minPlayed) {
@@ -166,7 +166,7 @@ export default function EndlessModeManager({
     const getFaceoffCount = (pids1: number[], pids2: number[]) => {
         const key1 = [...pids1].sort((a, b) => a - b).join(",");
         const key2 = [...pids2].sort((a, b) => a - b).join(",");
-        
+
         let count = 0;
         apiMatches.forEach(m => {
             if (m.match_status === "cancelled") return;
@@ -197,7 +197,7 @@ export default function EndlessModeManager({
         }
         const newPaused = new Set(pausedPlayerIds);
         const isNowPaused = !newPaused.has(player.id);
-        
+
         if (isNowPaused) {
             newPaused.add(player.id);
             showToast(`ให้ ${player.username} พักการเล่น`, "success");
@@ -206,7 +206,7 @@ export default function EndlessModeManager({
             showToast(`ให้ ${player.username} กลับมาเล่นแล้ว`, "success");
         }
         setPausedPlayerIds(newPaused);
-        
+
         try {
             const res = await fetch(`${STRAPI_BASE_URL}/api/tournament-players/${player.tpDocumentId}`, {
                 method: "PUT",
@@ -337,7 +337,7 @@ export default function EndlessModeManager({
                     // Penalty for repeat partners
                     score += getPartnerHistory(teamA[0].id, teamA[1].id) * 1000;
                     score += getPartnerHistory(teamB[0].id, teamB[1].id) * 1000;
-                    
+
                     // Penalty for repeat faceoffs
                     const faceoffCount = getFaceoffCount(teamA.map(p => p.id), teamB.map(p => p.id));
                     score += faceoffCount * 500;
@@ -361,7 +361,7 @@ export default function EndlessModeManager({
 
         } else {
             // Locked Mode Pairing
-            const availableTeams = permanentTeams.filter(t => 
+            const availableTeams = permanentTeams.filter(t =>
                 t.players.every(p => !busyPlayerIds.has(p.id) && !pausedPlayerIds.has(p.id))
             );
 
@@ -389,7 +389,7 @@ export default function EndlessModeManager({
                     const t2 = sortedTeams[j];
                     const faceoffCount = getFaceoffCount(t1.players.map(p => p.id), t2.players.map(p => p.id));
                     const score = (teamMatchCounts.get(t1.id)! + teamMatchCounts.get(t2.id)!) * 100 + faceoffCount * 500;
-                    
+
                     if (score < bestScore) {
                         bestScore = score;
                         bestPair = { teamA: t1.players, teamB: t2.players };
@@ -413,16 +413,16 @@ export default function EndlessModeManager({
             const res = await fetch(`${STRAPI_BASE_URL}/api/tournaments/${tournamentId}/create-endless-match`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
-                body: JSON.stringify({ 
-                    data: { 
+                body: JSON.stringify({
+                    data: {
                         playerIdsA: previewMatch.teamA.map(p => p.id),
                         playerIdsB: previewMatch.teamB.map(p => p.id)
-                    } 
+                    }
                 })
             });
             const json = await res.json();
             if (!res.ok) throw new Error(json.error?.message || "Error creating match");
-            
+
             showToast("สร้างแมตซ์เรียบร้อยแล้ว", "success");
             setPreviewMatch(null);
             await refreshInfo();
@@ -442,9 +442,6 @@ export default function EndlessModeManager({
         }
     };
 
-    const handleDrawNext = () => handleDraw("auto");
-    const handleLockedDraw = () => handleDraw("locked");
-
     // ─────────────────────────────────────────────────────────────────────────
     // UI helpers
     const spinnerSvg = (
@@ -459,7 +456,7 @@ export default function EndlessModeManager({
 
     const handleEditOffset = async (player: ApiPlayer, currentCount: number) => {
         if (!jwt || !player.tpDocumentId) return;
-        
+
         const { value } = await Swal.fire({
             title: `ปรับรอบการเล่นของ ${player.username}`,
             input: 'number',
@@ -474,11 +471,11 @@ export default function EndlessModeManager({
         if (value !== undefined && value !== "") {
             const newTotal = parseInt(value, 10);
             if (isNaN(newTotal)) return;
-            
+
             const currentOffset = player.match_offset || 0;
             const baseMatches = currentCount - currentOffset;
             const newOffset = newTotal - baseMatches;
-            
+
             try {
                 const res = await fetch(`${STRAPI_BASE_URL}/api/tournament-players/${player.tpDocumentId}`, {
                     method: "PUT",
@@ -625,56 +622,56 @@ export default function EndlessModeManager({
                                     return (actualPlayerCounts.get(a.id) || 0) - (actualPlayerCounts.get(b.id) || 0);
                                 })
                                 .map(p => {
-                                const count = actualPlayerCounts.get(p.id) || 0;
-                                const isBusy = busyPlayerIds.has(p.id);
-                                const isPaused = pausedPlayerIds.has(p.id);
-                                const isAvailable = !isBusy && !isPaused;
-                                const canManage = userId === p.id || userId === ownerId;
+                                    const count = actualPlayerCounts.get(p.id) || 0;
+                                    const isBusy = busyPlayerIds.has(p.id);
+                                    const isPaused = pausedPlayerIds.has(p.id);
+                                    const isAvailable = !isBusy && !isPaused;
+                                    const canManage = userId === p.id || userId === ownerId;
 
-                                return (
-                                    <div
-                                        key={p.id}
-                                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all ${isAvailable
-                                            ? "bg-white/[0.04] border-white/[0.07]"
-                                            : "bg-black/20 border-white/[0.04] opacity-60"
-                                        }`}
-                                    >
-                                        {/* Status dot */}
-                                        <span className={`w-2 h-2 rounded-full shrink-0 ${isBusy
-                                            ? "bg-orange-400 animate-pulse"
-                                            : isPaused
-                                                ? "bg-yellow-500"
-                                                : "bg-green-400"
-                                        }`} />
-
-                                        {/* Name */}
-                                        <span className={`flex-1 text-xs font-medium truncate ${isAvailable ? "text-slate-200" : "text-slate-500"}`}>
-                                            {p.username}
-                                        </span>
-
-                                        {/* Status label (right of name) */}
-                                        {isBusy && <span className="text-[9px] text-orange-400 font-bold shrink-0">แข่งอยู่</span>}
-                                        {isPaused && !isBusy && <span className="text-[9px] text-yellow-500 font-bold shrink-0">พัก</span>}
-
-                                        {/* Match count */}
-                                        <span className="text-[10px] text-slate-600 shrink-0 min-w-[28px] text-right">{count}แมตซ์</span>
-
-                                        {/* Pause toggle — always visible for owner/self */}
-                                        {canManage && !isBusy && (
-                                            <button
-                                                onClick={() => handleTogglePause(p as ApiPlayer)}
-                                                className={`shrink-0 w-8 h-8 rounded-lg border flex items-center justify-center text-base transition-all active:scale-90 ${isPaused
-                                                    ? "bg-green-500/15 border-green-500/30 text-green-400"
-                                                    : "bg-white/5 border-white/10 text-slate-600 hover:text-yellow-400 hover:border-yellow-500/30"
+                                    return (
+                                        <div
+                                            key={p.id}
+                                            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all ${isAvailable
+                                                ? "bg-white/[0.04] border-white/[0.07]"
+                                                : "bg-black/20 border-white/[0.04] opacity-60"
                                                 }`}
-                                                title={isPaused ? "ให้กลับมาเล่น" : "ให้พักก่อน"}
-                                            >
-                                                {isPaused ? "▶" : "⏸"}
-                                            </button>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                                        >
+                                            {/* Status dot */}
+                                            <span className={`w-2 h-2 rounded-full shrink-0 ${isBusy
+                                                ? "bg-orange-400 animate-pulse"
+                                                : isPaused
+                                                    ? "bg-yellow-500"
+                                                    : "bg-green-400"
+                                                }`} />
+
+                                            {/* Name */}
+                                            <span className={`flex-1 text-xs font-medium truncate ${isAvailable ? "text-slate-200" : "text-slate-500"}`}>
+                                                {p.username}
+                                            </span>
+
+                                            {/* Status label (right of name) */}
+                                            {isBusy && <span className="text-[9px] text-orange-400 font-bold shrink-0">แข่งอยู่</span>}
+                                            {isPaused && !isBusy && <span className="text-[9px] text-yellow-500 font-bold shrink-0">พัก</span>}
+
+                                            {/* Match count */}
+                                            <span className="text-[10px] text-slate-600 shrink-0 min-w-[28px] text-right">{count}แมตซ์</span>
+
+                                            {/* Pause toggle — always visible for owner/self */}
+                                            {canManage && !isBusy && (
+                                                <button
+                                                    onClick={() => handleTogglePause(p as ApiPlayer)}
+                                                    className={`shrink-0 w-8 h-8 rounded-lg border flex items-center justify-center text-base transition-all active:scale-90 ${isPaused
+                                                        ? "bg-green-500/15 border-green-500/30 text-green-400"
+                                                        : "bg-white/5 border-white/10 text-slate-600 hover:text-yellow-400 hover:border-yellow-500/30"
+                                                        }`}
+                                                    title={isPaused ? "ให้กลับมาเล่น" : "ให้พักก่อน"}
+                                                >
+                                                    {isPaused ? "▶" : "⏸"}
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                         </div>
 
                         {/* Draw button */}
@@ -687,7 +684,7 @@ export default function EndlessModeManager({
                                 {drawing ? <>{spinnerSvg}<span>กำลังสุ่ม...</span></>
                                     : !jwt ? <span>🔒 เข้าสู่ระบบเพื่อสุ่ม</span>
                                         : availablePlayers.length < (tournamentType === "double" ? 4 : 2) ? <span>⏳ รอผู้เล่นว่าง...</span>
-                                        : <><span>🎲 สุ่มแมตซ์ถัดไป</span></>}
+                                            : <><span>🎲 สุ่มแมตซ์ถัดไป</span></>}
                             </button>
                         )}
                     </div>
@@ -707,57 +704,57 @@ export default function EndlessModeManager({
                                     {[...permanentTeams]
                                         .sort((a, b) => (a.players.some(p => busyPlayerIds.has(p.id)) ? 1 : 0) - (b.players.some(p => busyPlayerIds.has(p.id)) ? 1 : 0))
                                         .map((team, idx) => {
-                                        const color = TEAM_COLORS[idx % TEAM_COLORS.length];
-                                        const isBusy = team.players.some(p => busyPlayerIds.has(p.id));
-                                        const matchCount = teamMatchCounts.get(team.id) || 0;
-                                        const isEditing = editingTeamId === team.id;
+                                            const color = TEAM_COLORS[idx % TEAM_COLORS.length];
+                                            const isBusy = team.players.some(p => busyPlayerIds.has(p.id));
+                                            const matchCount = teamMatchCounts.get(team.id) || 0;
+                                            const isEditing = editingTeamId === team.id;
 
-                                        return (
-                                            <div
-                                                key={team.id}
-                                                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all ${isEditing
-                                                    ? "bg-amber-500/10 border-amber-500/30"
-                                                    : `${color.bg} ${color.border}`}`}
-                                            >
-                                                {/* Color dot */}
-                                                <span className={`w-2 h-2 rounded-full shrink-0 ${isEditing ? "bg-amber-400" : color.text.replace("text-", "bg-")}`} />
+                                            return (
+                                                <div
+                                                    key={team.id}
+                                                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all ${isEditing
+                                                        ? "bg-amber-500/10 border-amber-500/30"
+                                                        : `${color.bg} ${color.border}`}`}
+                                                >
+                                                    {/* Color dot */}
+                                                    <span className={`w-2 h-2 rounded-full shrink-0 ${isEditing ? "bg-amber-400" : color.text.replace("text-", "bg-")}`} />
 
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <span className={`text-[10px] font-bold ${isEditing ? "text-amber-400" : color.text}`}>
-                                                            {team.label}
-                                                        </span>
-                                                        {isBusy && (
-                                                            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-orange-500/20 text-orange-400 font-bold">แข่งอยู่</span>
-                                                        )}
-                                                        {isEditing && (
-                                                            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold">กำลังแก้ไข</span>
-                                                        )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <span className={`text-[10px] font-bold ${isEditing ? "text-amber-400" : color.text}`}>
+                                                                {team.label}
+                                                            </span>
+                                                            {isBusy && (
+                                                                <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-orange-500/20 text-orange-400 font-bold">แข่งอยู่</span>
+                                                            )}
+                                                            {isEditing && (
+                                                                <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold">กำลังแก้ไข</span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs font-bold text-white truncate leading-snug">
+                                                            {team.players.map(p => p.username).join(" / ")}
+                                                        </p>
                                                     </div>
-                                                    <p className="text-xs font-bold text-white truncate leading-snug">
-                                                        {team.players.map(p => p.username).join(" / ")}
-                                                    </p>
-                                                </div>
 
-                                                <span className="text-[10px] text-slate-600 shrink-0">{matchCount}แมตซ์</span>
+                                                    <span className="text-[10px] text-slate-600 shrink-0">{matchCount}แมตซ์</span>
 
-                                                <div className="flex gap-0.5 shrink-0">
-                                                    <button
-                                                        onClick={() => isEditing ? cancelEdit() : startEditTeam(team)}
-                                                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 active:scale-90 transition-all"
-                                                    >
-                                                        {isEditing ? "✕" : "✏️"}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => removeTeam(team.id)}
-                                                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-500/10 active:scale-90 transition-all"
-                                                    >
-                                                        🗑
-                                                    </button>
+                                                    <div className="flex gap-0.5 shrink-0">
+                                                        <button
+                                                            onClick={() => isEditing ? cancelEdit() : startEditTeam(team)}
+                                                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 active:scale-90 transition-all"
+                                                        >
+                                                            {isEditing ? "✕" : "✏️"}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => removeTeam(team.id)}
+                                                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-500/10 active:scale-90 transition-all"
+                                                        >
+                                                            🗑
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })}
                                 </div>
                             </div>
                         )}
@@ -799,6 +796,7 @@ export default function EndlessModeManager({
                                     const isAssigned = assignedPlayerIds.has(p.id);
                                     const isMaxed = selectedForNew.length >= playersPerTeam && !isSelected;
                                     const isBusy = busyPlayerIds.has(p.id);
+                                    const canManage = userId === p.id || userId === ownerId;
                                     const disabled = isAssigned || isMaxed;
 
                                     return (
@@ -813,7 +811,7 @@ export default function EndlessModeManager({
                                                     : disabled
                                                         ? "bg-white/[0.02] border-white/5 text-slate-700 cursor-not-allowed"
                                                         : "bg-white/[0.04] border-white/[0.07] text-slate-300 active:bg-white/10"
-                                            }`}
+                                                }`}
                                         >
                                             {/* Checkbox circle */}
                                             <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${isSelected
@@ -821,7 +819,7 @@ export default function EndlessModeManager({
                                                 : isAssigned
                                                     ? "border-slate-700 bg-slate-800"
                                                     : "border-slate-600"
-                                            }`}>
+                                                }`}>
                                                 {isSelected && <span className="text-[9px] text-black font-black leading-none">✓</span>}
                                                 {isAssigned && <span className="text-[8px] text-slate-500 leading-none">🔒</span>}
                                             </span>
@@ -831,13 +829,14 @@ export default function EndlessModeManager({
                                                 {isBusy && <span className="ml-1.5 text-[9px] text-orange-400 font-bold">แข่งอยู่</span>}
                                             </span>
 
-                                            <button 
-                                                onClick={() => canManage && handleEditOffset(p as ApiPlayer, actualPlayerCounts.get(p.id) || 0)}
-                                                className={`text-[10px] shrink-0 ${canManage ? "text-indigo-400 hover:text-indigo-300 underline underline-offset-2" : "text-slate-600"}`}
+                                            <span
+                                                onClick={(e) => { e.stopPropagation(); canManage && handleEditOffset(p as ApiPlayer, actualPlayerCounts.get(p.id) || 0); }}
+                                                role="button"
+                                                className={`text-[10px] shrink-0 cursor-pointer ${canManage ? "text-indigo-400 hover:text-indigo-300 underline underline-offset-2" : "text-slate-600"}`}
                                                 title={canManage ? "ปรับจำนวนแมตช์" : undefined}
                                             >
                                                 {actualPlayerCounts.get(p.id) || 0}แมตซ์ {canManage && "✏️"}
-                                            </button>
+                                            </span>
                                         </button>
                                     );
                                 })}

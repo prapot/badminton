@@ -770,7 +770,7 @@ export default function TournamentDetailPage() {
 
             showToast("ยกเลิกแมตซ์เรียบร้อย 🚫", "success");
             setScoreEditing(null);
-            fetchMatches();
+            refreshInfo();
         } catch (e: unknown) {
             showToast(e instanceof Error ? e.message : "ยกเลิกไม่สำเร็จ", "error");
         } finally {
@@ -820,7 +820,7 @@ export default function TournamentDetailPage() {
             }
 
             setScoreEditing(null);
-            fetchMatches();
+            refreshInfo();
         } catch (e: unknown) {
             showToast(e instanceof Error ? e.message : "บันทึกไม่สำเร็จ", "error");
         } finally {

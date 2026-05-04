@@ -556,11 +556,11 @@ export default function RankingPage() {
 
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                         {[
-                            { name: 'Bronze', stars: 3, color: 'from-[#cd7f32]/20 to-orange-950/40', border: 'border-orange-500/20', icon: '🥉', textColor: 'text-orange-200' },
-                            { name: 'Silver', stars: 3, color: 'from-slate-400/20 to-slate-800/40', border: 'border-slate-400/20', icon: '🥈', textColor: 'text-slate-200' },
-                            { name: 'Gold', stars: 4, color: 'from-yellow-500/20 to-yellow-900/40', border: 'border-yellow-500/20', icon: '🥇', textColor: 'text-yellow-100' },
-                            { name: 'Platinum', stars: 5, color: 'from-cyan-400/20 to-cyan-900/40', border: 'border-cyan-400/20', icon: '💎', textColor: 'text-cyan-100' },
-                            { name: 'Diamond', stars: 5, color: 'from-blue-500/20 to-blue-900/40', border: 'border-blue-500/20', icon: '💠', textColor: 'text-blue-100' },
+                            { name: 'Bronze', stars: 5, color: 'from-[#cd7f32]/20 to-orange-950/40', border: 'border-orange-500/20', icon: '🥉', textColor: 'text-orange-200' },
+                            { name: 'Silver', stars: 5, color: 'from-slate-400/20 to-slate-800/40', border: 'border-slate-400/20', icon: '🥈', textColor: 'text-slate-200' },
+                            { name: 'Gold', stars: 7, color: 'from-yellow-500/20 to-yellow-900/40', border: 'border-yellow-500/20', icon: '🥇', textColor: 'text-yellow-100' },
+                            { name: 'Platinum', stars: 8, color: 'from-cyan-400/20 to-cyan-900/40', border: 'border-cyan-400/20', icon: '💎', textColor: 'text-cyan-100' },
+                            { name: 'Diamond', stars: 10, color: 'from-blue-500/20 to-blue-900/40', border: 'border-blue-500/20', icon: '💠', textColor: 'text-blue-100' },
                             { name: 'Master', stars: '∞', color: 'from-red-500/20 to-red-950/40', border: 'border-red-500/20', icon: '🏆', textColor: 'text-red-100' },
                         ].map((r) => (
                             <div key={r.name} className={`group relative bg-gradient-to-br ${r.color} backdrop-blur-md border ${r.border} rounded-[2rem] p-6 flex flex-col items-center text-center transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-${r.name.toLowerCase()}-500/20 overflow-hidden`}>
@@ -589,9 +589,9 @@ export default function RankingPage() {
                                     Win Streak <span className="text-orange-500">Bonus</span>
                                 </h3>
                                 <p className="text-slate-400 text-xs sm:text-sm leading-relaxed max-w-xl">
-                                    ทะยานสู่อันดับสูงสุดให้ไวขึ้น! เมื่อชนะติดต่อกันครบ <span className="text-white font-bold underline decoration-orange-500 underline-offset-4">3 แมตซ์</span> 
+                                    ทะยานสู่อันดับสูงสุดให้ไวขึ้น! เมื่อชนะติดต่อกันครบ <span className="text-white font-bold underline decoration-orange-500 underline-offset-4">3 แมตช์</span> 
                                     รับดาวโบนัสเพิ่มทันที <span className="text-yellow-400 font-bold">+1 ดวง</span> 
-                                    <span className="block mt-1 text-[10px] opacity-50 uppercase tracking-widest">(Available for Bronze to Platinum only)</span>
+                                    <span className="block mt-1 text-[10px] opacity-50 uppercase tracking-widest">(Available for Bronze and Silver only)</span>
                                 </p>
                             </div>
                         </div>

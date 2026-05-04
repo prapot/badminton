@@ -32,11 +32,11 @@ const RankBadge: React.FC<RankBadgeProps> = ({ rank: initialRank, stars = 0, sho
     const s = sizeClasses[size];
 
     const getMaxStars = (rankName: string) => {
-        if (rankName.includes('Bronze')) return 3;
-        if (rankName.includes('Silver')) return 3;
-        if (rankName.includes('Gold')) return 4;
-        if (rankName.includes('Platinum')) return 5;
-        if (rankName.includes('Diamond')) return 5;
+        if (rankName.includes('Bronze')) return 5;
+        if (rankName.includes('Silver')) return 5;
+        if (rankName.includes('Gold')) return 7;
+        if (rankName.includes('Platinum')) return 8;
+        if (rankName.includes('Diamond')) return 10;
         return 0; // Master handled separately
     };
 
@@ -62,7 +62,7 @@ const RankBadge: React.FC<RankBadgeProps> = ({ rank: initialRank, stars = 0, sho
                             <span className={`${s.text} font-black text-yellow-400 drop-shadow-sm`}>x{stars}</span>
                         </div>
                     ) : (
-                        <div className="flex items-center gap-0.5">
+                        <div className="flex flex-wrap justify-center items-center gap-0.5 w-full max-w-[60px] sm:max-w-[100px]">
                             {[...Array(maxStars)].map((_, i) => (
                                 <div key={i} className={`${s.star} rounded-full shadow-sm transition-all duration-500 ${i < stars ? 'bg-yellow-400 shadow-yellow-500/50 scale-110' : 'bg-black/40 border border-white/10'}`}>
                                     {i < stars && <div className="w-full h-full bg-white/30 rounded-full animate-pulse" />}

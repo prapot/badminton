@@ -2,12 +2,13 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Swal from "sweetalert2";
+import RankBadge from "../RankBadge";
 
 interface ApiPlayer {
     id: number;
     username: string;
     picture?: { url: string } | null;
-    rankings?: Array<{ mmr: number }> | null;
+    rankings?: Array<{ mmr: number; rank?: string; stars?: number }> | null;
     tpDocumentId?: string;
     match_offset?: number;
 }
@@ -73,6 +74,7 @@ export default function EndlessModeManager({
     const [drawing, setDrawing] = useState(false);
     const [pairingMode, setPairingMode] = useState<PairingMode>("auto");
     const [previewMatch, setPreviewMatch] = useState<{ teamA: ApiPlayer[], teamB: ApiPlayer[] } | null>(null);
+    const [showPlayerList, setShowPlayerList] = useState(false);
 
     // ── Permanent teams (persist across draws) ───────────────────────────
     const [permanentTeams, setPermanentTeams] = useState<PermanentTeam[]>(permanentTeamsData || []);
@@ -287,6 +289,23 @@ export default function EndlessModeManager({
         await saveTeamsToDB(filtered);
     };
 
+    // ── Rank-based skill score (used for team balancing) ──────────────────
+    // Converts rank+stars into a linear numeric score:
+    // Bronze(0-3) → Silver(4-7) → Gold(8-12) → Platinum(13-18) → Diamond(19-24) → Master(25+)
+    const getSkillScore = (p: ApiPlayer): number => {
+        const r = p.rankings?.[0];
+        if (!r?.rank) return 0; // default = Bronze 0 (new player / after re-rank)
+        const name = r.rank.toLowerCase();
+        const stars = r.stars || 0;
+        if (name.includes('master'))   return 25 + stars;
+        if (name.includes('diamond'))  return 19 + stars;
+        if (name.includes('platinum')) return 13 + stars;
+        if (name.includes('gold'))     return 8 + stars;
+        if (name.includes('silver'))   return 4 + stars;
+        if (name.includes('bronze'))   return 0 + stars;
+        return 0;
+    };
+
     // ── FRONTEND MATCHMAKING ────────────────────────────────────────────────
     const calculateNextMatch = () => {
         if (pairingMode === "auto") {
@@ -307,9 +326,8 @@ export default function EndlessModeManager({
                 return actA - actB;
             });
 
-            // 2. Take top pool of players with same/similar low counts (to have some variation)
-            const poolSize = Math.min(sortedByCount.length, requiredCount + 4);
-            const pool = sortedByCount.slice(0, poolSize);
+            // 2. Use all available players as pool — scoring will naturally prioritize low-count players
+            const pool = sortedByCount;
 
             let bestScore = Infinity;
             let bestPairing: { teamA: ApiPlayer[], teamB: ApiPlayer[] } | null = null;
@@ -329,22 +347,40 @@ export default function EndlessModeManager({
 
                 // Calculate Score (Lower is better)
                 let score = 0;
+
+                // Priority 1: Players with fewer ACTUAL matches get picked first
+                // (use actual counts, NOT effective — so new players with 0 matches are strongly prioritized)
                 [...teamA, ...teamB].forEach(p => {
-                    score += (effectivePlayerCounts.get(p.id) || 0) * 10000;
+                    score += (actualPlayerCounts.get(p.id) || 0) * 10000;
                 });
 
                 if (tournamentType === "double") {
-                    // Penalty for repeat partners
-                    score += getPartnerHistory(teamA[0].id, teamA[1].id) * 1000;
-                    score += getPartnerHistory(teamB[0].id, teamB[1].id) * 1000;
+                    // Priority 2: Avoid repeat partners (exponential penalty)
+                    const partnerHistA = getPartnerHistory(teamA[0].id, teamA[1].id);
+                    const partnerHistB = getPartnerHistory(teamB[0].id, teamB[1].id);
+                    score += Math.pow(partnerHistA + 1, 2) * 2000;
+                    score += Math.pow(partnerHistB + 1, 2) * 2000;
 
-                    // Penalty for repeat faceoffs
+                    // Priority 3: Avoid repeat faceoffs (exponential penalty)
                     const faceoffCount = getFaceoffCount(teamA.map(p => p.id), teamB.map(p => p.id));
-                    score += faceoffCount * 500;
+                    score += Math.pow(faceoffCount + 1, 2) * 1000;
+
+                    // Priority 4: Rank Balance (high+low in same team — critical for fair games)
+                    const avgSkillA = teamA.reduce((s, p) => s + getSkillScore(p), 0) / teamA.length;
+                    const avgSkillB = teamB.reduce((s, p) => s + getSkillScore(p), 0) / teamB.length;
+                    const skillDiff = Math.abs(avgSkillA - avgSkillB);
+                    score += skillDiff * 800;
                 } else {
                     const faceoffCount = getFaceoffCount([teamA[0].id], [teamB[0].id]);
-                    score += faceoffCount * 500;
+                    score += Math.pow(faceoffCount + 1, 2) * 1000;
+
+                    // Rank Balance for singles
+                    const skillDiff = Math.abs(getSkillScore(teamA[0]) - getSkillScore(teamB[0]));
+                    score += skillDiff * 800;
                 }
+
+                // Small random jitter to break ties → ensures different pairings on re-roll
+                score += Math.random() * 99;
 
                 if (score < bestScore) {
                     bestScore = score;
@@ -554,39 +590,43 @@ export default function EndlessModeManager({
                         {previewMatch && (
                             <div className="mb-4 animate-in fade-in slide-in-from-top-4 duration-300">
                                 <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-2xl overflow-hidden shadow-lg shadow-indigo-500/10">
-                                    <div className="px-4 py-2 bg-indigo-500/20 border-b border-indigo-500/20 flex justify-between items-center">
-                                        <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">คู่แข่งขันถัดไป</span>
-                                        <button onClick={() => setPreviewMatch(null)} className="text-slate-400 hover:text-white transition-all text-sm">✕</button>
+                                    <div className="px-4 py-2.5 bg-indigo-500/20 border-b border-indigo-500/20 flex justify-between items-center">
+                                        <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">🏸 คู่แข่งขันถัดไป</span>
+                                        <button onClick={() => setPreviewMatch(null)} className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all active:scale-90">✕</button>
                                     </div>
-                                    <div className="p-4 space-y-4">
-                                        <div className="flex items-center justify-between gap-4">
-                                            {/* Team A */}
-                                            <div className="flex-1 text-center">
-                                                <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">ทีม A</div>
-                                                <div className="space-y-1">
-                                                    {previewMatch.teamA.map(p => (
-                                                        <div key={p.id} className="text-xs font-black text-white bg-white/5 py-1.5 px-2 rounded-lg border border-white/5 truncate">
-                                                            {p.username}
-                                                        </div>
-                                                    ))}
-                                                </div>
+                                    <div className="p-3 space-y-3">
+                                        {/* Team A */}
+                                        <div>
+                                            <div className="text-[9px] text-indigo-400 uppercase font-bold mb-1.5 tracking-wider">ทีม A</div>
+                                            <div className="space-y-1.5">
+                                                {previewMatch.teamA.map(p => (
+                                                    <div key={p.id} className="flex items-center gap-2 bg-white/[0.04] py-2 px-3 rounded-xl border border-white/[0.06]">
+                                                        <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={false} size="sm" />
+                                                        <span className="flex-1 text-sm font-bold text-white truncate">{p.username}</span>
+                                                        <span className="text-[10px] text-slate-500 shrink-0">{actualPlayerCounts.get(p.id) || 0}แมตซ์</span>
+                                                    </div>
+                                                ))}
                                             </div>
+                                        </div>
 
-                                            {/* VS */}
-                                            <div className="shrink-0 flex flex-col items-center">
-                                                <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-[10px] font-black text-white shadow-lg shadow-indigo-500/30">VS</div>
-                                            </div>
+                                        {/* VS Divider */}
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent" />
+                                            <div className="w-9 h-9 rounded-full bg-indigo-500 flex items-center justify-center text-[11px] font-black text-white shadow-lg shadow-indigo-500/30">VS</div>
+                                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent" />
+                                        </div>
 
-                                            {/* Team B */}
-                                            <div className="flex-1 text-center">
-                                                <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">ทีม B</div>
-                                                <div className="space-y-1">
-                                                    {previewMatch.teamB.map(p => (
-                                                        <div key={p.id} className="text-xs font-black text-white bg-white/5 py-1.5 px-2 rounded-lg border border-white/5 truncate">
-                                                            {p.username}
-                                                        </div>
-                                                    ))}
-                                                </div>
+                                        {/* Team B */}
+                                        <div>
+                                            <div className="text-[9px] text-indigo-400 uppercase font-bold mb-1.5 tracking-wider">ทีม B</div>
+                                            <div className="space-y-1.5">
+                                                {previewMatch.teamB.map(p => (
+                                                    <div key={p.id} className="flex items-center gap-2 bg-white/[0.04] py-2 px-3 rounded-xl border border-white/[0.06]">
+                                                        <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={false} size="sm" />
+                                                        <span className="flex-1 text-sm font-bold text-white truncate">{p.username}</span>
+                                                        <span className="text-[10px] text-slate-500 shrink-0">{actualPlayerCounts.get(p.id) || 0}แมตซ์</span>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
 
@@ -595,13 +635,13 @@ export default function EndlessModeManager({
                                             <button
                                                 onClick={handleConfirmMatch}
                                                 disabled={drawing}
-                                                className="flex-1 h-10 rounded-xl bg-green-500 hover:bg-green-400 active:scale-95 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20"
+                                                className="flex-1 min-h-[44px] rounded-xl bg-green-500 hover:bg-green-400 active:scale-[0.97] text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20"
                                             >
                                                 {drawing ? spinnerSvg : "✅ ตกลงและเริ่มแข่ง"}
                                             </button>
                                             <button
                                                 onClick={() => calculateNextMatch()}
-                                                className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all"
+                                                className="min-w-[44px] min-h-[44px] rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all text-lg"
                                                 title="สุ่มใหม่"
                                             >
                                                 🔄
@@ -612,67 +652,72 @@ export default function EndlessModeManager({
                             </div>
                         )}
 
-                        {/* Player roster */}
-                        <div className="space-y-1">
-                            {[...players]
-                                .sort((a, b) => {
-                                    // Busy players last, then by match count (ascending)
-                                    if (busyPlayerIds.has(a.id) && !busyPlayerIds.has(b.id)) return 1;
-                                    if (!busyPlayerIds.has(a.id) && busyPlayerIds.has(b.id)) return -1;
-                                    return (actualPlayerCounts.get(a.id) || 0) - (actualPlayerCounts.get(b.id) || 0);
-                                })
-                                .map(p => {
-                                    const count = actualPlayerCounts.get(p.id) || 0;
-                                    const isBusy = busyPlayerIds.has(p.id);
-                                    const isPaused = pausedPlayerIds.has(p.id);
-                                    const isAvailable = !isBusy && !isPaused;
-                                    const canManage = userId === p.id || userId === ownerId;
+                        {/* Compact player status bar — toggleable */}
+                        {jwt && (
+                            <div>
+                                <button
+                                    onClick={() => setShowPlayerList(!showPlayerList)}
+                                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-slate-400 hover:text-slate-200 transition-all active:scale-[0.98]"
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <span className="text-[10px]">👥</span>
+                                        <span className="font-medium">ผู้เล่น {availablePlayers.length}/{players.length} ว่าง</span>
+                                        {pausedPlayerIds.size > 0 && (
+                                            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-yellow-500/20 text-yellow-400 font-bold">{pausedPlayerIds.size} พัก</span>
+                                        )}
+                                    </span>
+                                    <span className={`transition-transform duration-200 ${showPlayerList ? "rotate-180" : ""}`}>▾</span>
+                                </button>
 
-                                    return (
-                                        <div
-                                            key={p.id}
-                                            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all ${isAvailable
-                                                ? "bg-white/[0.04] border-white/[0.07]"
-                                                : "bg-black/20 border-white/[0.04] opacity-60"
-                                                }`}
-                                        >
-                                            {/* Status dot */}
-                                            <span className={`w-2 h-2 rounded-full shrink-0 ${isBusy
-                                                ? "bg-orange-400 animate-pulse"
-                                                : isPaused
-                                                    ? "bg-yellow-500"
-                                                    : "bg-green-400"
-                                                }`} />
-
-                                            {/* Name */}
-                                            <span className={`flex-1 text-xs font-medium truncate ${isAvailable ? "text-slate-200" : "text-slate-500"}`}>
-                                                {p.username}
-                                            </span>
-
-                                            {/* Status label (right of name) */}
-                                            {isBusy && <span className="text-[9px] text-orange-400 font-bold shrink-0">แข่งอยู่</span>}
-                                            {isPaused && !isBusy && <span className="text-[9px] text-yellow-500 font-bold shrink-0">พัก</span>}
-
-                                            {/* Match count */}
-                                            <span className="text-[10px] text-slate-600 shrink-0 min-w-[28px] text-right">{count}แมตซ์</span>
-
-                                            {/* Pause toggle — always visible for owner/self */}
-                                            {canManage && !isBusy && (
-                                                <button
-                                                    onClick={() => handleTogglePause(p as ApiPlayer)}
-                                                    className={`shrink-0 w-8 h-8 rounded-lg border flex items-center justify-center text-base transition-all active:scale-90 ${isPaused
-                                                        ? "bg-green-500/15 border-green-500/30 text-green-400"
-                                                        : "bg-white/5 border-white/10 text-slate-600 hover:text-yellow-400 hover:border-yellow-500/30"
-                                                        }`}
-                                                    title={isPaused ? "ให้กลับมาเล่น" : "ให้พักก่อน"}
-                                                >
-                                                    {isPaused ? "▶" : "⏸"}
-                                                </button>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                        </div>
+                                {showPlayerList && (
+                                    <div className="mt-2 space-y-1 max-h-52 overflow-y-auto">
+                                        {[...players]
+                                            .sort((a, b) => {
+                                                if (busyPlayerIds.has(a.id) && !busyPlayerIds.has(b.id)) return 1;
+                                                if (!busyPlayerIds.has(a.id) && busyPlayerIds.has(b.id)) return -1;
+                                                if (pausedPlayerIds.has(a.id) && !pausedPlayerIds.has(b.id)) return 1;
+                                                if (!pausedPlayerIds.has(a.id) && pausedPlayerIds.has(b.id)) return -1;
+                                                return (actualPlayerCounts.get(a.id) || 0) - (actualPlayerCounts.get(b.id) || 0);
+                                            })
+                                            .map(p => {
+                                                const isBusy = busyPlayerIds.has(p.id);
+                                                const isPaused = pausedPlayerIds.has(p.id);
+                                                return (
+                                                    <div key={p.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
+                                                        isBusy ? "bg-orange-500/5 border-orange-500/15 opacity-60"
+                                                        : isPaused ? "bg-yellow-500/5 border-yellow-500/15 opacity-70"
+                                                        : "bg-white/[0.03] border-white/[0.05]"
+                                                    }`}>
+                                                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                                            isBusy ? "bg-orange-400 animate-pulse" : isPaused ? "bg-yellow-500" : "bg-green-400"
+                                                        }`} />
+                                                        <span className={`flex-1 text-xs font-medium truncate ${
+                                                            isBusy || isPaused ? "text-slate-500" : "text-slate-200"
+                                                        }`}>
+                                                            {p.username}
+                                                        </span>
+                                                        {isBusy && <span className="text-[9px] text-orange-400 font-bold shrink-0">แข่งอยู่</span>}
+                                                        {isPaused && !isBusy && <span className="text-[9px] text-yellow-500 font-bold shrink-0">พัก</span>}
+                                                        <span className="text-[10px] text-slate-600 shrink-0">{actualPlayerCounts.get(p.id) || 0}แมตซ์</span>
+                                                        {!isBusy && (
+                                                            <button
+                                                                onClick={() => handleTogglePause(p as ApiPlayer)}
+                                                                className={`shrink-0 w-7 h-7 rounded-lg border flex items-center justify-center text-sm transition-all active:scale-90 ${isPaused
+                                                                    ? "bg-green-500/15 border-green-500/30 text-green-400"
+                                                                    : "bg-white/5 border-white/10 text-slate-600 hover:text-yellow-400 hover:border-yellow-500/30"
+                                                                }`}
+                                                                title={isPaused ? "ให้กลับมาเล่น" : "ให้พักก่อน"}
+                                                            >
+                                                                {isPaused ? "▶" : "⏸"}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Draw button */}
                         {!previewMatch && (
@@ -796,7 +841,7 @@ export default function EndlessModeManager({
                                     const isAssigned = assignedPlayerIds.has(p.id);
                                     const isMaxed = selectedForNew.length >= playersPerTeam && !isSelected;
                                     const isBusy = busyPlayerIds.has(p.id);
-                                    const canManage = userId === p.id || userId === ownerId;
+                                    const canManage = !!userId; // any logged-in user can pause/resume
                                     const disabled = isAssigned || isMaxed;
 
                                     return (
@@ -871,47 +916,58 @@ export default function EndlessModeManager({
                                     {previewMatch && (
                                         <div className="mb-4 animate-in fade-in slide-in-from-top-4 duration-300">
                                             <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl overflow-hidden shadow-lg shadow-amber-500/10">
-                                                <div className="px-4 py-2 bg-amber-500/20 border-b border-amber-500/20 flex justify-between items-center">
-                                                    <span className="text-[10px] font-black text-amber-300 uppercase tracking-widest">คู่แข่งขันทีมถาวร</span>
-                                                    <button onClick={() => setPreviewMatch(null)} className="text-slate-400 hover:text-white transition-all text-sm">✕</button>
+                                                <div className="px-4 py-2.5 bg-amber-500/20 border-b border-amber-500/20 flex justify-between items-center">
+                                                    <span className="text-[10px] font-black text-amber-300 uppercase tracking-widest">🏸 คู่แข่งขันทีมถาวร</span>
+                                                    <button onClick={() => setPreviewMatch(null)} className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all active:scale-90">✕</button>
                                                 </div>
-                                                <div className="p-4 space-y-4">
-                                                    <div className="flex items-center justify-between gap-4">
-                                                        <div className="flex-1 text-center">
-                                                            <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">ทีม A</div>
-                                                            <div className="space-y-1">
-                                                                {previewMatch.teamA.map(p => (
-                                                                    <div key={p.id} className="text-xs font-black text-white bg-white/5 py-1.5 px-2 rounded-lg border border-white/5 truncate">
-                                                                        {p.username}
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                        <div className="shrink-0 flex flex-col items-center">
-                                                            <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center text-[10px] font-black text-white shadow-lg shadow-amber-500/30">VS</div>
-                                                        </div>
-                                                        <div className="flex-1 text-center">
-                                                            <div className="text-[9px] text-slate-500 uppercase font-bold mb-1">ทีม B</div>
-                                                            <div className="space-y-1">
-                                                                {previewMatch.teamB.map(p => (
-                                                                    <div key={p.id} className="text-xs font-black text-white bg-white/5 py-1.5 px-2 rounded-lg border border-white/5 truncate">
-                                                                        {p.username}
-                                                                    </div>
-                                                                ))}
-                                                            </div>
+                                                <div className="p-3 space-y-3">
+                                                    {/* Team A */}
+                                                    <div>
+                                                        <div className="text-[9px] text-amber-400 uppercase font-bold mb-1.5 tracking-wider">ทีม A</div>
+                                                        <div className="space-y-1.5">
+                                                            {previewMatch.teamA.map(p => (
+                                                                <div key={p.id} className="flex items-center gap-2 bg-white/[0.04] py-2 px-3 rounded-xl border border-white/[0.06]">
+                                                                    <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={false} size="sm" />
+                                                                    <span className="flex-1 text-sm font-bold text-white truncate">{p.username}</span>
+                                                                    <span className="text-[10px] text-slate-500 shrink-0">{actualPlayerCounts.get(p.id) || 0}แมตซ์</span>
+                                                                </div>
+                                                            ))}
                                                         </div>
                                                     </div>
+
+                                                    {/* VS Divider */}
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+                                                        <div className="w-9 h-9 rounded-full bg-amber-500 flex items-center justify-center text-[11px] font-black text-white shadow-lg shadow-amber-500/30">VS</div>
+                                                        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+                                                    </div>
+
+                                                    {/* Team B */}
+                                                    <div>
+                                                        <div className="text-[9px] text-amber-400 uppercase font-bold mb-1.5 tracking-wider">ทีม B</div>
+                                                        <div className="space-y-1.5">
+                                                            {previewMatch.teamB.map(p => (
+                                                                <div key={p.id} className="flex items-center gap-2 bg-white/[0.04] py-2 px-3 rounded-xl border border-white/[0.06]">
+                                                                    <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={false} size="sm" />
+                                                                    <span className="flex-1 text-sm font-bold text-white truncate">{p.username}</span>
+                                                                    <span className="text-[10px] text-slate-500 shrink-0">{actualPlayerCounts.get(p.id) || 0}แมตซ์</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Action Buttons */}
                                                     <div className="flex gap-2 pt-1">
                                                         <button
                                                             onClick={handleConfirmMatch}
                                                             disabled={drawing}
-                                                            className="flex-1 h-10 rounded-xl bg-green-500 hover:bg-green-400 active:scale-95 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20"
+                                                            className="flex-1 min-h-[44px] rounded-xl bg-green-500 hover:bg-green-400 active:scale-[0.97] text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20"
                                                         >
                                                             {drawing ? spinnerSvg : "✅ เริ่มแข่งคู่นี้"}
                                                         </button>
                                                         <button
                                                             onClick={() => calculateNextMatch()}
-                                                            className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all"
+                                                            className="min-w-[44px] min-h-[44px] rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all text-lg"
                                                         >
                                                             🔄
                                                         </button>

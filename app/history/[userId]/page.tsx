@@ -11,9 +11,10 @@ const STRAPI_BASE_URL = process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://local
 interface MatchHistory {
     id: number;
     documentId: string;
-    old_mmr: number;
-    new_mmr: number;
-    mmr_change: number;
+    old_rp: number;
+    new_rp: number;
+    rp_change: number;
+    is_win: boolean;
     createdAt: string;
     matches: Array<{
         id: number;
@@ -69,6 +70,32 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
     const [meta, setMeta] = useState<PaginationMeta | null>(null);
     const [seasons, setSeasons] = useState<any[]>([]);
     const [selectedSeason, setSelectedSeason] = useState<string>("all");
+    
+    const TIERS = [
+        { name: 'Bronze', divisions: 5, starsPerDiv: 3 },
+        { name: 'Silver', divisions: 5, starsPerDiv: 3 },
+        { name: 'Gold', divisions: 5, starsPerDiv: 4 },
+        { name: 'Platinum', divisions: 5, starsPerDiv: 5 },
+        { name: 'Diamond', divisions: 5, starsPerDiv: 5 },
+        { name: 'Master', divisions: 1, starsPerDiv: 999999 }
+    ];
+    const DIVISIONS = ['V', 'IV', 'III', 'II', 'I'];
+
+    const getRankInfoFromPoints = (points: number) => {
+        let p = Math.max(0, points);
+        for (const tier of TIERS) {
+            if (tier.name === 'Master') {
+                return 'Master';
+            }
+            const tierMax = tier.divisions * tier.starsPerDiv * 100;
+            if (p < tierMax) {
+                const divIdx = Math.floor(p / (tier.starsPerDiv * 100));
+                return `${tier.name} ${DIVISIONS[divIdx]}`;
+            }
+            p -= tierMax;
+        }
+        return 'Bronze V';
+    };
 
     const fetchData = useCallback(async (pageNum: number = 1) => {
         if (!jwt) return;
@@ -188,8 +215,8 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
                             const userScore = isTeamA ? match.score_a : match.score_b;
                             const oppScore = isTeamA ? match.score_b : match.score_a;
                             const isCancelled = match.match_status === "cancelled";
-                            const isWin = !isCancelled && userScore > oppScore;
-                            const isLoss = !isCancelled && userScore < oppScore;
+                            const isWin = !isCancelled && h.is_win;
+                            const isLoss = !isCancelled && !h.is_win;
 
                             const tournament = match.tournament_id;
                             const isRanking = tournament?.mode === "ranking";
@@ -261,13 +288,16 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
 
                                             {isRanking && (
                                                 <div className="text-center min-w-[100px]">
-                                                    <p className="text-[9px] text-slate-500 font-bold uppercase mb-1 tracking-widest">MMR Change</p>
+                                                    <p className="text-[9px] text-slate-500 font-bold uppercase mb-1 tracking-widest">Rank Progression</p>
                                                     <div className="flex flex-col items-center">
-                                                        <span className="text-xs text-slate-400 font-medium">
-                                                            {h.old_mmr} ➜ {h.new_mmr}
+                                                        <span className="text-xs text-white font-black bg-white/5 px-2 py-0.5 rounded-lg border border-white/10 mb-1 shadow-sm">
+                                                            {getRankInfoFromPoints(h.old_rp)} ➜ {getRankInfoFromPoints(h.new_rp)}
                                                         </span>
-                                                        <span className={`text-sm font-black ${h.mmr_change > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                            {h.mmr_change > 0 ? `+${h.mmr_change}` : h.mmr_change}
+                                                        <span className={`text-[10px] font-black flex items-center gap-1 ${h.rp_change > 0 ? 'text-green-400' : h.rp_change < 0 ? 'text-red-400' : 'text-slate-500'}`}>
+                                                            {h.rp_change > 0 ? `+${h.rp_change} RP` : h.rp_change < 0 ? `${h.rp_change} RP` : 'PROTECTED'}
+                                                            {h.rp_change > 0 && <span className="animate-bounce">↑</span>}
+                                                            {h.rp_change < 0 && <span className="animate-bounce">↓</span>}
+                                                            {h.rp_change === 0 && <span className="opacity-50">🛡️</span>}
                                                         </span>
                                                     </div>
                                                 </div>

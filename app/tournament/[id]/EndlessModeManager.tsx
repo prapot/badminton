@@ -8,7 +8,7 @@ interface ApiPlayer {
     id: number;
     username: string;
     picture?: { url: string } | null;
-    rankings?: Array<{ mmr: number; rank?: string; stars?: number }> | null;
+    rankings?: Array<{ ranking_points: number; rank?: string; stars?: number }> | null;
     tpDocumentId?: string;
     match_offset?: number;
 }

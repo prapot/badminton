@@ -1,0 +1,49 @@
+
+> badminton@0.1.0 develop
+> strapi develop
+
+- Cleaning dist dir /Users/admin/pyps/www/badminton-service/dist
+✔ Cleaning dist dir (12ms)
+- Loading Strapi
+[2026-05-08 02:05:40.025] [33mwarn[39m: The associated subscription is cancelled. Switching to CE.
+[2026-05-08 02:05:40.448] [33mwarn[39m: admin.auth.options.expiresIn is deprecated and will be removed in Strapi 6. Please configure admin.auth.sessions.maxRefreshTokenLifespan and admin.auth.sessions.maxSessionLifespan.
+- Building build context
+
+[INFO] Including the following ENV variables as part of the JS bundle:
+    - ADMIN_PATH
+    - STRAPI_ADMIN_BACKEND_URL
+    - STRAPI_TELEMETRY_DISABLED
+    - STRAPI_AI_URL
+    - STRAPI_ANALYTICS_URL
+✔ Building build context (92ms)
+- Creating admin
+✔ Creating admin (431ms)
+✔ Loading Strapi (3743ms)
+- Generating types
+✔ Generating types (178ms)
+- Compiling TS
+- Cleaning dist dir /Users/admin/pyps/www/badminton-service/dist
+✔ Cleaning dist dir (14ms)
+✔ Compiling TS (3579ms)
+
+ Project information
+
+┌────────────────────┬──────────────────────────────────────────────────┐
+│ Time               │ Fri May 08 2026 02:05:44 GMT+0700 (Indochina Ti… │
+│ Launched in        │ 7536 ms                                          │
+│ Environment        │ development                                      │
+│ Process PID        │ 18878                                            │
+│ Version            │ 5.36.1 (node v20.17.0)                           │
+│ Edition            │ Community                                        │
+│ Database           │ sqlite                                           │
+│ Database name      │ .tmp/data.db                                     │
+└────────────────────┴──────────────────────────────────────────────────┘
+
+ Actions available
+
+Welcome back!
+To access the server ⚡️, go to:
+http://localhost:1337
+
+[2026-05-08 02:05:44.893] [32minfo[39m: Strapi started successfully
+2:06:07 AM [vite] page reload .strapi/client/index.html

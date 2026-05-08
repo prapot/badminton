@@ -25,7 +25,6 @@ import {
 } from "../TournamentTypes";
 import {
     calcStandings,
-    calculateExpectedMmrChange,
     gcd,
     lcm,
     getPartnerRepeats
@@ -299,7 +298,7 @@ export default function TournamentDetailPage() {
         }, 0);
     }, [drawnPairs, apiMatches]);
 
-    const [drawMode, setDrawMode] = useState<"random" | "mmr_balanced">("random");
+    const [drawMode, setDrawMode] = useState<"random" | "rp_balanced">("random");
     const [roundsPerPlayer, setRoundsPerPlayer] = useState(1);
     const [numCourts, setNumCourts] = useState(2);
     const [startStep, setStartStep] = useState<string | null>(null); // progress label
@@ -410,10 +409,10 @@ export default function TournamentDetailPage() {
                     const restedB = playerUsedInPreviousSlot.has(b.id) ? 1 : 0;
                     if (restedA !== restedB) return restedA - restedB;
 
-                    if (drawMode === "mmr_balanced") {
+                    if (drawMode === "rp_balanced") {
                         const jitterA = Math.random() * 2 - 1;
                         const jitterB = Math.random() * 2 - 1;
-                        return ((b.rankings?.[0]?.mmr ?? 1500) + jitterB) - ((a.rankings?.[0]?.mmr ?? 1500) + jitterA);
+                        return ((b.rankings?.[0]?.ranking_points ?? 0) + jitterB) - ((a.rankings?.[0]?.ranking_points ?? 0) + jitterA);
                     } else {
                         return Math.random() - 0.5;
                     }

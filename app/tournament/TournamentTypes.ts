@@ -57,7 +57,7 @@ export interface ApiRanking {
     win: number;
     lose: number;
     win_streak: number;
-    mmr: number;
+    ranking_points: number;
     rank?: string;
     stars?: number;
 }
@@ -78,7 +78,7 @@ export interface ApiTeam {
 
 export interface ApiMatchHistory {
     id: number;
-    mmr_change: number;
+    rp_change: number;
     users: ApiPlayer[];
 }
 

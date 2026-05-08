@@ -6,8 +6,8 @@ interface DrawSectionProps {
     tournamentInfo: TournamentInfo;
     user: User | null;
     drawnPairs: DrawnPair[] | null;
-    drawMode: "random" | "mmr_balanced";
-    setDrawMode: (mode: "random" | "mmr_balanced") => void;
+    drawMode: "random" | "rp_balanced";
+    setDrawMode: (mode: "random" | "rp_balanced") => void;
     setDrawnPairs: (pairs: DrawnPair[] | null) => void;
     roundsPerPlayer: number;
     setRoundsPerPlayer: (n: number) => void;
@@ -72,10 +72,10 @@ const DrawSection: React.FC<DrawSectionProps> = ({
                             🎲 สุ่มทั่วไป
                         </button>
                         <button
-                            onClick={() => { setDrawMode("mmr_balanced"); setDrawnPairs(null); }}
-                            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold border transition-all ${drawMode === "mmr_balanced" ? "bg-yellow-500/20 border-yellow-500/30 text-yellow-300" : "bg-white/3 border-white/8 text-slate-400 hover:bg-white/8"}`}
+                            onClick={() => { setDrawMode("rp_balanced"); setDrawnPairs(null); }}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold border transition-all ${drawMode === "rp_balanced" ? "bg-yellow-500/20 border-yellow-500/30 text-yellow-300" : "bg-white/3 border-white/8 text-slate-400 hover:bg-white/8"}`}
                         >
-                            ⚖️ สมดุล MMR
+                            ⚖️ สมดุล RP
                         </button>
                     </div>
 
@@ -84,8 +84,8 @@ const DrawSection: React.FC<DrawSectionProps> = ({
                             <div className="flex-1 min-w-0">
                                 <p className="text-[11px] font-bold text-green-400">⚖️ ทุกคนเล่นเท่ากัน (Fair Play)</p>
                                 <p className="text-[10px] text-green-400/60 mt-0.5">
-                                    {drawMode === "mmr_balanced"
-                                        ? "คำนวณรอบน้อยที่สุดเพื่อให้ทุกคนเล่นเท่ากัน และจัดคู่ตามฝีมือ (MMR)"
+                                    {drawMode === "rp_balanced"
+                                        ? "คำนวณรอบน้อยที่สุดเพื่อให้ทุกคนเล่นเท่ากัน และจัดคู่ตามฝีมือ (RP)"
                                         : "คำนวณรอบน้อยที่สุดเพื่อให้ทุกคนเล่นเท่ากัน โดยการสุ่มคู่"}
                                 </p>
                             </div>
@@ -141,7 +141,7 @@ const DrawSection: React.FC<DrawSectionProps> = ({
 
                     {!drawnPairs ? (
                         <div className="py-10 text-center text-slate-500">
-                            <p className="text-3xl mb-2">{drawMode === "mmr_balanced" ? "⚖️" : "🎲"}</p>
+                            <p className="text-3xl mb-2">{drawMode === "rp_balanced" ? "⚖️" : "🎲"}</p>
                             <p className="text-sm">กดปุ่ม &quot;สุ่มคู่&quot; เพื่อจับคู่ผู้เล่น</p>
                             <p className="text-xs mt-1 text-slate-600">
                                 {(() => {
@@ -192,11 +192,11 @@ const DrawSection: React.FC<DrawSectionProps> = ({
                                                         คู่เดิม {teamARepeats} ครั้ง
                                                     </span>
                                                 )}
-                                                {drawMode === "mmr_balanced" && (
+                                                {drawMode === "rp_balanced" && (
                                                     <div className="mt-1 flex items-center gap-1.5">
-                                                        <span className="text-[10px] font-bold text-slate-400 uppercase">Avg MMR:</span>
+                                                        <span className="text-[10px] font-bold text-slate-400 uppercase">Avg RP:</span>
                                                         <span className="text-[10px] font-black text-indigo-400">
-                                                            {Math.round(pair.teamA.reduce((sum, p) => sum + (p.rankings?.[0]?.mmr ?? 1500), 0) / pair.teamA.length)}
+                                                            {Math.round(pair.teamA.reduce((sum, p) => sum + (p.rankings?.[0]?.ranking_points ?? 0), 0) / pair.teamA.length)}
                                                         </span>
                                                     </div>
                                                 )}
@@ -233,11 +233,11 @@ const DrawSection: React.FC<DrawSectionProps> = ({
                                                                 คู่เดิม {teamBRepeats} ครั้ง
                                                             </span>
                                                         )}
-                                                        {drawMode === "mmr_balanced" && (
+                                                        {drawMode === "rp_balanced" && (
                                                             <div className="mt-1 flex items-center gap-1.5">
-                                                                <span className="text-[10px] font-bold text-slate-400 uppercase">Avg MMR:</span>
+                                                                <span className="text-[10px] font-bold text-slate-400 uppercase">Avg RP:</span>
                                                                 <span className="text-[10px] font-black text-indigo-400">
-                                                                    {Math.round(pair.teamB.reduce((sum, p) => sum + (p.rankings?.[0]?.mmr ?? 1500), 0) / pair.teamB.length)}
+                                                                    {Math.round(pair.teamB.reduce((sum, p) => sum + (p.rankings?.[0]?.ranking_points ?? 0), 0) / pair.teamB.length)}
                                                                 </span>
                                                             </div>
                                                         )}

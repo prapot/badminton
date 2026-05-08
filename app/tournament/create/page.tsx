@@ -34,8 +34,8 @@ const formatOptions: { value: Format; label: string; desc: string; icon: string;
 ];
 
 const modeOptions: { value: Mode; label: string; desc: string; icon: string; color: string }[] = [
-    { value: "ranking", label: "Ranking", desc: "บันทึก MMR และสถิติผู้เล่น ใช้คัดอันดับ", icon: "🏆", color: "from-yellow-500/10 to-amber-500/10 border-yellow-500/30 ring-yellow-500/20 text-yellow-300" },
-    { value: "casual", label: "Casual", desc: "ไม่บันทึกสถิติ เล่นสนุกๆ ไม่กระทบ MMR", icon: "🎮", color: "from-blue-500/10 to-cyan-500/10 border-blue-500/30 ring-blue-500/20 text-blue-300" },
+    { value: "ranking", label: "Ranking", desc: "บันทึก RP และสถิติผู้เล่น ใช้คัดอันดับ", icon: "🏆", color: "from-yellow-500/10 to-amber-500/10 border-yellow-500/30 ring-yellow-500/20 text-yellow-300" },
+    { value: "casual", label: "Casual", desc: "ไม่บันทึกสถิติ เล่นสนุกๆ ไม่กระทบ RP", icon: "🎮", color: "from-blue-500/10 to-cyan-500/10 border-blue-500/30 ring-blue-500/20 text-blue-300" },
 ];
 
 export default function CreateTournamentPage() {
@@ -270,7 +270,7 @@ export default function CreateTournamentPage() {
                             <h2 className="font-semibold text-white flex items-center gap-2">
                                 <span>🎯</span> โหมดการแข่งขัน
                             </h2>
-                            <p className="text-xs text-slate-400">เลือกว่าทัวร์นาเมนต์นี้จะส่งผลต่อ MMR และสถิติผู้เล่นหรือไม่</p>
+                            <p className="text-xs text-slate-400">เลือกว่าทัวร์นาเมนต์นี้จะส่งผลต่อ RP และสถิติผู้เล่นหรือไม่</p>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {modeOptions.map((m) => (

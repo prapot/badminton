@@ -1,6 +1,5 @@
 import React from 'react';
 import { TournamentInfo, User, ApiMatch } from '../TournamentTypes';
-import { calculateExpectedMmrChange } from '../TournamentUtils';
 import RankBadge from '../RankBadge';
 
 interface MatchScheduleProps {
@@ -103,23 +102,6 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                         const winnerA = isCompleted && match.score_a > match.score_b;
                                         const winnerB = isCompleted && match.score_b > match.score_a;
 
-                                        let predictedAChange = 0;
-                                        let predictedALose = 0;
-                                        let predictedBChange = 0;
-                                        let predictedBLose = 0;
-                                        if (!isCompleted && match.team_a_id && match.team_b_id) {
-                                            const aMmrs = match.team_a_id.team_players.map(tp => tp.user_id?.rankings?.[0]?.mmr ?? 1500);
-                                            const bMmrs = match.team_b_id.team_players.map(tp => tp.user_id?.rankings?.[0]?.mmr ?? 1500);
-                                            const avgA = aMmrs.length ? aMmrs.reduce((a, b) => a + b, 0) / aMmrs.length : null;
-                                            const avgB = bMmrs.length ? bMmrs.reduce((a, b) => a + b, 0) / bMmrs.length : null;
-                                            if (avgA !== null && avgB !== null) {
-                                                const predictions = calculateExpectedMmrChange(avgA, avgB);
-                                                predictedAChange = predictions.aWins;
-                                                predictedALose = predictions.aLoses;
-                                                predictedBChange = predictions.bWins;
-                                                predictedBLose = predictions.bLoses;
-                                            }
-                                        }
 
                                         return (
                                             <div key={match.id}
@@ -164,7 +146,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                 const u = tp.user_id;
                                                                 if (!u) return null;
                                                                 const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
-                                                                const mmr_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.mmr_change;
+                                                                const rp_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.rp_change;
                                                                 return (
                                                                     <div key={idx} className="flex items-center justify-end gap-2 sm:gap-3 relative">
                                                                         <div className="flex flex-col items-end min-w-0 flex-1">
@@ -182,9 +164,6 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                         showName={false}
                                                                                     />
                                                                                     <div className="flex flex-col items-start leading-none">
-                                                                                        <span className="text-yellow-500 font-black text-[9px] sm:text-[10px]">
-                                                                                            {u.rankings?.[0]?.mmr ?? 1500}
-                                                                                        </span>
                                                                                         <div className="flex items-center gap-1 text-[7px] text-slate-500 font-bold">
                                                                                             <span className="text-green-500/80">{u.rankings?.[0]?.win ?? 0}W</span>
                                                                                             <span className="text-red-500/80">{u.rankings?.[0]?.lose ?? 0}L</span>
@@ -194,23 +173,9 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                             )}
                                                                         </div>
                                                                         <div className="relative flex items-center">
-                                                                            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner ${match.first_serve === "A" && idx === 0 ? "border-[#2ecc71] shadow-[0_0_20px_rgba(46,204,113,0.5)] scale-105" : "border-slate-700/50"}`}>
-                                                                                {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
-                                                                            </div>
-                                                                            {match.first_serve === "A" && idx === 0 && (
-                                                                                <div className="absolute -right-6 z-30 w-7 h-7 bg-[#2ecc71] rounded-full border-2 border-[#1a2535] flex items-center justify-center shadow-[0_0_15px_rgba(46,204,113,0.8)] animate-bounce-subtle">
-                                                                                    <span className="text-[14px] filter drop-shadow-md">🏸</span>
-                                                                                </div>
-                                                                            )}
-                                                                            {mmr_change !== undefined ? (
-                                                                                <div className={`absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black border shadow-lg ${mmr_change > 0 ? "bg-[#0f2a1a] border-green-500 text-green-400 shadow-green-900/40" : "bg-[#2a0f0f] border-red-500 text-red-400 shadow-red-900/40"}`}>
-                                                                                    {mmr_change > 0 ? "+" : ""}{mmr_change}
-                                                                                </div>
-                                                                            ) : (!isCompleted && predictedAChange > 0) ? (
-                                                                                <div title="คะแนน MMR คาดการณ์หากชนะ/แพ้ 21-20" className="absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2 py-[2px] sm:py-0.5 rounded-full text-[8px] sm:text-[9px] font-bold border shadow-lg backdrop-blur-md bg-slate-800/90 border-slate-600/50 shadow-black/50 whitespace-nowrap flex items-center gap-[2px] sm:gap-1 z-10">
-                                                                                    <span className="text-green-400 drop-shadow-[0_0_2px_rgba(74,222,128,0.3)]">+{predictedAChange}</span>
-                                                                                    <span className="text-slate-500 leading-none text-[7px] sm:text-[8px]">/</span>
-                                                                                    <span className="text-red-400 drop-shadow-[0_0_2px_rgba(248,113,113,0.3)]">-{predictedALose}</span>
+                                                                            {rp_change !== undefined ? (
+                                                                                <div className={`absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black border shadow-lg ${rp_change > 0 ? "bg-[#0f2a1a] border-green-500 text-green-400 shadow-green-900/40" : "bg-[#2a0f0f] border-red-500 text-red-400 shadow-red-900/40"}`}>
+                                                                                    {rp_change > 0 ? "+" : ""}{rp_change}
                                                                                 </div>
                                                                             ) : null}
                                                                         </div>
@@ -254,7 +219,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                         const u = tp.user_id;
                                                                         if (!u) return null;
                                                                         const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
-                                                                        const mmr_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.mmr_change;
+                                                                        const rp_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.rp_change;
                                                                         return (
                                                                             <div key={idx} className="flex items-center justify-start gap-2 sm:gap-3 relative">
                                                                                 <div className="relative flex items-center">
@@ -266,15 +231,9 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                             <span className="text-[14px] filter drop-shadow-md">🏸</span>
                                                                                         </div>
                                                                                     )}
-                                                                                    {mmr_change !== undefined ? (
-                                                                                        <div className={`absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black border shadow-lg ${mmr_change > 0 ? "bg-[#0f2a1a] border-green-500 text-green-400 shadow-green-900/40" : "bg-[#2a0f0f] border-red-500 text-red-400 shadow-red-900/40"}`}>
-                                                                                            {mmr_change > 0 ? "+" : ""}{mmr_change}
-                                                                                        </div>
-                                                                                    ) : (!isCompleted && predictedBChange > 0) ? (
-                                                                                        <div title="คะแนน MMR คาดการณ์หากชนะ/แพ้ 21-20" className="absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2 py-[2px] sm:py-0.5 rounded-full text-[8px] sm:text-[9px] font-bold border shadow-lg backdrop-blur-md bg-slate-800/90 border-slate-600/50 shadow-black/50 whitespace-nowrap flex items-center gap-[2px] sm:gap-1 z-10">
-                                                                                            <span className="text-green-400 drop-shadow-[0_0_2px_rgba(74,222,128,0.3)]">+{predictedBChange}</span>
-                                                                                            <span className="text-slate-500 leading-none text-[7px] sm:text-[8px]">/</span>
-                                                                                            <span className="text-red-400 drop-shadow-[0_0_2px_rgba(248,113,113,0.3)]">-{predictedBLose}</span>
+                                                                                    {rp_change !== undefined ? (
+                                                                                        <div className={`absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black border shadow-lg ${rp_change > 0 ? "bg-[#0f2a1a] border-green-500 text-green-400 shadow-green-900/40" : "bg-[#2a0f0f] border-red-500 text-red-400 shadow-red-900/40"}`}>
+                                                                                            {rp_change > 0 ? "+" : ""}{rp_change}
                                                                                         </div>
                                                                                     ) : null}
                                                                                 </div>
@@ -293,9 +252,6 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                                 showName={false}
                                                                                             />
                                                                                             <div className="flex flex-col items-start leading-none">
-                                                                                                <span className="text-yellow-500 font-black text-[9px] sm:text-[10px]">
-                                                                                                    {u.rankings?.[0]?.mmr ?? 1500}
-                                                                                                </span>
                                                                                                 <div className="flex items-center gap-1 text-[7px] text-slate-500 font-bold">
                                                                                                     <span className="text-green-500/80">{u.rankings?.[0]?.win ?? 0}W</span>
                                                                                                     <span className="text-red-500/80">{u.rankings?.[0]?.lose ?? 0}L</span>

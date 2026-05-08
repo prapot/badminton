@@ -13,14 +13,14 @@ export function calcStandings(players: string[], matches: TMatch[], round: strin
     return Object.values(map).sort((a, b) => b.pts - a.pts || (b.sumFor - b.sumAgainst) - (a.sumFor - a.sumAgainst));
 }
 
-export function calculateExpectedMmrChange(teamAMmr: number | null, teamBMmr: number | null): { aWins: number, aLoses: number, bWins: number, bLoses: number } {
-    const defaultMmr = 1500;
-    const aMmr = teamAMmr ?? defaultMmr;
-    const bMmr = teamBMmr ?? defaultMmr;
+export function calculateExpectedRpChange(teamARp: number | null, teamBRp: number | null): { aWins: number, aLoses: number, bWins: number, bLoses: number } {
+    const defaultRp = 0;
+    const aRp = teamARp ?? defaultRp;
+    const bRp = teamBRp ?? defaultRp;
     const K = 32;
 
-    const expectedAWins = 1 / (1 + Math.pow(10, (bMmr - aMmr) / 400));
-    const expectedBWins = 1 / (1 + Math.pow(10, (aMmr - bMmr) / 400));
+    const expectedAWins = 1 / (1 + Math.pow(10, (bRp - aRp) / 400));
+    const expectedBWins = 1 / (1 + Math.pow(10, (aRp - bRp) / 400));
 
     const movMultiplier = Math.log(2);
 

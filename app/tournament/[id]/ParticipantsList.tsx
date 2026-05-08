@@ -169,9 +169,9 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                             const starsB = b.rankings?.[0]?.stars ?? 0;
                             if (starsA !== starsB) return starsB - starsA;
 
-                            const mmrA = a.rankings?.[0]?.mmr ?? 1500;
-                            const mmrB = b.rankings?.[0]?.mmr ?? 1500;
-                            return mmrB - mmrA;
+                            const rpA = a.rankings?.[0]?.ranking_points ?? 0;
+                            const rpB = b.rankings?.[0]?.ranking_points ?? 0;
+                            return rpB - rpA;
                         })
                         .map((player, idx) => {
                         const isPaused = pausedPlayerIds.has(player.id);
@@ -229,9 +229,6 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                                                 size="sm"
                                             />
                                             <div className="flex flex-col">
-                                                <span className="text-[10px] text-yellow-500/80 font-bold leading-none">
-                                                    {player.rankings?.[0]?.mmr ?? 1500} MMR
-                                                </span>
                                                 <div className="flex items-center gap-1 text-[8px] text-slate-400 font-medium">
                                                     <span className="text-green-400">W{player.rankings?.[0]?.win ?? 0}</span>
                                                     <span className="text-red-400">L{player.rankings?.[0]?.lose ?? 0}</span>

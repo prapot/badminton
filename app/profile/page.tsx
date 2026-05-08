@@ -61,7 +61,7 @@ export default function ProfilePage() {
                         setUserRanking(data.data[0]);
                     } else {
                         // Fallback if no active season ranking exists yet
-                        setUserRanking({ rank: "Unranked", stars: 0, mmr: 1500, win: 0, lose: 0 });
+                        setUserRanking({ rank: "Bronze V", stars: 0, ranking_points: 0, win: 0, lose: 0 });
                     }
                 } catch (err) {
                     console.error("Failed to fetch ranking", err);
@@ -215,15 +215,15 @@ export default function ProfilePage() {
                     <div className="text-center sm:text-left mt-2 sm:mt-0 flex flex-col gap-2 flex-1">
                         <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
                             <p className="text-white font-black text-2xl sm:text-3xl tracking-tight">{user.username}</p>
-                            <RankBadge 
-                                rank={userRanking?.rank || "Unranked"} 
-                                stars={userRanking?.stars || 0} 
+                            <RankBadge
+                                rank={userRanking?.rank || "Unranked"}
+                                stars={userRanking?.stars || 0}
                                 size="md"
                             />
                         </div>
                         <div className="flex flex-wrap justify-center sm:justify-start items-center gap-3 text-sm">
                             <div className="flex items-center gap-1.5 bg-black/30 px-2.5 py-1 rounded-lg border border-white/5">
-                                <span className="text-yellow-500 font-black">MMR: {userRanking?.mmr ?? 1500}</span>
+                                <span className="text-yellow-500 font-black">RP: {userRanking?.ranking_points ?? 0}</span>
                             </div>
                             <div className="flex items-center gap-2 text-slate-400 font-medium">
                                 <span className="flex items-center gap-1">

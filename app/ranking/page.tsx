@@ -32,13 +32,14 @@ interface ApiUser {
 interface TRanking {
     id: number;
     documentId: string;
-    mmr: number;
+    ranking_points: number;
     win: number;
     lose: number;
     win_streak: number;
     match_played: number;
     rank?: string;
     stars?: number;
+    brave_points?: number;
     user_id: ApiUser | null;
 }
 
@@ -62,7 +63,7 @@ interface PlayerRow {
     username: string;
     email: string;
     picture?: ApiPicture | null;
-    mmr: number;
+    ranking_points: number;
     win: number;
     lose: number;
     win_streak: number;
@@ -129,7 +130,7 @@ export default function RankingPage() {
             // 1. Fetch rankings for selected season
             if (!selectedSeason && seasons.length > 0) return; // Wait for season selection if seasons exist
 
-            let url = `${STRAPI_BASE_URL}/api/rankings?populate[user_id][populate][0]=picture&sort[0]=mmr:desc&pagination[pageSize]=1000`;
+            let url = `${STRAPI_BASE_URL}/api/rankings?populate[user_id][populate][0]=picture&sort[0]=ranking_points:desc&pagination[pageSize]=1000`;
             
             // If no season is selected but we are on initial load, we might want to skip until fetchSeasons sets it
             // OR if we want to show current active season specifically
@@ -174,14 +175,14 @@ export default function RankingPage() {
                     username: u.username || "Unknown",
                     email: u.email || "",
                     picture: u.picture,
-                    mmr: r.mmr,
+                    ranking_points: r.ranking_points,
                     win: r.win,
                     lose: r.lose,
                     win_streak: r.win_streak,
                     match_played: r.match_played,
                     hasRanking: true,
                     rankingId: r.id,
-                    rankings: [{ rank: r.rank, stars: r.stars, mmr: r.mmr }]
+                    rankings: [{ rank: r.rank, stars: r.stars, ranking_points: r.ranking_points }]
                 });
             });
 
@@ -193,7 +194,7 @@ export default function RankingPage() {
                         username: u.username,
                         email: u.email,
                         picture: u.picture,
-                        mmr: 0,
+                        ranking_points: 0,
                         win: 0,
                         lose: 0,
                         win_streak: 0,
@@ -227,7 +228,7 @@ export default function RankingPage() {
                     const starsB = b.rankings?.[0]?.stars ?? 0;
                     if (starsA !== starsB) return starsB - starsA;
 
-                    return b.mmr - a.mmr;
+                    return b.ranking_points - a.ranking_points;
                 }
                 return a.username.localeCompare(b.username);
             });
@@ -289,7 +290,7 @@ export default function RankingPage() {
                                         </div>
                                         <div>
                                             <p className="font-black text-white text-base leading-none mb-1">{p.username}</p>
-                                            <p className="text-[10px] font-black text-yellow-500/80 uppercase tracking-widest">{p.mmr} MMR</p>
+                                            <p className="text-[10px] font-black text-yellow-500/80 uppercase tracking-widest">{p.ranking_points} RP</p>
                                         </div>
                                     </div>
                                 ))}
@@ -556,11 +557,11 @@ export default function RankingPage() {
 
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                         {[
-                            { name: 'Bronze', stars: 5, color: 'from-[#cd7f32]/20 to-orange-950/40', border: 'border-orange-500/20', icon: '🥉', textColor: 'text-orange-200' },
-                            { name: 'Silver', stars: 5, color: 'from-slate-400/20 to-slate-800/40', border: 'border-slate-400/20', icon: '🥈', textColor: 'text-slate-200' },
-                            { name: 'Gold', stars: 7, color: 'from-yellow-500/20 to-yellow-900/40', border: 'border-yellow-500/20', icon: '🥇', textColor: 'text-yellow-100' },
-                            { name: 'Platinum', stars: 8, color: 'from-cyan-400/20 to-cyan-900/40', border: 'border-cyan-400/20', icon: '💎', textColor: 'text-cyan-100' },
-                            { name: 'Diamond', stars: 10, color: 'from-blue-500/20 to-blue-900/40', border: 'border-blue-500/20', icon: '💠', textColor: 'text-blue-100' },
+                            { name: 'Bronze', stars: 3, color: 'from-[#cd7f32]/20 to-orange-950/40', border: 'border-orange-500/20', icon: '🥉', textColor: 'text-orange-200' },
+                            { name: 'Silver', stars: 3, color: 'from-slate-400/20 to-slate-800/40', border: 'border-slate-400/20', icon: '🥈', textColor: 'text-slate-200' },
+                            { name: 'Gold', stars: 4, color: 'from-yellow-500/20 to-yellow-900/40', border: 'border-yellow-500/20', icon: '🥇', textColor: 'text-yellow-100' },
+                            { name: 'Platinum', stars: 5, color: 'from-cyan-400/20 to-cyan-900/40', border: 'border-cyan-400/20', icon: '💎', textColor: 'text-cyan-100' },
+                            { name: 'Diamond', stars: 5, color: 'from-blue-500/20 to-blue-900/40', border: 'border-blue-500/20', icon: '💠', textColor: 'text-blue-100' },
                             { name: 'Master', stars: '∞', color: 'from-red-500/20 to-red-950/40', border: 'border-red-500/20', icon: '🏆', textColor: 'text-red-100' },
                         ].map((r) => (
                             <div key={r.name} className={`group relative bg-gradient-to-br ${r.color} backdrop-blur-md border ${r.border} rounded-[2rem] p-6 flex flex-col items-center text-center transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-${r.name.toLowerCase()}-500/20 overflow-hidden`}>
@@ -578,21 +579,38 @@ export default function RankingPage() {
                     </div>
 
                     {/* Rules Note */}
-                    <div className="mt-10 relative overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8 group">
-                        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-transparent pointer-events-none" />
-                        <div className="relative flex flex-col sm:flex-row gap-6 items-center">
-                            <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-3xl shadow-lg shadow-orange-600/20 animate-pulse">
-                                🔥
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
+                        <div className="relative overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8 group">
+                            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-orange-500/5 via-red-500/5 to-transparent pointer-events-none" />
+                            <div className="relative flex flex-col sm:flex-row gap-6 items-center">
+                                <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-3xl shadow-lg shadow-orange-600/20 animate-pulse">
+                                    🔥
+                                </div>
+                                <div className="text-center sm:text-left">
+                                    <h3 className="text-white font-black text-lg sm:text-xl uppercase tracking-tighter mb-1">
+                                        Win Streak <span className="text-orange-500">Bonus</span>
+                                    </h3>
+                                    <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
+                                        ชนะติดต่อกันครบ <span className="text-white font-bold">3 แมตช์</span> รับแต้มกล้าหาญเพิ่มขึ้น! ช่วยให้คุณข้ามดิวิชั่นได้ไวขึ้น
+                                    </p>
+                                </div>
                             </div>
-                            <div className="text-center sm:text-left">
-                                <h3 className="text-white font-black text-lg sm:text-xl uppercase tracking-tighter mb-1">
-                                    Win Streak <span className="text-orange-500">Bonus</span>
-                                </h3>
-                                <p className="text-slate-400 text-xs sm:text-sm leading-relaxed max-w-xl">
-                                    ทะยานสู่อันดับสูงสุดให้ไวขึ้น! เมื่อชนะติดต่อกันครบ <span className="text-white font-bold underline decoration-orange-500 underline-offset-4">3 แมตช์</span> 
-                                    รับดาวโบนัสเพิ่มทันที <span className="text-yellow-400 font-bold">+1 ดวง</span> 
-                                    <span className="block mt-1 text-[10px] opacity-50 uppercase tracking-widest">(Available for Bronze and Silver only)</span>
-                                </p>
+                        </div>
+
+                        <div className="relative overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8 group">
+                            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-blue-500/5 via-indigo-500/5 to-transparent pointer-events-none" />
+                            <div className="relative flex flex-col sm:flex-row gap-6 items-center">
+                                <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-3xl shadow-lg shadow-indigo-600/20">
+                                    🛡️
+                                </div>
+                                <div className="text-center sm:text-left">
+                                    <h3 className="text-white font-black text-lg sm:text-xl uppercase tracking-tighter mb-1">
+                                        Brave Points & <span className="text-blue-400">Protection</span>
+                                    </h3>
+                                    <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
+                                        สะสมแต้มกล้าหาญครบ 100 แต้ม เพื่อรับ <span className="text-yellow-400 font-bold">ดาวโบนัส +1</span> หรือใช้ป้องกัน <span className="text-red-400 font-bold">ดาวลดเมื่อแพ้</span>
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -1,6 +1,5 @@
 import { ApiMatch, TournamentInfo } from "../TournamentTypes";
 import Swal from "sweetalert2";
-import { calculateExpectedMmrChange } from "../TournamentUtils";
 
 interface FullScoreEditorModalProps {
     match: ApiMatch;
@@ -31,24 +30,6 @@ export default function FullScoreEditorModal({
 }: FullScoreEditorModalProps) {
     const isCompleted = match.match_status === "done";
 
-    let predictedAChange = 0;
-    let predictedALose = 0;
-    let predictedBChange = 0;
-    let predictedBLose = 0;
-
-    if (!isCompleted && match.team_a_id && match.team_b_id) {
-        const aMmrs = match.team_a_id.team_players.map(tp => tp.user_id?.rankings?.[0]?.mmr ?? 1500);
-        const bMmrs = match.team_b_id.team_players.map(tp => tp.user_id?.rankings?.[0]?.mmr ?? 1500);
-        const avgA = aMmrs.length ? aMmrs.reduce((a, b) => a + b, 0) / aMmrs.length : null;
-        const avgB = bMmrs.length ? bMmrs.reduce((a, b) => a + b, 0) / bMmrs.length : null;
-        if (avgA !== null && avgB !== null) {
-            const predictions = calculateExpectedMmrChange(avgA, avgB);
-            predictedAChange = predictions.aWins;
-            predictedALose = predictions.aLoses;
-            predictedBChange = predictions.bWins;
-            predictedBLose = predictions.bLoses;
-        }
-    }
 
     const handleConfirmSave = () => {
         if (scoreA < 15 && scoreB < 15) {
@@ -207,31 +188,12 @@ export default function FullScoreEditorModal({
                     </div>
                 </div>
 
-                {/* MMR Predictions (only for ranking mode & not completed) */}
-                {!isCompleted && tournamentInfo?.mode === "ranking" && (
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-green-500/5 border border-green-500/10 rounded-2xl p-4">
-                            <p className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wider">TEAM A คาดการณ์</p>
-                            <div className="flex justify-between items-center">
-                                <span className="text-xs text-green-400">ชนะ: +{predictedAChange}</span>
-                                <span className="text-xs text-red-400">แพ้: -{predictedALose}</span>
-                            </div>
-                        </div>
-                        <div className="bg-blue-500/5 border border-blue-500/10 rounded-2xl p-4 text-right">
-                            <p className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wider text-right">TEAM B คาดการณ์</p>
-                            <div className="flex justify-between items-center">
-                                <span className="text-xs text-red-400">แพ้: -{predictedBLose}</span>
-                                <span className="text-xs text-[#3498db]">ชนะ: +{predictedBChange}</span>
-                            </div>
-                        </div>
-                    </div>
-                )}
 
                 {/* Actions */}
                 <div className="flex flex-col gap-3 pt-2">
                     {isCompleted && tournamentInfo?.mode === "ranking" && (
                         <p className="text-[10px] text-orange-400/70 text-center font-medium italic mb-1">
-                            ⚠️ การแก้ไขผลคะแนนที่จบไปแล้วในโหมด Ranking อาจทำให้สถิติ MMR ไม่ตรงตามความเป็นจริง
+                            ⚠️ การแก้ไขผลคะแนนที่จบไปแล้วในโหมด Ranking อาจทำให้สถิติ RP ไม่ตรงตามความเป็นจริง
                         </p>
                     )}
                     <div className="flex flex-col sm:flex-row gap-4">

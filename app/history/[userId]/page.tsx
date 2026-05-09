@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/lib/useAuth";
 import Link from "next/link";
+import RankBadge from "@/app/tournament/RankBadge";
+import { getRankInfoFromPoints } from "@/app/tournament/TournamentUtils";
 
 const STRAPI_BASE_URL = process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
 
@@ -75,31 +77,7 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
     const [selectedSeason, setSelectedSeason] = useState<string>("all");
     const [rankingStats, setRankingStats] = useState<any>(null);
 
-    const TIERS = [
-        { name: 'Bronze', divisions: 5, starsPerDiv: 3 },
-        { name: 'Silver', divisions: 5, starsPerDiv: 3 },
-        { name: 'Gold', divisions: 5, starsPerDiv: 4 },
-        { name: 'Platinum', divisions: 5, starsPerDiv: 5 },
-        { name: 'Diamond', divisions: 5, starsPerDiv: 5 },
-        { name: 'Master', divisions: 1, starsPerDiv: 999999 }
-    ];
-    const DIVISIONS = ['V', 'IV', 'III', 'II', 'I'];
 
-    const getRankInfoFromPoints = (points: number) => {
-        let p = Math.max(0, points);
-        for (const tier of TIERS) {
-            if (tier.name === 'Master') {
-                return 'Master';
-            }
-            const tierMax = tier.divisions * tier.starsPerDiv * 100;
-            if (p < tierMax) {
-                const divIdx = Math.floor(p / (tier.starsPerDiv * 100));
-                return `${tier.name} ${DIVISIONS[divIdx]}`;
-            }
-            p -= tierMax;
-        }
-        return 'Bronze V';
-    };
 
     const fetchData = useCallback(async (pageNum: number = 1) => {
         if (!jwt) return;
@@ -209,10 +187,14 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
                 {/* Stats Summary Card */}
                 {!loading && rankingStats && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-                        <div className="bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-md">
-                            <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 tracking-widest text-center">Current Rank</p>
-                            <p className="text-lg font-black text-white text-center">{rankingStats.rank || 'Unranked'}</p>
-                            <p className="text-[10px] text-yellow-500 font-bold text-center">⭐ {rankingStats.stars || 0} Stars</p>
+                        <div className="bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-md flex flex-col items-center justify-center">
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mb-2 tracking-widest text-center">Current Rank</p>
+                            <RankBadge
+                                rank={rankingStats.rank}
+                                stars={rankingStats.stars}
+                                size="sm"
+                                showName={true}
+                            />
                         </div>
                         <div className="bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-md">
                             <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 tracking-widest text-center">Matches</p>
@@ -232,8 +214,8 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
                             <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 tracking-widest text-center">Brave Points</p>
                             <p className="text-lg font-black text-purple-400 text-center">{rankingStats.brave_points || 0}</p>
                             <div className="w-full bg-white/5 h-1 rounded-full mt-1 overflow-hidden">
-                                <div 
-                                    className="bg-purple-500 h-full transition-all" 
+                                <div
+                                    className="bg-purple-500 h-full transition-all"
                                     style={{ width: `${Math.min(100, rankingStats.brave_points || 0)}%` }}
                                 />
                             </div>
@@ -345,17 +327,30 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
                                             </div>
 
                                             {isRanking && (
-                                                <div className="text-center min-w-[100px]">
-                                                    <p className="text-[9px] text-slate-500 font-bold uppercase mb-1 tracking-widest">Rank Progression</p>
-                                                    <div className="flex flex-col items-center">
-                                                        <span className="text-xs text-white font-black bg-white/5 px-2 py-0.5 rounded-lg border border-white/10 mb-1 shadow-sm">
-                                                            {h.rank_before || getRankInfoFromPoints(h.old_rp)} ➜ {h.rank_after || getRankInfoFromPoints(h.new_rp)}
-                                                        </span>
-                                                        <span className={`text-[10px] font-black flex items-center gap-1 ${h.rp_change > 0 ? 'text-green-400' : h.rp_change < 0 ? 'text-red-400' : 'text-slate-500'}`}>
-                                                            {h.rp_change > 0 ? `+${h.rp_change} RP` : h.rp_change < 0 ? `${h.rp_change} RP` : 'PROTECTED'}
+                                                <div className="text-center min-w-[140px]">
+                                                    <p className="text-[9px] text-slate-500 font-bold uppercase mb-2 tracking-widest">Rank Progression</p>
+                                                    <div className="flex flex-col items-center gap-1.5">
+                                                        <div className="flex flex-col items-center gap-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <RankBadge
+                                                                    rank={getRankInfoFromPoints(h.old_rp).rankStr}
+                                                                    stars={getRankInfoFromPoints(h.old_rp).stars}
+                                                                    size="sm"
+                                                                    showName={true}
+                                                                />
+                                                                <span className="text-slate-600 font-bold">➜</span>
+                                                                <RankBadge
+                                                                    rank={getRankInfoFromPoints(h.new_rp).rankStr}
+                                                                    stars={getRankInfoFromPoints(h.new_rp).stars}
+                                                                    size="sm"
+                                                                    showName={true}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <span className={`text-[10px] font-black flex items-center gap-1 px-3 py-0.5 rounded-full bg-black/40 border border-white/5 ${h.rp_change > 0 ? 'text-green-400' : h.rp_change < 0 ? 'text-red-400' : 'text-slate-500'}`}>
+                                                            {h.rp_change > 0 ? `+${Math.abs(Math.floor(h.rp_change / 100))} ⭐` : h.rp_change < 0 ? `-${Math.abs(Math.floor(h.rp_change / 100))} ⭐` : 'PROTECTED 🛡️'}
                                                             {h.rp_change > 0 && <span className="animate-bounce">↑</span>}
                                                             {h.rp_change < 0 && <span className="animate-bounce">↓</span>}
-                                                            {h.rp_change === 0 && <span className="opacity-50">🛡️</span>}
                                                         </span>
                                                     </div>
                                                 </div>

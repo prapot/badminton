@@ -64,8 +64,8 @@ export function getRankInfoFromPoints(points: number) {
         { name: 'Bronze', div: 5, stars: 4 },
         { name: 'Silver', div: 5, stars: 4 },
         { name: 'Gold', div: 5, stars: 5 },
-        { name: 'Platinum', div: 5, stars: 5 },
-        { name: 'Diamond', div: 5, stars: 5 },
+        { name: 'Platinum', div: 5, stars: 6 },
+        { name: 'Diamond', div: 5, stars: 6 },
         { name: 'Master', div: 1, stars: 99999 }
     ];
     const DIVS = ['V', 'IV', 'III', 'II', 'I'];
@@ -78,10 +78,13 @@ export function getRankInfoFromPoints(points: number) {
                 return { tier: 'Master', rankStr: 'Master', weight: 6000 + (s * 10) };
             }
             const divIdx = Math.floor(p / (t.stars * 100));
+            const divRp = p % (t.stars * 100);
+            const stars = Math.floor(divRp / 100);
             return {
                 tier: t.name,
                 division: DIVS[divIdx],
                 rankStr: `${t.name} ${DIVS[divIdx]}`,
+                stars: stars,
                 weight: 1000 + (TIERS.indexOf(t) * 1000) + (divIdx * 200)
             };
         }

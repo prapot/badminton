@@ -163,12 +163,12 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                     size="sm"
                                                                                     showName={true}
                                                                                 />
-                                                                                <div className="flex flex-col items-start leading-none">
+                                                                                {/* <div className="flex flex-col items-start leading-none">
                                                                                     <div className="flex items-center gap-1 text-[7px] text-slate-500 font-bold">
                                                                                         <span className="text-green-500/80">{u.rankings?.[0]?.win ?? 0}W</span>
                                                                                         <span className="text-red-500/80">{u.rankings?.[0]?.lose ?? 0}L</span>
                                                                                     </div>
-                                                                                </div>
+                                                                                </div> */}
                                                                             </div>
                                                                         </div>
                                                                         <div className="relative flex items-center shrink-0">
@@ -186,19 +186,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                 </div>
                                                                             )}
                                                                             {(() => {
-                                                                                const history = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id));
-                                                                                if (history) {
-                                                                                    const oldRank = getRankInfoFromPoints(history.old_rp);
-                                                                                    const newRank = getRankInfoFromPoints(history.new_rp);
-                                                                                    if (newRank.weight > oldRank.weight) {
-                                                                                        return (
-                                                                                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-yellow-400 to-amber-600 text-white text-[7px] sm:text-[8px] font-black px-1.5 py-0.5 rounded-md shadow-xl border border-white/20 animate-pulse whitespace-nowrap">
-                                                                                                RANK UP!
-                                                                                                <div className="absolute -inset-1 bg-yellow-400/20 blur-md rounded-full -z-10 animate-pulse" />
-                                                                                            </div>
-                                                                                        );
-                                                                                    }
-                                                                                } else if (match.match_status !== 'done' && match.match_status !== 'cancelled') {
+                                                                                if (match.match_status !== 'done' && match.match_status !== 'cancelled') {
                                                                                     const currentRp = u.rankings?.[0]?.ranking_points || 0;
                                                                                     const currentRank = getRankInfoFromPoints(currentRp);
                                                                                     const potentialRank = getRankInfoFromPoints(currentRp + 100);
@@ -272,19 +260,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                         </div>
                                                                                     )}
                                                                                     {(() => {
-                                                                                        const history = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id));
-                                                                                        if (history) {
-                                                                                            const oldRank = getRankInfoFromPoints(history.old_rp);
-                                                                                            const newRank = getRankInfoFromPoints(history.new_rp);
-                                                                                            if (newRank.weight > oldRank.weight) {
-                                                                                                return (
-                                                                                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-yellow-400 to-amber-600 text-white text-[7px] sm:text-[8px] font-black px-1.5 py-0.5 rounded-md shadow-xl border border-white/20 animate-pulse whitespace-nowrap">
-                                                                                                        RANK UP!
-                                                                                                        <div className="absolute -inset-1 bg-yellow-400/20 blur-md rounded-full -z-10 animate-pulse" />
-                                                                                                    </div>
-                                                                                                );
-                                                                                            }
-                                                                                        } else if (match.match_status !== 'done' && match.match_status !== 'cancelled') {
+                                                                                        if (match.match_status !== 'done' && match.match_status !== 'cancelled') {
                                                                                             const currentRp = u.rankings?.[0]?.ranking_points || 0;
                                                                                             const currentRank = getRankInfoFromPoints(currentRp);
                                                                                             const potentialRank = getRankInfoFromPoints(currentRp + 100);
@@ -313,12 +289,12 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                             size="sm"
                                                                                             showName={true}
                                                                                         />
-                                                                                        <div className="flex flex-col items-start leading-none">
+                                                                                        {/* <div className="flex flex-col items-start leading-none">
                                                                                             <div className="flex items-center gap-1 text-[7px] text-slate-500 font-bold">
                                                                                                 <span className="text-green-500/80">{u.rankings?.[0]?.win ?? 0}W</span>
                                                                                                 <span className="text-red-500/80">{u.rankings?.[0]?.lose ?? 0}L</span>
                                                                                             </div>
-                                                                                        </div>
+                                                                                        </div> */}
                                                                                     </div>
                                                                                 </div>
                                                                             </div>

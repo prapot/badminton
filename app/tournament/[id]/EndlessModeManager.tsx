@@ -606,34 +606,48 @@ export default function EndlessModeManager({
                                     <div className="p-3 space-y-3">
                                         {/* Team A */}
                                         <div>
-                                            <div className="text-[9px] text-indigo-400 uppercase font-bold mb-1.5 tracking-wider">ทีม A</div>
-                                            <div className="space-y-1.5">
+                                            <div className="text-[9px] text-indigo-400 uppercase font-black mb-2 tracking-[0.2em] px-1">ทีม A</div>
+                                            <div className="space-y-2">
                                                 {previewMatch.teamA.map(p => (
-                                                    <div key={p.id} className="flex items-center gap-2 bg-white/[0.04] py-2 px-3 rounded-xl border border-white/[0.06]">
-                                                        <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={false} size="sm" />
-                                                        <span className="flex-1 text-sm font-bold text-white truncate">{p.username}</span>
-                                                        <span className="text-[10px] text-slate-500 shrink-0">{actualPlayerCounts.get(p.id) || 0}แมตซ์</span>
+                                                    <div key={p.id} className="flex items-center gap-3 bg-white/[0.04] py-2.5 px-4 rounded-2xl border border-white/[0.06] shadow-inner">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <span className="text-sm font-bold text-white truncate">{p.username}</span>
+                                                                <span className="text-[10px] text-slate-500 font-bold shrink-0">{actualPlayerCounts.get(p.id) || 0} แมตซ์</span>
+                                                            </div>
+                                                            <div className="mt-1 flex items-center gap-2">
+                                                                <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
 
                                         {/* VS Divider */}
-                                        <div className="flex items-center gap-3">
-                                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent" />
-                                            <div className="w-9 h-9 rounded-full bg-indigo-500 flex items-center justify-center text-[11px] font-black text-white shadow-lg shadow-indigo-500/30">VS</div>
-                                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent" />
+                                        <div className="py-2 flex items-center gap-3">
+                                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent" />
+                                            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[11px] font-black text-white shadow-xl shadow-indigo-500/20 rotate-45">
+                                                <span className="-rotate-45">VS</span>
+                                            </div>
+                                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent" />
                                         </div>
 
                                         {/* Team B */}
                                         <div>
-                                            <div className="text-[9px] text-indigo-400 uppercase font-bold mb-1.5 tracking-wider">ทีม B</div>
-                                            <div className="space-y-1.5">
+                                            <div className="text-[9px] text-indigo-400 uppercase font-black mb-2 tracking-[0.2em] px-1">ทีม B</div>
+                                            <div className="space-y-2">
                                                 {previewMatch.teamB.map(p => (
-                                                    <div key={p.id} className="flex items-center gap-2 bg-white/[0.04] py-2 px-3 rounded-xl border border-white/[0.06]">
-                                                        <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={false} size="sm" />
-                                                        <span className="flex-1 text-sm font-bold text-white truncate">{p.username}</span>
-                                                        <span className="text-[10px] text-slate-500 shrink-0">{actualPlayerCounts.get(p.id) || 0}แมตซ์</span>
+                                                    <div key={p.id} className="flex items-center gap-3 bg-white/[0.04] py-2.5 px-4 rounded-2xl border border-white/[0.06] shadow-inner">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <span className="text-sm font-bold text-white truncate">{p.username}</span>
+                                                                <span className="text-[10px] text-slate-500 font-bold shrink-0">{actualPlayerCounts.get(p.id) || 0} แมตซ์</span>
+                                                            </div>
+                                                            <div className="mt-1 flex items-center gap-2">
+                                                                <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -705,6 +719,7 @@ export default function EndlessModeManager({
                                                         }`}>
                                                             {p.username}
                                                         </span>
+                                                        <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} size="sm" showName={false} />
                                                         {isBusy && <span className="text-[9px] text-orange-400 font-bold shrink-0">แข่งอยู่</span>}
                                                         {isPaused && !isBusy && <span className="text-[9px] text-yellow-500 font-bold shrink-0">พัก</span>}
                                                         <span className="text-[10px] text-slate-600 shrink-0">{actualPlayerCounts.get(p.id) || 0}แมตซ์</span>
@@ -785,9 +800,14 @@ export default function EndlessModeManager({
                                                                 <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold">กำลังแก้ไข</span>
                                                             )}
                                                         </div>
-                                                        <p className="text-xs font-bold text-white truncate leading-snug">
-                                                            {team.players.map(p => p.username).join(" / ")}
-                                                        </p>
+                                                        <div className="mt-2 space-y-1.5">
+                                                            {team.players.map(p => (
+                                                                <div key={p.id} className="flex items-center gap-2">
+                                                                    <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} size="sm" showName={true} />
+                                                                    <span className="text-[11px] font-bold text-white truncate">{p.username}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </div>
 
                                                     <span className="text-[10px] text-slate-600 shrink-0">{matchCount}แมตซ์</span>
@@ -932,34 +952,48 @@ export default function EndlessModeManager({
                                                 <div className="p-3 space-y-3">
                                                     {/* Team A */}
                                                     <div>
-                                                        <div className="text-[9px] text-amber-400 uppercase font-bold mb-1.5 tracking-wider">ทีม A</div>
-                                                        <div className="space-y-1.5">
+                                                        <div className="text-[9px] text-amber-400 uppercase font-black mb-2 tracking-[0.2em] px-1">ทีม A</div>
+                                                        <div className="space-y-2">
                                                             {previewMatch.teamA.map(p => (
-                                                                <div key={p.id} className="flex items-center gap-2 bg-white/[0.04] py-2 px-3 rounded-xl border border-white/[0.06]">
-                                                                    <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={false} size="sm" />
-                                                                    <span className="flex-1 text-sm font-bold text-white truncate">{p.username}</span>
-                                                                    <span className="text-[10px] text-slate-500 shrink-0">{actualPlayerCounts.get(p.id) || 0}แมตซ์</span>
+                                                                <div key={p.id} className="flex items-center gap-3 bg-white/[0.04] py-2.5 px-4 rounded-2xl border border-white/[0.06] shadow-inner">
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex items-center justify-between gap-2">
+                                                                            <span className="text-sm font-bold text-white truncate">{p.username}</span>
+                                                                            <span className="text-[10px] text-slate-500 font-bold shrink-0">{actualPlayerCounts.get(p.id) || 0} แมตซ์</span>
+                                                                        </div>
+                                                                        <div className="mt-1 flex items-center gap-2">
+                                                                            <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             ))}
                                                         </div>
                                                     </div>
 
                                                     {/* VS Divider */}
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
-                                                        <div className="w-9 h-9 rounded-full bg-amber-500 flex items-center justify-center text-[11px] font-black text-white shadow-lg shadow-amber-500/30">VS</div>
-                                                        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+                                                    <div className="py-2 flex items-center gap-3">
+                                                        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
+                                                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[11px] font-black text-white shadow-xl shadow-amber-500/20 rotate-45">
+                                                            <span className="-rotate-45">VS</span>
+                                                        </div>
+                                                        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
                                                     </div>
 
                                                     {/* Team B */}
                                                     <div>
-                                                        <div className="text-[9px] text-amber-400 uppercase font-bold mb-1.5 tracking-wider">ทีม B</div>
-                                                        <div className="space-y-1.5">
+                                                        <div className="text-[9px] text-amber-400 uppercase font-black mb-2 tracking-[0.2em] px-1">ทีม B</div>
+                                                        <div className="space-y-2">
                                                             {previewMatch.teamB.map(p => (
-                                                                <div key={p.id} className="flex items-center gap-2 bg-white/[0.04] py-2 px-3 rounded-xl border border-white/[0.06]">
-                                                                    <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={false} size="sm" />
-                                                                    <span className="flex-1 text-sm font-bold text-white truncate">{p.username}</span>
-                                                                    <span className="text-[10px] text-slate-500 shrink-0">{actualPlayerCounts.get(p.id) || 0}แมตซ์</span>
+                                                                <div key={p.id} className="flex items-center gap-3 bg-white/[0.04] py-2.5 px-4 rounded-2xl border border-white/[0.06] shadow-inner">
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex items-center justify-between gap-2">
+                                                                            <span className="text-sm font-bold text-white truncate">{p.username}</span>
+                                                                            <span className="text-[10px] text-slate-500 font-bold shrink-0">{actualPlayerCounts.get(p.id) || 0} แมตซ์</span>
+                                                                        </div>
+                                                                        <div className="mt-1 flex items-center gap-2">
+                                                                            <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             ))}
                                                         </div>

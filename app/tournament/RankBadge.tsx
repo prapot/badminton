@@ -76,11 +76,11 @@ const RankBadge: React.FC<RankBadgeProps> = ({ rank: initialRank, stars = 0, sho
 
     const sizeClasses = {
         sm: { 
-            container: 'px-2 py-0.5 min-w-[70px]', 
-            text: 'text-[9px]', 
-            star: 'w-1.5 h-1.5', 
-            icon: 'text-[10px]',
-            gap: 'gap-1'
+            container: 'px-1.5 py-0.5 min-w-[60px]', 
+            text: 'text-[8px]', 
+            star: 'w-1 h-1', 
+            icon: 'text-[9px]',
+            gap: 'gap-0.5'
         },
         md: { 
             container: 'px-3 py-1 min-w-[90px]', 
@@ -101,13 +101,11 @@ const RankBadge: React.FC<RankBadgeProps> = ({ rank: initialRank, stars = 0, sho
     const s = sizeClasses[size];
 
     const getMaxStars = (rankName: string) => {
-        if (rankName.includes('Bronze')) return 3; // Logic is 4, shows full 3 before up
-        if (rankName.includes('Silver')) return 3; // Logic is 4, shows full 3 before up
-        if (rankName.includes('Gold')) return 4;   // Logic is 5, shows full 4 before up
-        if (rankName.includes('Platinum')) return 4; // Logic is 5
-        if (rankName.includes('Diamond')) return 4;  // Logic is 5
-        if (rankName.includes('Master')) return 999; // Represents infinite
-        return 0;
+        const lower = rankName.toLowerCase();
+        if (lower.includes('bronze') || lower.includes('silver')) return 3;
+        if (lower.includes('gold')) return 4;
+        if (lower.includes('platinum') || lower.includes('diamond')) return 5;
+        return 0; // Master
     };
 
     const maxStars = getMaxStars(rank);

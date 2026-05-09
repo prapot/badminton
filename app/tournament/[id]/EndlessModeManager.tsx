@@ -294,16 +294,25 @@ export default function EndlessModeManager({
     // Bronze(0-3) → Silver(4-7) → Gold(8-12) → Platinum(13-18) → Diamond(19-24) → Master(25+)
     const getSkillScore = (p: ApiPlayer): number => {
         const r = p.rankings?.[0];
-        if (!r?.rank) return 0; // default = Bronze 0 (new player / after re-rank)
-        const name = r.rank.toLowerCase();
+        if (!r?.rank) return 1000;
+        
+        const tierWeights: Record<string, number> = {
+            bronze: 1000, silver: 2000, gold: 3000, platinum: 4000, diamond: 5000, master: 6000
+        };
+        const divisions: Record<string, number> = { 'V': 0, 'IV': 1, 'III': 2, 'II': 3, 'I': 4 };
+
+        const rankParts = r.rank.split(' ');
+        const tier = rankParts[0].toLowerCase();
+        const div = rankParts[1] || '';
         const stars = r.stars || 0;
-        if (name.includes('master'))   return 25 + stars;
-        if (name.includes('diamond'))  return 19 + stars;
-        if (name.includes('platinum')) return 13 + stars;
-        if (name.includes('gold'))     return 8 + stars;
-        if (name.includes('silver'))   return 4 + stars;
-        if (name.includes('bronze'))   return 0 + stars;
-        return 0;
+
+        if (tier === 'master') return 6000 + (stars * 10);
+
+        const base = tierWeights[tier] || 1000;
+        const divBonus = (divisions[div] || 0) * 200;
+        const starBonus = stars * 50;
+
+        return base + divBonus + starBonus;
     };
 
     // ── FRONTEND MATCHMAKING ────────────────────────────────────────────────
@@ -369,14 +378,14 @@ export default function EndlessModeManager({
                     const avgSkillA = teamA.reduce((s, p) => s + getSkillScore(p), 0) / teamA.length;
                     const avgSkillB = teamB.reduce((s, p) => s + getSkillScore(p), 0) / teamB.length;
                     const skillDiff = Math.abs(avgSkillA - avgSkillB);
-                    score += skillDiff * 800;
+                    score += skillDiff * 2;
                 } else {
                     const faceoffCount = getFaceoffCount([teamA[0].id], [teamB[0].id]);
                     score += Math.pow(faceoffCount + 1, 2) * 1000;
 
                     // Rank Balance for singles
                     const skillDiff = Math.abs(getSkillScore(teamA[0]) - getSkillScore(teamB[0]));
-                    score += skillDiff * 800;
+                    score += skillDiff * 2;
                 }
 
                 // Small random jitter to break ties → ensures different pairings on re-roll

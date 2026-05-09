@@ -101,11 +101,12 @@ const RankBadge: React.FC<RankBadgeProps> = ({ rank: initialRank, stars = 0, sho
     const s = sizeClasses[size];
 
     const getMaxStars = (rankName: string) => {
-        if (rankName.includes('Bronze')) return 3;
-        if (rankName.includes('Silver')) return 3;
-        if (rankName.includes('Gold')) return 4;
-        if (rankName.includes('Platinum')) return 5;
-        if (rankName.includes('Diamond')) return 5;
+        if (rankName.includes('Bronze')) return 3; // Logic is 4, shows full 3 before up
+        if (rankName.includes('Silver')) return 3; // Logic is 4, shows full 3 before up
+        if (rankName.includes('Gold')) return 4;   // Logic is 5, shows full 4 before up
+        if (rankName.includes('Platinum')) return 4; // Logic is 5
+        if (rankName.includes('Diamond')) return 4;  // Logic is 5
+        if (rankName.includes('Master')) return 999; // Represents infinite
         return 0;
     };
 

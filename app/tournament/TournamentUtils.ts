@@ -59,3 +59,33 @@ export function getPartnerRepeats(playerIds: number[], currentPairIdx: number, m
     });
     return count;
 }
+export function getRankInfoFromPoints(points: number) {
+    const TIERS = [
+        { name: 'Bronze', div: 5, stars: 4 },
+        { name: 'Silver', div: 5, stars: 4 },
+        { name: 'Gold', div: 5, stars: 5 },
+        { name: 'Platinum', div: 5, stars: 5 },
+        { name: 'Diamond', div: 5, stars: 5 },
+        { name: 'Master', div: 1, stars: 99999 }
+    ];
+    const DIVS = ['V', 'IV', 'III', 'II', 'I'];
+    let p = points;
+    for (const t of TIERS) {
+        const tierMax = t.div * t.stars * 100;
+        if (p < tierMax || t.name === 'Master') {
+            if (t.name === 'Master') {
+                const s = Math.floor(p / 100);
+                return { tier: 'Master', rankStr: 'Master', weight: 6000 + (s * 10) };
+            }
+            const divIdx = Math.floor(p / (t.stars * 100));
+            return {
+                tier: t.name,
+                division: DIVS[divIdx],
+                rankStr: `${t.name} ${DIVS[divIdx]}`,
+                weight: 1000 + (TIERS.indexOf(t) * 1000) + (divIdx * 200)
+            };
+        }
+        p -= tierMax;
+    }
+    return { tier: 'Bronze', rankStr: 'Bronze V', weight: 1000 };
+}

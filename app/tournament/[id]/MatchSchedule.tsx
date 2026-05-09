@@ -1,5 +1,6 @@
 import React from 'react';
 import { TournamentInfo, User, ApiMatch } from '../TournamentTypes';
+import { getRankInfoFromPoints } from '../TournamentUtils';
 import RankBadge from '../RankBadge';
 
 interface MatchScheduleProps {
@@ -138,10 +139,10 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                     </div>
                                                 </div>
 
-                                                <div className="mt-3 flex items-center justify-between gap-2 sm:gap-4 px-4 pb-4">
+                                                <div className="mt-2 flex items-center justify-between gap-1.5 sm:gap-4 px-3 sm:px-4 pb-3 sm:pb-4">
                                                     {/* Team A */}
                                                     <div className={`flex-1 min-w-0 transition-colors ${winnerA ? "text-green-400" : isCompleted && !winnerA ? "text-slate-500" : "text-white"}`}>
-                                                        <div className="flex flex-col gap-3 justify-center h-full">
+                                                        <div className="flex flex-col gap-2 sm:gap-3 justify-center h-full">
                                                             {match.team_a_id?.team_players.map((tp, idx) => {
                                                                 const u = tp.user_id;
                                                                 if (!u) return null;
@@ -155,29 +156,63 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                 <p className="font-bold text-xs sm:text-sm truncate text-white">{u.username}</p>
                                                                             </div>
                                                                             {/* Stats - ranking mode only */}
-                                                                            {tournamentInfo.mode === "ranking" && (
-                                                                                <div className="flex items-center gap-2 bg-black/30 px-2 py-1 rounded-lg border border-white/5">
-                                                                                    <RankBadge 
-                                                                                        rank={u.rankings?.[0]?.rank} 
-                                                                                        stars={u.rankings?.[0]?.stars} 
-                                                                                        size="sm"
-                                                                                        showName={false}
-                                                                                    />
-                                                                                    <div className="flex flex-col items-start leading-none">
-                                                                                        <div className="flex items-center gap-1 text-[7px] text-slate-500 font-bold">
-                                                                                            <span className="text-green-500/80">{u.rankings?.[0]?.win ?? 0}W</span>
-                                                                                            <span className="text-red-500/80">{u.rankings?.[0]?.lose ?? 0}L</span>
-                                                                                        </div>
+                                                                            <div className="flex items-center gap-2 bg-black/30 px-2 py-1 rounded-lg border border-white/5">
+                                                                                <RankBadge
+                                                                                    rank={u.rankings?.[0]?.rank}
+                                                                                    stars={u.rankings?.[0]?.stars}
+                                                                                    size="sm"
+                                                                                    showName={true}
+                                                                                />
+                                                                                <div className="flex flex-col items-start leading-none">
+                                                                                    <div className="flex items-center gap-1 text-[7px] text-slate-500 font-bold">
+                                                                                        <span className="text-green-500/80">{u.rankings?.[0]?.win ?? 0}W</span>
+                                                                                        <span className="text-red-500/80">{u.rankings?.[0]?.lose ?? 0}L</span>
                                                                                     </div>
                                                                                 </div>
-                                                                            )}
+                                                                            </div>
                                                                         </div>
-                                                                        <div className="relative flex items-center">
-                                                                            {rp_change !== undefined ? (
-                                                                                <div className={`absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black border shadow-lg ${rp_change > 0 ? "bg-[#0f2a1a] border-green-500 text-green-400 shadow-green-900/40" : "bg-[#2a0f0f] border-red-500 text-red-400 shadow-red-900/40"}`}>
-                                                                                    {rp_change > 0 ? "+" : ""}{rp_change}
+                                                                        <div className="relative flex items-center shrink-0">
+                                                                            <div className={`w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner ${match.first_serve === "A" && idx === 0 ? "border-[#2ecc71] shadow-[0_0_20px_rgba(46,204,113,0.5)] scale-105" : "border-slate-700/50"}`}>
+                                                                                {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-[10px] sm:text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                                                            </div>
+                                                                            {match.first_serve === "A" && idx === 0 && (
+                                                                                <div className="absolute -right-6 z-30 w-7 h-7 bg-[#2ecc71] rounded-full border-2 border-[#1a2535] flex items-center justify-center shadow-[0_0_15px_rgba(46,204,113,0.8)] animate-bounce-subtle">
+                                                                                    <span className="text-[14px] filter drop-shadow-md">🏸</span>
                                                                                 </div>
-                                                                            ) : null}
+                                                                            )}
+                                                                            {rp_change !== undefined && (
+                                                                                <div className={`absolute -bottom-3 sm:-bottom-4 left-1/2 -translate-x-1/2 z-20 px-2 sm:px-3 py-0.5 rounded-full text-[8px] sm:text-[9px] font-black border shadow-lg whitespace-nowrap ${rp_change > 0 ? "bg-[#0f2a1a] border-green-500 text-green-400 shadow-green-900/40" : rp_change < 0 ? "bg-[#2a0f0f] border-red-500 text-red-400 shadow-red-900/40" : "bg-slate-800 border-slate-500 text-slate-300 shadow-black/40"}`}>
+                                                                                    {rp_change > 0 ? "+" : rp_change < 0 ? "-" : "+"}{Math.abs(Math.floor(rp_change / 100))} ⭐
+                                                                                </div>
+                                                                            )}
+                                                                            {(() => {
+                                                                                const history = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id));
+                                                                                if (history) {
+                                                                                    const oldRank = getRankInfoFromPoints(history.old_rp);
+                                                                                    const newRank = getRankInfoFromPoints(history.new_rp);
+                                                                                    if (newRank.weight > oldRank.weight) {
+                                                                                        return (
+                                                                                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-yellow-400 to-amber-600 text-white text-[7px] sm:text-[8px] font-black px-1.5 py-0.5 rounded-md shadow-xl border border-white/20 animate-pulse whitespace-nowrap">
+                                                                                                RANK UP!
+                                                                                                <div className="absolute -inset-1 bg-yellow-400/20 blur-md rounded-full -z-10 animate-pulse" />
+                                                                                            </div>
+                                                                                        );
+                                                                                    }
+                                                                                } else if (match.match_status !== 'done' && match.match_status !== 'cancelled') {
+                                                                                    const currentRp = u.rankings?.[0]?.ranking_points || 0;
+                                                                                    const currentRank = getRankInfoFromPoints(currentRp);
+                                                                                    const potentialRank = getRankInfoFromPoints(currentRp + 100);
+                                                                                    if (potentialRank.weight > currentRank.weight) {
+                                                                                        return (
+                                                                                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-yellow-400 to-amber-600 text-white text-[7px] sm:text-[8px] font-black px-1.5 py-0.5 rounded-md shadow-xl border border-white/20 animate-pulse whitespace-nowrap">
+                                                                                                RANK UP!
+                                                                                                <div className="absolute -inset-1 bg-yellow-400/20 blur-md rounded-full -z-10 animate-pulse" />
+                                                                                            </div>
+                                                                                        );
+                                                                                    }
+                                                                                }
+                                                                                return null;
+                                                                            })()}
                                                                         </div>
                                                                     </div>
                                                                 );
@@ -189,21 +224,21 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                     </div>
 
                                                     {/* Score / VS */}
-                                                    <div className="shrink-0 group-hover:scale-105 transition-transform flex flex-col items-center justify-center self-stretch">
+                                                    <div className="shrink-0 flex flex-col items-center justify-center self-stretch">
                                                         {isCompleted ? (
-                                                            <div className="flex items-center gap-2 sm:gap-3 bg-[#0f1923] px-3 sm:px-4 py-2 sm:py-3 rounded-2xl border border-white/10 shadow-inner">
-                                                                <span className={`text-xl sm:text-3xl font-black ${winnerA ? "text-green-400" : "text-white"}`}>{match.score_a}</span>
+                                                            <div className="flex items-center gap-1.5 sm:gap-3 bg-[#0f1923] px-2.5 sm:px-4 py-1.5 sm:py-3 rounded-xl sm:rounded-2xl border border-white/10 shadow-inner">
+                                                                <span className={`text-lg sm:text-3xl font-black ${winnerA ? "text-green-400" : "text-white"}`}>{match.score_a}</span>
                                                                 <div className="flex flex-col items-center gap-0.5">
-                                                                    <div className="w-px h-2 bg-white/10" />
-                                                                    <span className="text-[10px] font-bold text-slate-600">VS</span>
-                                                                    <div className="w-px h-2 bg-white/10" />
+                                                                    <div className="w-px h-1.5 sm:h-2 bg-white/10" />
+                                                                    <span className="text-[8px] sm:text-[10px] font-bold text-slate-600">VS</span>
+                                                                    <div className="w-px h-1.5 sm:h-2 bg-white/10" />
                                                                 </div>
-                                                                <span className={`text-xl sm:text-3xl font-black ${winnerB ? "text-green-400" : "text-white"}`}>{match.score_b}</span>
+                                                                <span className={`text-lg sm:text-3xl font-black ${winnerB ? "text-green-400" : "text-white"}`}>{match.score_b}</span>
                                                             </div>
                                                         ) : (
-                                                            <div className="flex flex-col items-center gap-2">
-                                                                <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center relative">
-                                                                    <span className="text-xs font-black text-slate-500">VS</span>
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center relative">
+                                                                    <span className="text-[8px] sm:text-xs font-black text-slate-500">VS</span>
                                                                     <div className="absolute inset-0 rounded-full border border-[#3498db]/30 animate-ping opacity-20" />
                                                                 </div>
                                                             </div>
@@ -222,20 +257,48 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                         const rp_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.rp_change;
                                                                         return (
                                                                             <div key={idx} className="flex items-center justify-start gap-2 sm:gap-3 relative">
-                                                                                <div className="relative flex items-center">
-                                                                                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner ${match.first_serve === "B" && idx === 0 ? "border-[#2ecc71] shadow-[0_0_20px_rgba(46,204,113,0.5)] scale-105" : "border-slate-700/50"}`}>
-                                                                                        {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                                                                <div className="relative flex items-center shrink-0">
+                                                                                    <div className={`w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner ${match.first_serve === "B" && idx === 0 ? "border-[#2ecc71] shadow-[0_0_20px_rgba(46,204,113,0.5)] scale-105" : "border-slate-700/50"}`}>
+                                                                                        {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-[10px] sm:text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                                                                     </div>
                                                                                     {match.first_serve === "B" && idx === 0 && (
                                                                                         <div className="absolute -left-6 z-30 w-7 h-7 bg-[#2ecc71] rounded-full border-2 border-[#1a2535] flex items-center justify-center shadow-[0_0_15px_rgba(46,204,113,0.8)] animate-bounce-subtle">
                                                                                             <span className="text-[14px] filter drop-shadow-md">🏸</span>
                                                                                         </div>
                                                                                     )}
-                                                                                    {rp_change !== undefined ? (
-                                                                                        <div className={`absolute -bottom-2 sm:-bottom-2.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black border shadow-lg ${rp_change > 0 ? "bg-[#0f2a1a] border-green-500 text-green-400 shadow-green-900/40" : "bg-[#2a0f0f] border-red-500 text-red-400 shadow-red-900/40"}`}>
-                                                                                            {rp_change > 0 ? "+" : ""}{rp_change}
+                                                                                    {rp_change !== undefined && (
+                                                                                        <div className={`absolute -bottom-3 sm:-bottom-4 left-1/2 -translate-x-1/2 z-20 px-2 sm:px-3 py-0.5 rounded-full text-[8px] sm:text-[9px] font-black border shadow-lg whitespace-nowrap ${rp_change > 0 ? "bg-[#0f2a1a] border-green-500 text-green-400 shadow-green-900/40" : rp_change < 0 ? "bg-[#2a0f0f] border-red-500 text-red-400 shadow-red-900/40" : "bg-slate-800 border-slate-500 text-slate-300 shadow-black/40"}`}>
+                                                                                            {rp_change > 0 ? "+" : rp_change < 0 ? "-" : "+"}{Math.abs(Math.floor(rp_change / 100))} ⭐
                                                                                         </div>
-                                                                                    ) : null}
+                                                                                    )}
+                                                                                    {(() => {
+                                                                                        const history = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id));
+                                                                                        if (history) {
+                                                                                            const oldRank = getRankInfoFromPoints(history.old_rp);
+                                                                                            const newRank = getRankInfoFromPoints(history.new_rp);
+                                                                                            if (newRank.weight > oldRank.weight) {
+                                                                                                return (
+                                                                                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-yellow-400 to-amber-600 text-white text-[7px] sm:text-[8px] font-black px-1.5 py-0.5 rounded-md shadow-xl border border-white/20 animate-pulse whitespace-nowrap">
+                                                                                                        RANK UP!
+                                                                                                        <div className="absolute -inset-1 bg-yellow-400/20 blur-md rounded-full -z-10 animate-pulse" />
+                                                                                                    </div>
+                                                                                                );
+                                                                                            }
+                                                                                        } else if (match.match_status !== 'done' && match.match_status !== 'cancelled') {
+                                                                                            const currentRp = u.rankings?.[0]?.ranking_points || 0;
+                                                                                            const currentRank = getRankInfoFromPoints(currentRp);
+                                                                                            const potentialRank = getRankInfoFromPoints(currentRp + 100);
+                                                                                            if (potentialRank.weight > currentRank.weight) {
+                                                                                                return (
+                                                                                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-yellow-400 to-amber-600 text-white text-[7px] sm:text-[8px] font-black px-1.5 py-0.5 rounded-md shadow-xl border border-white/20 animate-pulse whitespace-nowrap">
+                                                                                                        RANK UP!
+                                                                                                        <div className="absolute -inset-1 bg-yellow-400/20 blur-md rounded-full -z-10 animate-pulse" />
+                                                                                                    </div>
+                                                                                                );
+                                                                                            }
+                                                                                        }
+                                                                                        return null;
+                                                                                    })()}
                                                                                 </div>
                                                                                 <div className="flex flex-col items-start min-w-0 flex-1">
                                                                                     <div className="flex items-center justify-start gap-1.5 mb-1">
@@ -243,22 +306,20 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                         {winnerB && idx === 0 && <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded-md">Winner</span>}
                                                                                     </div>
                                                                                     {/* Stats - ranking mode only */}
-                                                                                    {tournamentInfo.mode === "ranking" && (
-                                                                                        <div className="flex items-center gap-2 bg-black/30 px-2 py-1 rounded-lg border border-white/5">
-                                                                                            <RankBadge 
-                                                                                                rank={u.rankings?.[0]?.rank} 
-                                                                                                stars={u.rankings?.[0]?.stars} 
-                                                                                                size="sm"
-                                                                                                showName={false}
-                                                                                            />
-                                                                                            <div className="flex flex-col items-start leading-none">
-                                                                                                <div className="flex items-center gap-1 text-[7px] text-slate-500 font-bold">
-                                                                                                    <span className="text-green-500/80">{u.rankings?.[0]?.win ?? 0}W</span>
-                                                                                                    <span className="text-red-500/80">{u.rankings?.[0]?.lose ?? 0}L</span>
-                                                                                                </div>
+                                                                                    <div className="flex items-center gap-2 bg-black/30 px-2 py-1 rounded-lg border border-white/5">
+                                                                                        <RankBadge
+                                                                                            rank={u.rankings?.[0]?.rank}
+                                                                                            stars={u.rankings?.[0]?.stars}
+                                                                                            size="sm"
+                                                                                            showName={true}
+                                                                                        />
+                                                                                        <div className="flex flex-col items-start leading-none">
+                                                                                            <div className="flex items-center gap-1 text-[7px] text-slate-500 font-bold">
+                                                                                                <span className="text-green-500/80">{u.rankings?.[0]?.win ?? 0}W</span>
+                                                                                                <span className="text-red-500/80">{u.rankings?.[0]?.lose ?? 0}L</span>
                                                                                             </div>
                                                                                         </div>
-                                                                                    )}
+                                                                                    </div>
                                                                                 </div>
                                                                             </div>
                                                                         );

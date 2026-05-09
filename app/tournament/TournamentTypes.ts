@@ -79,6 +79,8 @@ export interface ApiTeam {
 export interface ApiMatchHistory {
     id: number;
     rp_change: number;
+    old_rp: number;
+    new_rp: number;
     users: ApiPlayer[];
 }
 

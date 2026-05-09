@@ -15,8 +15,11 @@ interface MatchHistory {
     new_rp: number;
     rp_change: number;
     is_win: boolean;
+    rank_before?: string;
+    rank_after?: string;
     createdAt: string;
     matches: Array<{
+        round: any;
         id: number;
         documentId: string;
         score_a: number;
@@ -70,7 +73,8 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
     const [meta, setMeta] = useState<PaginationMeta | null>(null);
     const [seasons, setSeasons] = useState<any[]>([]);
     const [selectedSeason, setSelectedSeason] = useState<string>("all");
-    
+    const [rankingStats, setRankingStats] = useState<any>(null);
+
     const TIERS = [
         { name: 'Bronze', divisions: 5, starsPerDiv: 3 },
         { name: 'Silver', divisions: 5, starsPerDiv: 3 },
@@ -124,12 +128,26 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
             setHistories(historyData.data || []);
             setMeta(historyData.meta.pagination);
 
+            // 3. Fetch ranking stats for summary
+            let rankingUrl = `${STRAPI_BASE_URL}/api/rankings?filters[user_id][id]=${userId}`;
+            if (selectedSeason !== "all") {
+                rankingUrl += `&filters[season][documentId]=${selectedSeason}`;
+            } else {
+                rankingUrl += `&sort=createdAt:desc&pagination[pageSize]=1`;
+            }
+
+            const rankingRes = await fetch(rankingUrl, { headers: { Authorization: `Bearer ${jwt}` } });
+            if (rankingRes.ok) {
+                const rData = await rankingRes.json();
+                setRankingStats(rData.data?.[0] || null);
+            }
+
         } catch (e: any) {
             setError(e.message);
         } finally {
             setLoading(false);
         }
-    }, [userId, jwt, targetUser]);
+    }, [userId, jwt, targetUser, selectedSeason]);
 
     useEffect(() => {
         if (!jwt) return;
@@ -187,6 +205,41 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
                         </select>
                     </div>
                 </div>
+
+                {/* Stats Summary Card */}
+                {!loading && rankingStats && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+                        <div className="bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-md">
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 tracking-widest text-center">Current Rank</p>
+                            <p className="text-lg font-black text-white text-center">{rankingStats.rank || 'Unranked'}</p>
+                            <p className="text-[10px] text-yellow-500 font-bold text-center">⭐ {rankingStats.stars || 0} Stars</p>
+                        </div>
+                        <div className="bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-md">
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 tracking-widest text-center">Matches</p>
+                            <p className="text-lg font-black text-white text-center">{rankingStats.match_played || 0}</p>
+                            <p className="text-[10px] text-slate-400 font-bold text-center">Total Games</p>
+                        </div>
+                        <div className="bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-md">
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 tracking-widest text-center">Win / Loss</p>
+                            <p className="text-lg font-black text-center">
+                                <span className="text-green-400">{rankingStats.win || 0}</span>
+                                <span className="text-slate-600 mx-2">/</span>
+                                <span className="text-red-400">{rankingStats.lose || 0}</span>
+                            </p>
+                            <p className="text-[10px] text-slate-400 font-bold text-center">Winrate {Math.round(((rankingStats.win || 0) / (rankingStats.match_played || 1)) * 100)}%</p>
+                        </div>
+                        <div className="bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-md">
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 tracking-widest text-center">Brave Points</p>
+                            <p className="text-lg font-black text-purple-400 text-center">{rankingStats.brave_points || 0}</p>
+                            <div className="w-full bg-white/5 h-1 rounded-full mt-1 overflow-hidden">
+                                <div 
+                                    className="bg-purple-500 h-full transition-all" 
+                                    style={{ width: `${Math.min(100, rankingStats.brave_points || 0)}%` }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {loading ? (
                     <div className="space-y-4">
@@ -252,6 +305,11 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
                                                     }`}>
                                                     {isRanking ? '🏆 RANKING' : '🎮 CASUAL'}
                                                 </span>
+                                                {match.round && (
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-white/10 text-white border-white/20">
+                                                        ROUND {match.round}
+                                                    </span>
+                                                )}
                                                 <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
                                                     {new Date(h.createdAt).toLocaleDateString('th-TH', {
                                                         day: 'numeric', month: 'short', year: 'numeric',
@@ -291,7 +349,7 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
                                                     <p className="text-[9px] text-slate-500 font-bold uppercase mb-1 tracking-widest">Rank Progression</p>
                                                     <div className="flex flex-col items-center">
                                                         <span className="text-xs text-white font-black bg-white/5 px-2 py-0.5 rounded-lg border border-white/10 mb-1 shadow-sm">
-                                                            {getRankInfoFromPoints(h.old_rp)} ➜ {getRankInfoFromPoints(h.new_rp)}
+                                                            {h.rank_before || getRankInfoFromPoints(h.old_rp)} ➜ {h.rank_after || getRankInfoFromPoints(h.new_rp)}
                                                         </span>
                                                         <span className={`text-[10px] font-black flex items-center gap-1 ${h.rp_change > 0 ? 'text-green-400' : h.rp_change < 0 ? 'text-red-400' : 'text-slate-500'}`}>
                                                             {h.rp_change > 0 ? `+${h.rp_change} RP` : h.rp_change < 0 ? `${h.rp_change} RP` : 'PROTECTED'}

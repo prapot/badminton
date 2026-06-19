@@ -215,69 +215,20 @@ export default function RankingPage() {
                 }
             });
 
-            // 5. Sort: ranked players first (by tier → division → stars → ranking_points), then unranked alphabetically
-            /**
-             * getRankScore: returns a numeric score for comparison.
-             * Tier base values (per 1000):  bronze=1, silver=2, gold=3, platinum=4, diamond=5, master=6
-             * Division offset (_v=0, _iv=1, _iii=2, _ii=3, _i=4) → adds 0–4
-             * So master_i > master_v > diamond_i > diamond_v > ... > bronze_v
-             */
-            const getRankScore = (rankStr?: string): number => {
-                if (!rankStr) return 0;
-                const r = rankStr.toLowerCase();
-
-                const tierBase: Record<string, number> = {
-                    bronze: 1000,
-                    silver: 2000,
-                    gold: 3000,
-                    platinum: 4000,
-                    diamond: 5000,
-                    master: 6000,
-                };
-                const divOffset: Record<string, number> = {
-                    _v: 0,
-                    _iv: 1,
-                    _iii: 2,
-                    _ii: 3,
-                    _i: 4,
-                };
-
-                let base = 0;
-                for (const [tier, val] of Object.entries(tierBase)) {
-                    if (r.includes(tier)) { base = val; break; }
-                }
-                if (base === 0) return 0;
-
-                // Master has no division cap — treat as highest division
-                if (base === 6000) return 6000 + 4;
-
-                let offset = 0;
-                for (const [div, val] of Object.entries(divOffset)) {
-                    if (r.endsWith(div)) { offset = val; break; }
-                }
-                return base + offset;
-            };
-
+            // 5. Sort: ranked players first by ranking_points desc (canonical numeric score),
+            //    then unranked alphabetically.
+            //    ranking_points is monotonically increasing — higher pts = higher tier/division/stars.
+            //    No need to parse rank strings; the number IS the rank.
             merged.sort((a, b) => {
-                // Ranked players always before unranked
+                // Ranked always before unranked
                 if (a.hasRanking && !b.hasRanking) return -1;
                 if (!a.hasRanking && b.hasRanking) return 1;
 
                 if (a.hasRanking && b.hasRanking) {
-                    // 1. Rank tier + division (higher = better)
-                    const scoreA = getRankScore(a.rankings?.[0]?.rank);
-                    const scoreB = getRankScore(b.rankings?.[0]?.rank);
-                    if (scoreA !== scoreB) return scoreB - scoreA;
-
-                    // 2. Stars within same division (more stars = closer to promotion)
-                    const starsA = a.rankings?.[0]?.stars ?? 0;
-                    const starsB = b.rankings?.[0]?.stars ?? 0;
-                    if (starsA !== starsB) return starsB - starsA;
-
-                    // 3. Ranking points as tiebreaker
+                    // Primary: ranking_points descending
                     if (a.ranking_points !== b.ranking_points) return b.ranking_points - a.ranking_points;
 
-                    // 4. Win rate as final tiebreaker
+                    // Tiebreaker: win rate
                     const wrA = a.match_played > 0 ? a.win / a.match_played : 0;
                     const wrB = b.match_played > 0 ? b.win / b.match_played : 0;
                     return wrB - wrA;

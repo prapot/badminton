@@ -235,7 +235,8 @@ export default function TournamentDetailPage() {
 
     const handleJoin = async () => {
         const isEndless = tournamentInfo?.format === "endless_mode";
-        const canJoin = tournamentInfo?.tournament_status === "upcoming" || (isEndless && tournamentInfo?.tournament_status === "ongoing");
+        const isOngoing = tournamentInfo?.tournament_status === "ongoing";
+        const canJoin = tournamentInfo?.tournament_status === "upcoming" || (isEndless && isOngoing);
         if (!jwt || !user || joining || !canJoin) return;
         // Final guard: check if already joined to prevent duplicates
         if (tournamentInfo.players.some(p => p.id === user.id)) {
@@ -243,18 +244,33 @@ export default function TournamentDetailPage() {
             return;
         }
 
+        // ── คำนวณ match_offset สำหรับผู้เล่นที่เข้าร่วมทีหลัง (endless mode ที่กำลังแข่ง) ──
+        let matchOffset = 0;
+        if (isEndless && isOngoing) {
+            // ใช้ค่าสูงสุดของ match count เฉพาะผู้เล่นที่ยังเล่นอยู่ (ไม่ได้พัก)
+            const activeCounts = (tournamentInfo?.players ?? [])
+                .filter(p => !pausedPlayerIds.has(p.id))
+                .map(p => playerMatchCounts[p.id] ?? 0);
+            if (activeCounts.length > 0) {
+                matchOffset = Math.max(...activeCounts);
+            }
+        }
+
         setJoining(true);
         try {
+            const body: Record<string, unknown> = { tournament_id: id, user: user.id, seed: null };
+            if (matchOffset > 0) body.match_offset = matchOffset;
+
             const res = await fetch(`${STRAPI_BASE_URL}/api/tournament-players`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
-                body: JSON.stringify({ data: { tournament_id: id, user: user.id, seed: null } }),
+                body: JSON.stringify({ data: body }),
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err?.error?.message || `HTTP ${res.status}`);
             }
-            showToast("เข้าร่วมสำเร็จ! 🏈", "success");
+            showToast(matchOffset > 0 ? `เข้าร่วมสำเร็จ! เริ่มที่ ${matchOffset} แมตซ์ 🏸` : "เข้าร่วมสำเร็จ! 🏈", "success");
             refreshInfo();
         } catch (e: unknown) {
             showToast(e instanceof Error ? e.message : "เข้าร่วมไม่สำเร็จ", "error");
@@ -262,6 +278,7 @@ export default function TournamentDetailPage() {
             setJoining(false);
         }
     };
+
 
     const handleLeave = async () => {
         const isEndless = tournamentInfo?.format === "endless_mode";

@@ -74,6 +74,7 @@ export default function EndlessModeManager({
     const [drawing, setDrawing] = useState(false);
     const [pairingMode, setPairingMode] = useState<PairingMode>("auto");
     const [previewMatch, setPreviewMatch] = useState<{ teamA: ApiPlayer[], teamB: ApiPlayer[] } | null>(null);
+    const [selectedSwapPlayer, setSelectedSwapPlayer] = useState<number | null>(null);
     const [showPlayerList, setShowPlayerList] = useState(false);
 
     // ── Permanent teams (persist across draws) ───────────────────────────
@@ -295,7 +296,7 @@ export default function EndlessModeManager({
     const getSkillScore = (p: ApiPlayer): number => {
         const r = p.rankings?.[0];
         if (!r?.rank) return 1000;
-        
+
         const tierWeights: Record<string, number> = {
             bronze: 1000, silver: 2000, gold: 3000, platinum: 4000, diamond: 5000, master: 6000
         };
@@ -600,8 +601,8 @@ export default function EndlessModeManager({
                             <div className="mb-4 animate-in fade-in slide-in-from-top-4 duration-300">
                                 <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-2xl overflow-hidden shadow-lg shadow-indigo-500/10">
                                     <div className="px-4 py-2.5 bg-indigo-500/20 border-b border-indigo-500/20 flex justify-between items-center">
-                                        <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">🏸 คู่แข่งขันถัดไป</span>
-                                        <button onClick={() => setPreviewMatch(null)} className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all active:scale-90">✕</button>
+                                        <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">🏸 คู่แข่งขันถัดไป <span className="text-[9px] font-normal text-indigo-400 ml-2">(แตะ 2 ครั้งเพื่อสลับตัว)</span></span>
+                                        <button onClick={() => { setPreviewMatch(null); setSelectedSwapPlayer(null); }} className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all active:scale-90">✕</button>
                                     </div>
                                     <div className="p-3 space-y-3">
                                         {/* Team A */}
@@ -609,7 +610,30 @@ export default function EndlessModeManager({
                                             <div className="text-[9px] text-indigo-400 uppercase font-black mb-2 tracking-[0.2em] px-1">ทีม A</div>
                                             <div className="space-y-2">
                                                 {previewMatch.teamA.map(p => (
-                                                    <div key={p.id} className="flex items-center gap-3 bg-white/[0.04] py-2.5 px-4 rounded-2xl border border-white/[0.06] shadow-inner">
+                                                    <div
+                                                        key={p.id}
+                                                        onClick={() => {
+                                                            if (selectedSwapPlayer === p.id) {
+                                                                setSelectedSwapPlayer(null);
+                                                            } else if (selectedSwapPlayer && previewMatch.teamB.some(b => b.id === selectedSwapPlayer)) {
+                                                                const newTeamA = [...previewMatch.teamA];
+                                                                const newTeamB = [...previewMatch.teamB];
+                                                                const indexA = newTeamA.findIndex(a => a.id === p.id);
+                                                                const indexB = newTeamB.findIndex(b => b.id === selectedSwapPlayer);
+                                                                const temp = newTeamA[indexA];
+                                                                newTeamA[indexA] = newTeamB[indexB];
+                                                                newTeamB[indexB] = temp;
+                                                                setPreviewMatch({ ...previewMatch, teamA: newTeamA, teamB: newTeamB });
+                                                                setSelectedSwapPlayer(null);
+                                                            } else {
+                                                                setSelectedSwapPlayer(p.id);
+                                                            }
+                                                        }}
+                                                        className={`flex items-center gap-3 py-2.5 px-4 rounded-2xl border shadow-inner cursor-pointer transition-all active:scale-[0.98] ${selectedSwapPlayer === p.id
+                                                                ? "bg-yellow-500/20 border-yellow-400 ring-2 ring-yellow-400/50 shadow-yellow-500/20"
+                                                                : "bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]"
+                                                            }`}
+                                                    >
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center justify-between gap-2">
                                                                 <span className="text-sm font-bold text-white truncate">{p.username}</span>
@@ -619,6 +643,7 @@ export default function EndlessModeManager({
                                                                 <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />
                                                             </div>
                                                         </div>
+                                                        <div className="shrink-0 text-slate-500 opacity-50 text-xs">↕️</div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -638,7 +663,30 @@ export default function EndlessModeManager({
                                             <div className="text-[9px] text-indigo-400 uppercase font-black mb-2 tracking-[0.2em] px-1">ทีม B</div>
                                             <div className="space-y-2">
                                                 {previewMatch.teamB.map(p => (
-                                                    <div key={p.id} className="flex items-center gap-3 bg-white/[0.04] py-2.5 px-4 rounded-2xl border border-white/[0.06] shadow-inner">
+                                                    <div
+                                                        key={p.id}
+                                                        onClick={() => {
+                                                            if (selectedSwapPlayer === p.id) {
+                                                                setSelectedSwapPlayer(null);
+                                                            } else if (selectedSwapPlayer && previewMatch.teamA.some(a => a.id === selectedSwapPlayer)) {
+                                                                const newTeamA = [...previewMatch.teamA];
+                                                                const newTeamB = [...previewMatch.teamB];
+                                                                const indexB = newTeamB.findIndex(b => b.id === p.id);
+                                                                const indexA = newTeamA.findIndex(a => a.id === selectedSwapPlayer);
+                                                                const temp = newTeamB[indexB];
+                                                                newTeamB[indexB] = newTeamA[indexA];
+                                                                newTeamA[indexA] = temp;
+                                                                setPreviewMatch({ ...previewMatch, teamA: newTeamA, teamB: newTeamB });
+                                                                setSelectedSwapPlayer(null);
+                                                            } else {
+                                                                setSelectedSwapPlayer(p.id);
+                                                            }
+                                                        }}
+                                                        className={`flex items-center gap-3 py-2.5 px-4 rounded-2xl border shadow-inner cursor-pointer transition-all active:scale-[0.98] ${selectedSwapPlayer === p.id
+                                                                ? "bg-yellow-500/20 border-yellow-400 ring-2 ring-yellow-400/50 shadow-yellow-500/20"
+                                                                : "bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]"
+                                                            }`}
+                                                    >
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center justify-between gap-2">
                                                                 <span className="text-sm font-bold text-white truncate">{p.username}</span>
@@ -648,6 +696,7 @@ export default function EndlessModeManager({
                                                                 <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />
                                                             </div>
                                                         </div>
+                                                        <div className="shrink-0 text-slate-500 opacity-50 text-xs">↕️</div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -663,7 +712,7 @@ export default function EndlessModeManager({
                                                 {drawing ? spinnerSvg : "✅ ตกลงและเริ่มแข่ง"}
                                             </button>
                                             <button
-                                                onClick={() => calculateNextMatch()}
+                                                onClick={() => { calculateNextMatch(); setSelectedSwapPlayer(null); }}
                                                 className="min-w-[44px] min-h-[44px] rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all text-lg"
                                                 title="สุ่มใหม่"
                                             >
@@ -706,17 +755,14 @@ export default function EndlessModeManager({
                                                 const isBusy = busyPlayerIds.has(p.id);
                                                 const isPaused = pausedPlayerIds.has(p.id);
                                                 return (
-                                                    <div key={p.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
-                                                        isBusy ? "bg-orange-500/5 border-orange-500/15 opacity-60"
-                                                        : isPaused ? "bg-yellow-500/5 border-yellow-500/15 opacity-70"
-                                                        : "bg-white/[0.03] border-white/[0.05]"
-                                                    }`}>
-                                                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                                                            isBusy ? "bg-orange-400 animate-pulse" : isPaused ? "bg-yellow-500" : "bg-green-400"
-                                                        }`} />
-                                                        <span className={`flex-1 text-xs font-medium truncate ${
-                                                            isBusy || isPaused ? "text-slate-500" : "text-slate-200"
+                                                    <div key={p.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${isBusy ? "bg-orange-500/5 border-orange-500/15 opacity-60"
+                                                            : isPaused ? "bg-yellow-500/5 border-yellow-500/15 opacity-70"
+                                                                : "bg-white/[0.03] border-white/[0.05]"
                                                         }`}>
+                                                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isBusy ? "bg-orange-400 animate-pulse" : isPaused ? "bg-yellow-500" : "bg-green-400"
+                                                            }`} />
+                                                        <span className={`flex-1 text-xs font-medium truncate ${isBusy || isPaused ? "text-slate-500" : "text-slate-200"
+                                                            }`}>
                                                             {p.username}
                                                         </span>
                                                         <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} size="sm" showName={false} />
@@ -729,7 +775,7 @@ export default function EndlessModeManager({
                                                                 className={`shrink-0 w-7 h-7 rounded-lg border flex items-center justify-center text-sm transition-all active:scale-90 ${isPaused
                                                                     ? "bg-green-500/15 border-green-500/30 text-green-400"
                                                                     : "bg-white/5 border-white/10 text-slate-600 hover:text-yellow-400 hover:border-yellow-500/30"
-                                                                }`}
+                                                                    }`}
                                                                 title={isPaused ? "ให้กลับมาเล่น" : "ให้พักก่อน"}
                                                             >
                                                                 {isPaused ? "▶" : "⏸"}

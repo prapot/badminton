@@ -61,34 +61,36 @@ export function getPartnerRepeats(playerIds: number[], currentPairIdx: number, m
 }
 export function getRankInfoFromPoints(points: number) {
     const TIERS = [
-        { name: 'Bronze', div: 5, stars: 4 },
-        { name: 'Silver', div: 5, stars: 4 },
-        { name: 'Gold', div: 5, stars: 5 },
-        { name: 'Platinum', div: 5, stars: 6 },
-        { name: 'Diamond', div: 5, stars: 6 },
-        { name: 'Master', div: 1, stars: 99999 }
+        { name: 'Bronze', divisions: 3, starsPerDiv: 3 },
+        { name: 'Silver', divisions: 3, starsPerDiv: 4 },
+        { name: 'Gold', divisions: 4, starsPerDiv: 4 },
+        { name: 'Platinum', divisions: 5, starsPerDiv: 5 },
+        { name: 'Diamond', divisions: 5, starsPerDiv: 5 },
+        { name: 'Master', divisions: 1, starsPerDiv: 99999 }
     ];
     const DIVS = ['V', 'IV', 'III', 'II', 'I'];
     let p = points;
     for (const t of TIERS) {
-        const tierMax = t.div * t.stars * 100;
+        const tierMax = t.divisions * t.starsPerDiv * 100;
         if (p < tierMax || t.name === 'Master') {
             if (t.name === 'Master') {
                 const s = Math.floor(p / 100);
                 return { tier: 'Master', rankStr: 'Master', weight: 6000 + (s * 10) };
             }
-            const divIdx = Math.floor(p / (t.stars * 100));
-            const divRp = p % (t.stars * 100);
+            const divIdx = Math.floor(p / (t.starsPerDiv * 100));
+            const divRp = p % (t.starsPerDiv * 100);
             const stars = Math.floor(divRp / 100);
+            const activeDivs = DIVS.slice(5 - t.divisions);
+            const divisionStr = activeDivs[divIdx];
             return {
                 tier: t.name,
-                division: DIVS[divIdx],
-                rankStr: `${t.name} ${DIVS[divIdx]}`,
+                division: divisionStr,
+                rankStr: `${t.name} ${divisionStr}`,
                 stars: stars,
-                weight: 1000 + (TIERS.indexOf(t) * 1000) + (divIdx * 200)
+                weight: 1000 + (TIERS.indexOf(t) * 1000) + (divIdx * 200) + (stars * 50)
             };
         }
         p -= tierMax;
     }
-    return { tier: 'Bronze', rankStr: 'Bronze V', weight: 1000 };
+    return { tier: 'Bronze', rankStr: 'Bronze III', weight: 1000 };
 }

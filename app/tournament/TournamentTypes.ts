@@ -127,3 +127,11 @@ export interface DrawnPair {
     teamB: RegisteredPlayer[] | null;
     servingSide?: "A" | "B";
 }
+
+export interface PaginationMeta {
+    page: number;
+    pageSize: number;
+    pageCount: number;
+    total: number;
+}
+

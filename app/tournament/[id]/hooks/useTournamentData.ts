@@ -30,7 +30,7 @@ export function useTournamentData(id: string, jwt: string | null) {
             .then((r) => r.json())
             .then((json) => {
                 const data = json.data ?? json;
-                const tpArr: Array<{ documentId?: string; id?: number | string; is_paused?: boolean; match_offset?: number; user?: Omit<RegisteredPlayer, "tpDocumentId" | "is_paused" | "match_offset"> }> = data.tournament_players ?? [];
+                const tpArr: Array<{ documentId?: string; id?: number | string; is_paused?: boolean; match_offset?: number; guest_name?: string; user?: Omit<RegisteredPlayer, "tpDocumentId" | "is_paused" | "match_offset"> }> = data.tournament_players ?? [];
                 setTournamentInfo({
                     name: data.name ?? "",
                     tournament_status: data.tournament_status ?? "upcoming",
@@ -39,14 +39,18 @@ export function useTournamentData(id: string, jwt: string | null) {
                     startDate: data.startDate ?? "",
                     mode: data.mode ?? "ranking",
                     players: tpArr
-                        .filter((tp) => !!tp.user)
+                        .filter((tp) => !!tp.user || !!tp.guest_name)
                         .reduce((acc, current) => {
-                            const x = acc.find(item => item.id === current.user!.id);
-                            if (!x) {
-                                return acc.concat([{ ...current.user!, tpDocumentId: String(current.documentId || current.id || ""), is_paused: current.is_paused || false, match_offset: current.match_offset || 0 }]);
-                            } else {
-                                return acc;
+                            if (current.user) {
+                                const x = acc.find(item => item.id === current.user!.id);
+                                if (!x) {
+                                    return acc.concat([{ ...current.user!, tpDocumentId: String(current.documentId || current.id || ""), is_paused: current.is_paused || false, match_offset: current.match_offset || 0 }]);
+                                }
+                            } else if (current.guest_name) {
+                                const fauxId = -(Number(current.id) || Math.floor(Math.random() * 10000));
+                                return acc.concat([{ id: fauxId, username: current.guest_name, email: "", tpDocumentId: String(current.documentId || current.id || ""), is_paused: current.is_paused || false, match_offset: current.match_offset || 0, is_guest: true, guest_name: current.guest_name }]);
                             }
+                            return acc;
                         }, [] as RegisteredPlayer[]),
                     permanent_teams: data.permanent_teams || [],
                     user_created: data.user_created ? { id: data.user_created.id || data.user_created } : (data.user_id ? { id: data.user_id } : null),
@@ -79,14 +83,25 @@ export function useTournamentData(id: string, jwt: string | null) {
             .then((r) => r.json())
             .then((json) => {
                 const data = json.data ?? json;
-                const tpArr: Array<{ documentId?: string; id?: number | string; is_paused?: boolean; match_offset?: number; user?: Omit<RegisteredPlayer, "tpDocumentId" | "is_paused" | "match_offset"> }> = data.tournament_players ?? [];
+                const tpArr: Array<{ documentId?: string; id?: number | string; is_paused?: boolean; match_offset?: number; guest_name?: string; user?: Omit<RegisteredPlayer, "tpDocumentId" | "is_paused" | "match_offset"> }> = data.tournament_players ?? [];
                 setTournamentInfo((prev) => prev ? {
                     ...prev,
                     startDate: data.startDate ?? prev.startDate,
                     mode: data.mode ?? prev.mode,
                     players: tpArr
-                        .filter((tp) => !!tp.user)
-                        .map((tp) => ({ ...tp.user!, tpDocumentId: String(tp.documentId || tp.id || ""), is_paused: tp.is_paused || false, match_offset: tp.match_offset || 0 })),
+                        .filter((tp) => !!tp.user || !!tp.guest_name)
+                        .reduce((acc, current) => {
+                            if (current.user) {
+                                const x = acc.find(item => item.id === current.user!.id);
+                                if (!x) {
+                                    return acc.concat([{ ...current.user!, tpDocumentId: String(current.documentId || current.id || ""), is_paused: current.is_paused || false, match_offset: current.match_offset || 0 }]);
+                                }
+                            } else if (current.guest_name) {
+                                const fauxId = -(Number(current.id) || Math.floor(Math.random() * 10000));
+                                return acc.concat([{ id: fauxId, username: current.guest_name, email: "", tpDocumentId: String(current.documentId || current.id || ""), is_paused: current.is_paused || false, match_offset: current.match_offset || 0, is_guest: true, guest_name: current.guest_name }]);
+                            }
+                            return acc;
+                        }, [] as RegisteredPlayer[]),
                     permanent_teams: data.permanent_teams || [],
                     user_created: data.user_created ? { id: data.user_created.id || data.user_created } : (data.user_id ? { id: data.user_id } : null),
                 } : null);
@@ -119,9 +134,14 @@ export function useTournamentData(id: string, jwt: string | null) {
         apiMatches.forEach(match => {
             if (match.match_status !== "done") return;
             [match.team_a_id, match.team_b_id].forEach(team => {
-                team?.team_players.forEach(tp => {
+                team?.team_players.forEach((tp: any) => {
                     if (tp.user_id) {
                         counts[tp.user_id.id] = (counts[tp.user_id.id] || 0) + 1;
+                    } else if (tp.guest_name) {
+                        const fauxUser = tournamentInfo?.players.find(p => p.guest_name === tp.guest_name && p.is_guest);
+                        if (fauxUser) {
+                            counts[fauxUser.id] = (counts[fauxUser.id] || 0) + 1;
+                        }
                     }
                 });
             });

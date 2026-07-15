@@ -61,7 +61,7 @@ export function useTournamentDraw({
 
             [m.team_a_id, m.team_b_id].forEach(t => {
                 if (!t) return;
-                const pids = t.team_players.map(tp => tp.user_id?.id).filter((pid): pid is number => !!pid);
+                const pids = t.team_players.map(tp => tp.user_id?.id || (tp.guest_name ? tournamentInfo.players.find(p => p.guest_name === tp.guest_name)?.id : null)).filter((pid): pid is number => !!pid);
                 if (pids.length > 1) {
                     for (let i = 0; i < pids.length; i++) {
                         for (let j = i + 1; j < pids.length; j++) {
@@ -75,8 +75,8 @@ export function useTournamentDraw({
             });
 
             if (m.team_a_id && m.team_b_id) {
-                const aids = m.team_a_id.team_players.map(tp => tp.user_id?.id).filter((pid): pid is number => !!pid);
-                const bids = m.team_b_id.team_players.map(tp => tp.user_id?.id).filter((pid): pid is number => !!pid);
+                const aids = m.team_a_id.team_players.map(tp => tp.user_id?.id || (tp.guest_name ? tournamentInfo.players.find(p => p.guest_name === tp.guest_name)?.id : null)).filter((pid): pid is number => !!pid);
+                const bids = m.team_b_id.team_players.map(tp => tp.user_id?.id || (tp.guest_name ? tournamentInfo.players.find(p => p.guest_name === tp.guest_name)?.id : null)).filter((pid): pid is number => !!pid);
                 aids.forEach(aid => {
                     bids.forEach(bid => {
                         if (!opponentHistory.has(aid)) opponentHistory.set(aid, new Set());
@@ -316,11 +316,11 @@ export function useTournamentDraw({
                     const isBye = !teamBId;
 
                     const playerAPromises = pair.teamA.map(player =>
-                        postJSON("/api/team-players", { data: { team_id: teamAId, user_id: player.id } })
+                        postJSON("/api/team-players", { data: { team_id: teamAId, ...(player.is_guest ? { guest_name: player.guest_name } : { user_id: player.id }) } })
                     );
 
                     const playerBPromises = (pair.teamB && teamBId) ? pair.teamB.map(player =>
-                        postJSON("/api/team-players", { data: { team_id: teamBId, user_id: player.id } })
+                        postJSON("/api/team-players", { data: { team_id: teamBId, ...(player.is_guest ? { guest_name: player.guest_name } : { user_id: player.id }) } })
                     ) : [];
 
                     const matchPromise = postJSON("/api/matches", {

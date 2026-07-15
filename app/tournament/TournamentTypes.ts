@@ -1,7 +1,7 @@
 export type TournamentStatus = "upcoming" | "ongoing" | "completed";
 export type PlayerType = "single" | "double";
 export type TournamentFormat = "round_robin" | "knockout" | "americano" | "endless_mode";
-export type TournamentMode = "ranking" | "casual";
+export type TournamentMode = "ranking" | "casual" | "party";
 
 export interface ListTournament {
     id: number;
@@ -38,6 +38,8 @@ export interface RegisteredPlayer {
     rankings?: ApiRanking[] | null;
     is_paused?: boolean;
     match_offset?: number;
+    guest_name?: string | null;
+    is_guest?: boolean;
 }
 
 export interface TournamentInfo {
@@ -46,7 +48,7 @@ export interface TournamentInfo {
     type: string;
     format: string;
     startDate: string;
-    mode: "ranking" | "casual";
+    mode: "ranking" | "casual" | "party";
     players: RegisteredPlayer[];
     user_created?: { id: number; username?: string } | null;
     permanent_teams?: any[];
@@ -67,13 +69,15 @@ export interface ApiPlayer {
     username: string;
     picture?: { url: string } | null;
     rankings?: ApiRanking[] | null;
+    guest_name?: string | null;
+    is_guest?: boolean;
 }
 
 export interface ApiTeam {
     id: number;
     documentId: string;
     team_no: string;
-    team_players: Array<{ id: number; user_id: ApiPlayer | null }>;
+    team_players: Array<{ id: number; user_id: ApiPlayer | null; guest_name?: string | null }>;
 }
 
 export interface ApiMatchHistory {

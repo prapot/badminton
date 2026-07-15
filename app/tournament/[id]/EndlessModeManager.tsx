@@ -11,6 +11,8 @@ interface ApiPlayer {
     rankings?: Array<{ ranking_points: number; rank?: string; stars?: number }> | null;
     tpDocumentId?: string;
     match_offset?: number;
+    is_guest?: boolean | null;
+    guest_name?: string | null;
 }
 
 interface ApiMatch {
@@ -30,7 +32,7 @@ interface PermanentTeam {
 interface EndlessModeManagerProps {
     tournamentId: string;
     tournamentType: "single" | "double";
-    players: Array<{ id: number; username: string; picture?: { url: string } | null; rankings?: any; tpDocumentId?: string; match_offset?: number }>;
+    players: ApiPlayer[];
     permanentTeamsData?: any[];
     apiMatches: ApiMatch[];
     jwt: string;
@@ -42,6 +44,7 @@ interface EndlessModeManagerProps {
     tournamentStatus: string;
     userId?: number;
     ownerId?: number;
+    tournamentMode: string;
 }
 
 const TEAM_COLORS = [
@@ -69,7 +72,8 @@ export default function EndlessModeManager({
     setPausedPlayerIds,
     tournamentStatus,
     userId,
-    ownerId
+    ownerId,
+    tournamentMode
 }: EndlessModeManagerProps) {
     const [drawing, setDrawing] = useState(false);
     const [pairingMode, setPairingMode] = useState<PairingMode>("auto");
@@ -92,6 +96,8 @@ export default function EndlessModeManager({
     const playersPerTeam = tournamentType === "double" ? 2 : 1;
 
     // ── Compute busy & match counts ───────────────────────────────────────
+    const getUnifiedPlayerId = (tp: any) => tp.user_id?.id || (tp.guest_name ? players.find(p => p.guest_name === tp.guest_name)?.id : null);
+
     const { busyPlayerIds, actualPlayerCounts, effectivePlayerCounts } = useMemo(() => {
         const actualCounts = new Map<number, number>();
         const busy = new Set<number>();
@@ -100,8 +106,8 @@ export default function EndlessModeManager({
         apiMatches.forEach(m => {
             if (m.match_status === "cancelled") return;
             const pids = [
-                ...(m.team_a_id?.team_players.map(tp => tp.user_id?.id) || []),
-                ...(m.team_b_id?.team_players.map(tp => tp.user_id?.id) || [])
+                ...(m.team_a_id?.team_players.map(getUnifiedPlayerId) || []),
+                ...(m.team_b_id?.team_players.map(getUnifiedPlayerId) || [])
             ].filter(Boolean) as number[];
 
             pids.forEach(id => {
@@ -157,7 +163,7 @@ export default function EndlessModeManager({
                 if (m.match_status === "cancelled") return;
                 [m.team_a_id, m.team_b_id].forEach(t => {
                     if (!t) return;
-                    const ids = t.team_players.map(tp => tp.user_id?.id).filter(Boolean).sort().join(",");
+                    const ids = t.team_players.map(getUnifiedPlayerId).filter(Boolean).sort().join(",");
                     if (ids === key) c++;
                 });
             });
@@ -173,8 +179,8 @@ export default function EndlessModeManager({
         let count = 0;
         apiMatches.forEach(m => {
             if (m.match_status === "cancelled") return;
-            const mA = m.team_a_id?.team_players.map(tp => tp.user_id?.id).filter(Boolean).sort((a, b) => a! - b!).join(",");
-            const mB = m.team_b_id?.team_players.map(tp => tp.user_id?.id).filter(Boolean).sort((a, b) => a! - b!).join(",");
+            const mA = m.team_a_id?.team_players.map(getUnifiedPlayerId).filter(Boolean).sort((a, b) => a! - b!).join(",");
+            const mB = m.team_b_id?.team_players.map(getUnifiedPlayerId).filter(Boolean).sort((a, b) => a! - b!).join(",");
             if ((mA === key1 && mB === key2) || (mA === key2 && mB === key1)) count++;
         });
         return count;
@@ -186,7 +192,7 @@ export default function EndlessModeManager({
             if (m.match_status === "cancelled") return;
             [m.team_a_id, m.team_b_id].forEach(t => {
                 if (!t) return;
-                const ids = t.team_players.map(tp => tp.user_id?.id).filter(Boolean);
+                const ids = t.team_players.map(getUnifiedPlayerId).filter(Boolean);
                 if (ids.length === 2 && ids.includes(p1Id) && ids.includes(p2Id)) count++;
             });
         });
@@ -640,7 +646,7 @@ export default function EndlessModeManager({
                                                                 <span className="text-[10px] text-slate-500 font-bold shrink-0">{actualPlayerCounts.get(p.id) || 0} แมตซ์</span>
                                                             </div>
                                                             <div className="mt-1 flex items-center gap-2">
-                                                                <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />
+                                                                {tournamentMode === 'ranking' && <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />}
                                                             </div>
                                                         </div>
                                                         <div className="shrink-0 text-slate-500 opacity-50 text-xs">↕️</div>
@@ -693,7 +699,7 @@ export default function EndlessModeManager({
                                                                 <span className="text-[10px] text-slate-500 font-bold shrink-0">{actualPlayerCounts.get(p.id) || 0} แมตซ์</span>
                                                             </div>
                                                             <div className="mt-1 flex items-center gap-2">
-                                                                <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />
+                                                                {tournamentMode === 'ranking' && <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />}
                                                             </div>
                                                         </div>
                                                         <div className="shrink-0 text-slate-500 opacity-50 text-xs">↕️</div>
@@ -765,7 +771,7 @@ export default function EndlessModeManager({
                                                             }`}>
                                                             {p.username}
                                                         </span>
-                                                        <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} size="sm" showName={false} />
+                                                        {tournamentMode === 'ranking' && <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} size="sm" showName={false} />}
                                                         {isBusy && <span className="text-[9px] text-orange-400 font-bold shrink-0">แข่งอยู่</span>}
                                                         {isPaused && !isBusy && <span className="text-[9px] text-yellow-500 font-bold shrink-0">พัก</span>}
                                                         <span className="text-[10px] text-slate-600 shrink-0">{actualPlayerCounts.get(p.id) || 0}แมตซ์</span>
@@ -849,7 +855,7 @@ export default function EndlessModeManager({
                                                         <div className="mt-2 space-y-1.5">
                                                             {team.players.map(p => (
                                                                 <div key={p.id} className="flex items-center gap-2">
-                                                                    <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} size="sm" showName={true} />
+                                                                    {tournamentMode === 'ranking' && <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} size="sm" showName={true} />}
                                                                     <span className="text-[11px] font-bold text-white truncate">{p.username}</span>
                                                                 </div>
                                                             ))}
@@ -1008,7 +1014,7 @@ export default function EndlessModeManager({
                                                                             <span className="text-[10px] text-slate-500 font-bold shrink-0">{actualPlayerCounts.get(p.id) || 0} แมตซ์</span>
                                                                         </div>
                                                                         <div className="mt-1 flex items-center gap-2">
-                                                                            <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />
+                                                                            {tournamentMode === 'ranking' && <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />}
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -1037,7 +1043,7 @@ export default function EndlessModeManager({
                                                                             <span className="text-[10px] text-slate-500 font-bold shrink-0">{actualPlayerCounts.get(p.id) || 0} แมตซ์</span>
                                                                         </div>
                                                                         <div className="mt-1 flex items-center gap-2">
-                                                                            <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />
+                                                                            {tournamentMode === 'ranking' && <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />}
                                                                         </div>
                                                                     </div>
                                                                 </div>

@@ -148,7 +148,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                     <div className={`flex-1 min-w-0 transition-colors ${winnerA ? "text-green-400" : isCompleted && !winnerA ? "text-slate-500" : "text-white"}`}>
                                                         <div className="flex flex-col gap-2 sm:gap-3 justify-center h-full">
                                                             {match.team_a_id?.team_players.map((tp, idx) => {
-                                                                const u = tp.user_id;
+                                                                const u = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
                                                                 if (!u) return null;
                                                                 const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
                                                                 const rp_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.rp_change;
@@ -160,20 +160,16 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                 <p className="font-bold text-xs sm:text-sm truncate text-white">{u.username}</p>
                                                                             </div>
                                                                             {/* Stats - ranking mode only */}
-                                                                            <div className="flex items-center gap-2 bg-black/30 px-2 py-1 rounded-lg border border-white/5">
-                                                                                <RankBadge
-                                                                                    rank={u.rankings?.[0]?.rank}
-                                                                                    stars={u.rankings?.[0]?.stars}
-                                                                                    size="sm"
-                                                                                    showName={true}
-                                                                                />
-                                                                                {/* <div className="flex flex-col items-start leading-none">
-                                                                                    <div className="flex items-center gap-1 text-[7px] text-slate-500 font-bold">
-                                                                                        <span className="text-green-500/80">{u.rankings?.[0]?.win ?? 0}W</span>
-                                                                                        <span className="text-red-500/80">{u.rankings?.[0]?.lose ?? 0}L</span>
-                                                                                    </div>
-                                                                                </div> */}
-                                                                            </div>
+                                                                            {tournamentInfo.mode === "ranking" && (
+                                                                                <div className="flex items-center gap-2 bg-black/30 px-2 py-1 rounded-lg border border-white/5">
+                                                                                    <RankBadge
+                                                                                        rank={u.rankings?.[0]?.rank}
+                                                                                        stars={u.rankings?.[0]?.stars}
+                                                                                        size="sm"
+                                                                                        showName={true}
+                                                                                    />
+                                                                                </div>
+                                                                            )}
                                                                         </div>
                                                                         <div className="relative flex items-center shrink-0">
                                                                             <div className={`w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner ${match.first_serve === "A" && idx === 0 ? "border-[#2ecc71] shadow-[0_0_20px_rgba(46,204,113,0.5)] scale-105" : "border-slate-700/50"}`}>
@@ -243,7 +239,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                             {match.team_b_id ? (
                                                                 <>
                                                                     {match.team_b_id.team_players.map((tp, idx) => {
-                                                                        const u = tp.user_id;
+                                                                        const u = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
                                                                         if (!u) return null;
                                                                         const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
                                                                         const rp_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.rp_change;
@@ -286,20 +282,16 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                         {winnerB && idx === 0 && <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded-md">Winner</span>}
                                                                                     </div>
                                                                                     {/* Stats - ranking mode only */}
-                                                                                    <div className="flex items-center gap-2 bg-black/30 px-2 py-1 rounded-lg border border-white/5">
-                                                                                        <RankBadge
-                                                                                            rank={u.rankings?.[0]?.rank}
-                                                                                            stars={u.rankings?.[0]?.stars}
-                                                                                            size="sm"
-                                                                                            showName={true}
-                                                                                        />
-                                                                                        {/* <div className="flex flex-col items-start leading-none">
-                                                                                            <div className="flex items-center gap-1 text-[7px] text-slate-500 font-bold">
-                                                                                                <span className="text-green-500/80">{u.rankings?.[0]?.win ?? 0}W</span>
-                                                                                                <span className="text-red-500/80">{u.rankings?.[0]?.lose ?? 0}L</span>
-                                                                                            </div>
-                                                                                        </div> */}
-                                                                                    </div>
+                                                                                    {tournamentInfo.mode === "ranking" && (
+                                                                                        <div className="flex items-center gap-2 bg-black/30 px-2 py-1 rounded-lg border border-white/5">
+                                                                                            <RankBadge
+                                                                                                rank={u.rankings?.[0]?.rank}
+                                                                                                stars={u.rankings?.[0]?.stars}
+                                                                                                size="sm"
+                                                                                                showName={true}
+                                                                                            />
+                                                                                        </div>
+                                                                                    )}
                                                                                 </div>
                                                                             </div>
                                                                         );

@@ -52,8 +52,8 @@ const TournamentCard: React.FC<TournamentCardProps> = ({
                         <span className={`shrink-0 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${sc.cls}`}>
                             {sc.label}
                         </span>
-                        <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${tournament.mode === "ranking" ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" : "bg-blue-500/10 text-blue-400 border-blue-500/20"}`}>
-                            {tournament.mode === "ranking" ? "🏆 Ranking" : "🎮 Casual"}
+                        <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${tournament.mode === "ranking" ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" : tournament.mode === "party" ? "bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20" : "bg-blue-500/10 text-blue-400 border-blue-500/20"}`}>
+                            {tournament.mode === "ranking" ? "🏆 Ranking" : tournament.mode === "party" ? "🎉 Party" : "🎮 Casual"}
                         </span>
                     </div>
 

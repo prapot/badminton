@@ -80,7 +80,7 @@ export default function FullScoreEditorModal({
                     <div className="flex-1 flex flex-col gap-6 items-center">
                         <div className="flex flex-col gap-3 w-full">
                             {(match.team_a_id?.team_players || []).map((tp, idx) => {
-                                const u = tp.user_id;
+                                const u = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
                                 if (!u) return null;
                                 const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
                                 return (
@@ -135,7 +135,7 @@ export default function FullScoreEditorModal({
                     <div className="flex-1 flex flex-col gap-6 items-center">
                         <div className="flex flex-col gap-3 w-full">
                             {(match.team_b_id?.team_players || []).map((tp, idx) => {
-                                const u = tp.user_id;
+                                const u = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
                                 if (!u) return null;
                                 const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
                                 return (

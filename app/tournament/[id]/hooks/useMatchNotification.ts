@@ -41,10 +41,10 @@ export function useMatchNotification(apiMatches: ApiMatch[], user: User | null) 
 
             const myPartnerCount = (myTeam?.team_players?.length || 0) - 1;
             const myPartner = myPartnerCount > 0 
-                ? myTeam?.team_players?.filter(tp => tp.user_id?.id !== user.id).map(tp => tp.user_id?.username).join(" และ ") 
+                ? myTeam?.team_players?.filter(tp => tp.user_id?.id !== user.id).map(tp => tp.user_id?.username || tp.guest_name).join(" และ ") 
                 : "ไม่มี (เล่นเดี่ยว)";
                 
-            const opponents = oppTeam?.team_players?.map(tp => tp.user_id?.username).filter(Boolean).join(" และ ") || "ยังไม่มีคู่แข่ง";
+            const opponents = oppTeam?.team_players?.map(tp => tp.user_id?.username || tp.guest_name).filter(Boolean).join(" และ ") || "ยังไม่มีคู่แข่ง";
 
             // Vibrate (works on Android Chrome)
             if ("vibrate" in navigator) {

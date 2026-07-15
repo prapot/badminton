@@ -4,6 +4,7 @@ import Swal from 'sweetalert2';
 import RankBadge from '../RankBadge';
 
 interface ParticipantsListProps {
+    tournamentId: string;
     tournamentInfo: TournamentInfo;
     user: User | null;
     jwt: string | null;
@@ -14,6 +15,7 @@ interface ParticipantsListProps {
     handleLeave: () => void;
     drawnPairs: any[] | null;
     playerMatchCounts: Record<number, number>;
+    apiMatches: any[];
     STRAPI_BASE_URL: string;
     refreshInfo: () => void;
     showToast: (msg: string, type: "success" | "error") => void;
@@ -23,6 +25,7 @@ interface ParticipantsListProps {
 }
 
 const ParticipantsList: React.FC<ParticipantsListProps> = ({
+    tournamentId,
     tournamentInfo,
     user,
     jwt,
@@ -33,6 +36,7 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
     handleLeave,
     drawnPairs,
     playerMatchCounts,
+    apiMatches,
     STRAPI_BASE_URL,
     refreshInfo,
     showToast,
@@ -40,6 +44,67 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
     pausedPlayerIds,
     setPausedPlayerIds,
 }) => {
+    const [guestName, setGuestName] = React.useState("");
+    const [addingGuest, setAddingGuest] = React.useState(false);
+
+    const handleAddGuest = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!guestName.trim()) return;
+        setAddingGuest(true);
+        try {
+            const res = await fetch(`${STRAPI_BASE_URL}/api/tournament-players`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+                body: JSON.stringify({ data: { tournament_id: tournamentId, guest_name: guestName.trim() } })
+            });
+            if (!res.ok) throw new Error("ไม่สามารถเพิ่มชื่อได้");
+            setGuestName("");
+            refreshInfo();
+            showToast("เพิ่มผู้เล่นสำเร็จ", "success");
+        } catch (e: any) {
+            showToast(e.message, "error");
+        } finally {
+            setAddingGuest(false);
+        }
+    };
+
+    const localStats = React.useMemo(() => {
+        const stats: Record<number, { win: number, lose: number }> = {};
+        if (tournamentInfo.mode !== 'party') return stats;
+        
+        tournamentInfo.players.forEach(p => {
+            stats[p.id] = { win: 0, lose: 0 };
+        });
+
+        apiMatches.forEach(match => {
+            if (match.match_status !== 'done' || !match.team_winner) return;
+            const teamA = match.team_a_id;
+            const teamB = match.team_b_id;
+            const winnerId = match.team_winner.id || match.team_winner.documentId;
+            
+            const isWinnerA = teamA && (teamA.id === winnerId || teamA.documentId === winnerId);
+            const isWinnerB = teamB && (teamB.id === winnerId || teamB.documentId === winnerId);
+            
+            [teamA, teamB].forEach((team: any) => {
+                if (!team) return;
+                const isWinner = team === teamA ? isWinnerA : isWinnerB;
+                team.team_players?.forEach((tp: any) => {
+                    let playerId: number | null = null;
+                    if (tp.guest_name) {
+                        const p = tournamentInfo.players.find(x => x.guest_name === tp.guest_name && x.is_guest);
+                        if (p) playerId = p.id;
+                    } else if (tp.user_id) {
+                        playerId = tp.user_id.id;
+                    }
+                    if (playerId && stats[playerId]) {
+                        if (isWinner) stats[playerId].win++;
+                        else stats[playerId].lose++;
+                    }
+                });
+            });
+        });
+        return stats;
+    }, [apiMatches, tournamentInfo]);
     const handleTogglePause = async (player: any) => {
         if (!player.tpDocumentId) {
             showToast("ไม่สามารถพักผู้เล่นได้: ไม่พบรหัส Tournament Player", "error");
@@ -78,8 +143,8 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
     };
 
     const myPlayerEntry = tournamentInfo.players.find(p => p.id === user?.id);
-    const canJoinLeave = tournamentInfo.tournament_status === "upcoming" ||
-        (tournamentInfo.format === "endless_mode" && tournamentInfo.tournament_status === "ongoing");
+    const canJoinLeave = tournamentInfo.mode !== "party" && (tournamentInfo.tournament_status === "upcoming" ||
+        (tournamentInfo.format === "endless_mode" && tournamentInfo.tournament_status === "ongoing"));
 
     const spinnerSvg = (
         <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
@@ -139,6 +204,29 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                 </div>
             </div>
 
+            {/* Guest Add UI */}
+            {tournamentInfo.mode === "party" && tournamentInfo.user_created?.id === user?.id && (
+                <div className="px-4 py-3 border-b border-white/8 bg-fuchsia-500/5">
+                    <form onSubmit={handleAddGuest} className="flex items-center gap-2">
+                        <input
+                            type="text"
+                            placeholder="พิมพ์ชื่อผู้เล่น..."
+                            value={guestName}
+                            onChange={e => setGuestName(e.target.value)}
+                            disabled={addingGuest}
+                            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-fuchsia-500/50"
+                        />
+                        <button
+                            type="submit"
+                            disabled={addingGuest || !guestName.trim()}
+                            className="min-h-[36px] px-4 py-1.5 rounded-lg bg-fuchsia-500/20 border border-fuchsia-500/30 text-fuchsia-300 text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+                        >
+                            {addingGuest ? spinnerSvg : "เพิ่มชื่อ"}
+                        </button>
+                    </form>
+                </div>
+            )}
+
             {/* Player list */}
             {tournamentInfo.players.length === 0 ? (
                 <div className="py-10 text-center text-slate-500">
@@ -175,9 +263,9 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                         })
                         .map((player, idx) => {
                         const isPaused = pausedPlayerIds.has(player.id);
-                        const isSelf = player.id === user?.id;
+                        const isSelf = player.id === user?.id && !player.is_guest;
                         const isOwner = tournamentInfo.user_created?.id === user?.id;
-                        const canManagePlayer = canJoinLeave && (isSelf || (isOwner && !isSelf));
+                        const canManagePlayer = (canJoinLeave && (isSelf || (isOwner && !isSelf))) || (tournamentInfo.mode === "party" && isOwner);
                         const pUrl = player.picture?.url
                             ? (player.picture.url.startsWith("http") ? player.picture.url : `${STRAPI_BASE_URL}${player.picture.url}`)
                             : null;
@@ -236,6 +324,15 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                                                         <span className="text-orange-400">🔥{player.rankings?.[0]?.win_streak}</span>
                                                     )}
                                                 </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {tournamentInfo.mode === "party" && (
+                                        <div className="flex items-center gap-2 mt-1.5">
+                                            <span className="px-2 py-0.5 rounded bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-400 text-[10px] font-bold">🎉 Party</span>
+                                            <div className="flex items-center gap-1 text-[8px] text-slate-400 font-medium">
+                                                <span className="text-green-400">W{localStats[player.id]?.win ?? 0}</span>
+                                                <span className="text-red-400">L{localStats[player.id]?.lose ?? 0}</span>
                                             </div>
                                         </div>
                                     )}

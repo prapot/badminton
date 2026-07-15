@@ -183,6 +183,7 @@ export default function TournamentDetailPage() {
                 {tournamentInfo && (
                     <>
                         <ParticipantsList
+                            tournamentId={id as string}
                             tournamentInfo={tournamentInfo}
                             user={user}
                             jwt={jwt!}
@@ -193,6 +194,7 @@ export default function TournamentDetailPage() {
                             handleLeave={handleLeave}
                             drawnPairs={drawnPairs}
                             playerMatchCounts={playerMatchCounts}
+                            apiMatches={apiMatches}
                             STRAPI_BASE_URL={STRAPI_BASE_URL}
                             refreshInfo={refreshInfo}
                             showToast={showToast}
@@ -242,6 +244,7 @@ export default function TournamentDetailPage() {
                             tournamentStatus={tournamentInfo.tournament_status}
                             userId={user?.id}
                             ownerId={tournamentInfo.user_created?.id}
+                            tournamentMode={tournamentInfo.mode}
                         />
                     )}
 

@@ -88,7 +88,7 @@ const KnockoutManager: React.FC<KnockoutManagerProps> = ({
                         await fetch(`${STRAPI_BASE_URL}/api/team-players`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
-                            body: JSON.stringify({ data: { team_id: teamAId, user_id: p.id } })
+                            body: JSON.stringify({ data: { team_id: teamAId, ...(p.is_guest ? { guest_name: p.guest_name } : { user_id: p.id }) } })
                         });
                     }
                 }
@@ -105,7 +105,7 @@ const KnockoutManager: React.FC<KnockoutManagerProps> = ({
                         await fetch(`${STRAPI_BASE_URL}/api/team-players`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
-                            body: JSON.stringify({ data: { team_id: teamBId, user_id: p.id } })
+                            body: JSON.stringify({ data: { team_id: teamBId, ...(p.is_guest ? { guest_name: p.guest_name } : { user_id: p.id }) } })
                         });
                     }
                 }
@@ -234,7 +234,7 @@ const KnockoutManager: React.FC<KnockoutManagerProps> = ({
                                                             <div className="flex flex-col min-w-0">
                                                                 {m.team_a_id?.team_players?.map((tp, idx) => (
                                                                     <span key={idx} className={`text-xs font-bold truncate ${isWinnerA ? 'text-green-300' : m.team_a_id ? 'text-slate-200' : 'text-slate-600 italic'}`}>
-                                                                        {tp.user_id?.username || "Guest"}
+                                                                        {tp.user_id?.username || tp.guest_name || "Guest"}
                                                                     </span>
                                                                 )) || <span className="text-xs font-bold text-slate-600 italic">{m.round === "1" ? "Bye" : "TBD"}</span>}
                                                             </div>
@@ -249,7 +249,7 @@ const KnockoutManager: React.FC<KnockoutManagerProps> = ({
                                                             <div className="flex flex-col min-w-0">
                                                                 {m.team_b_id?.team_players?.map((tp, idx) => (
                                                                     <span key={idx} className={`text-xs font-bold truncate ${isWinnerB ? 'text-green-300' : m.team_b_id ? 'text-slate-200' : 'text-slate-600 italic'}`}>
-                                                                        {tp.user_id?.username || "Guest"}
+                                                                        {tp.user_id?.username || tp.guest_name || "Guest"}
                                                                     </span>
                                                                 )) || <span className="text-xs font-bold text-slate-600 italic">{m.round === "1" ? "Bye" : "TBD"}</span>}
                                                             </div>

@@ -71,8 +71,10 @@ export default function TournamentHeader({
                         </span>
                         <span className={`text-[10px] sm:text-xs px-2 py-1 rounded-lg border font-bold ${tournamentInfo.mode === "ranking"
                             ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400"
-                            : "bg-blue-500/10 border-blue-500/20 text-blue-400"}`}>
-                            {tournamentInfo.mode === "ranking" ? "🏆 Ranking" : "🎮 Casual"}
+                            : tournamentInfo.mode === "party"
+                                ? "bg-fuchsia-500/10 border-fuchsia-500/20 text-fuchsia-400"
+                                : "bg-blue-500/10 border-blue-500/20 text-blue-400"}`}>
+                            {tournamentInfo.mode === "ranking" ? "🏆 Ranking" : tournamentInfo.mode === "party" ? "🎉 Party" : "🎮 Casual"}
                         </span>
                         <span className="text-[10px] sm:text-xs px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300">
                             {tournamentInfo.type === "single" ? "🏸 เดี่ยว" : "👥 คู่"}

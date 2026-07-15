@@ -193,6 +193,10 @@ const KnockoutManager: React.FC<KnockoutManagerProps> = ({
                                         const winnerId = m.team_winner && typeof m.team_winner === 'object' ? (m.team_winner as any).documentId || (m.team_winner as any).id : m.team_winner;
                                         const isWinnerA = m.match_status === 'done' && winnerId && m.team_a_id && (winnerId === m.team_a_id.documentId || winnerId === m.team_a_id.id);
                                         const isWinnerB = m.match_status === 'done' && winnerId && m.team_b_id && (winnerId === m.team_b_id.documentId || winnerId === m.team_b_id.id);
+                                        const isUserInMatch = !!userId && (
+                                            m.team_a_id?.team_players?.some(tp => tp.user_id?.id === userId) ||
+                                            m.team_b_id?.team_players?.some(tp => tp.user_id?.id === userId)
+                                        );
 
                                         return (
                                             <div key={m.id} className="relative z-10 px-4 group">
@@ -213,7 +217,7 @@ const KnockoutManager: React.FC<KnockoutManagerProps> = ({
                                                             setScoreB(m.score_b || 0);
                                                         }
                                                     }}
-                                                    className={`w-full bg-[#0f172a] border border-white/5 rounded-2xl overflow-hidden shadow-2xl transition-all ${isOwner ? 'hover:border-indigo-500/50 hover:scale-[1.03] cursor-pointer' : 'cursor-default'}`}
+                                                    className={`w-full ${isUserInMatch ? 'bg-yellow-500/5 border-yellow-400 ring-1 ring-yellow-400/50 shadow-[0_0_15px_rgba(250,204,21,0.15)]' : 'bg-[#0f172a] border-white/5'} border rounded-2xl overflow-hidden shadow-2xl transition-all ${isOwner ? `hover:scale-[1.03] cursor-pointer ${!isUserInMatch ? 'hover:border-indigo-500/50' : ''}` : 'cursor-default'}`}
                                                 >
                                                     {/* Match Meta */}
                                                     <div className="bg-white/5 px-4 py-2 flex justify-between items-center border-b border-white/5">

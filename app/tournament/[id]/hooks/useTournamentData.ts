@@ -57,9 +57,16 @@ export function useTournamentData(id: string, jwt: string | null) {
 
     // Auto-fetch matches when tournament is ongoing/completed
     useEffect(() => {
+        let interval: NodeJS.Timeout;
         if (tournamentInfo?.tournament_status === 'ongoing' || tournamentInfo?.tournament_status === 'completed') {
             fetchMatches();
+            interval = setInterval(() => {
+                fetchMatches();
+            }, 7000);
         }
+        return () => {
+            if (interval) clearInterval(interval);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tournamentInfo?.tournament_status]);
 
@@ -105,7 +112,7 @@ export function useTournamentData(id: string, jwt: string | null) {
 
         // Add manual offsets first
         tournamentInfo?.players.forEach(p => {
-             counts[p.id] = p.match_offset || 0;
+            counts[p.id] = p.match_offset || 0;
         });
 
         // Count only matches that are completed (scored)
@@ -127,7 +134,7 @@ export function useTournamentData(id: string, jwt: string | null) {
                 const median = played[Math.floor(played.length / 2)];
                 const mainGroup = played.filter(c => c >= median - 1);
                 const trueMin = mainGroup.length > 0 ? Math.min(...mainGroup) : median;
-                
+
                 Object.keys(counts).forEach(idStr => {
                     const pid = Number(idStr);
                     if ((counts[pid] || 0) < trueMin) {

@@ -10,6 +10,7 @@ import { useTournamentData } from "./hooks/useTournamentData";
 import { useTournamentActions } from "./hooks/useTournamentActions";
 import { useTournamentDraw } from "./hooks/useTournamentDraw";
 import { useTournamentScoring } from "./hooks/useTournamentScoring";
+import { useMatchNotification } from "./hooks/useMatchNotification";
 
 import FullScoreEditorModal from "./FullScoreEditorModal";
 import TournamentHeader from "./TournamentHeader";
@@ -56,6 +57,9 @@ export default function TournamentDetailPage() {
         pausedPlayerIds, setPausedPlayerIds,
         fetchMatches, refreshInfo
     } = useTournamentData(id, jwt);
+
+    // Watch for new matches for the user to alert them
+    useMatchNotification(apiMatches, user);
 
     const {
         joining, leaving, isJoined,

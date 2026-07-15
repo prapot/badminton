@@ -103,10 +103,14 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                         const winnerA = isCompleted && match.score_a > match.score_b;
                                         const winnerB = isCompleted && match.score_b > match.score_a;
 
+                                        const isUserInMatch = user?.id && (
+                                            match.team_a_id?.team_players.some(tp => tp.user_id?.id === user.id) ||
+                                            match.team_b_id?.team_players.some(tp => tp.user_id?.id === user.id)
+                                        );
 
                                         return (
                                             <div key={match.id}
-                                                className={`group relative overflow-hidden bg-black/20 border border-white/5 rounded-2xl transition-all duration-300 ${match.match_status !== "cancelled" ? "hover:bg-black/40 hover:border-white/10 hover:-translate-y-0.5 hover:shadow-xl cursor-pointer active:scale-[0.99]" : ""} ${match.match_status === "cancelled" ? "opacity-60 grayscale" : ""}`}
+                                                className={`group relative overflow-hidden ${isUserInMatch ? 'bg-yellow-500/5 border-yellow-400 ring-1 ring-yellow-400/50 shadow-[0_0_15px_rgba(250,204,21,0.15)]' : 'bg-black/20 border-white/5'} border rounded-2xl transition-all duration-300 ${match.match_status !== "cancelled" ? `hover:bg-black/40 hover:-translate-y-0.5 hover:shadow-xl cursor-pointer active:scale-[0.99] ${!isUserInMatch ? 'hover:border-white/10' : ''}` : ""} ${match.match_status === "cancelled" ? "opacity-60 grayscale" : ""}`}
                                                 onClick={() => {
                                                     if (match.match_status === "cancelled") return;
                                                     setScoreEditing(match);

@@ -14,9 +14,9 @@ export const typeOptions: { value: PlayerType; label: string; desc: string; icon
 ];
 
 export const formatOptions: { value: TournamentFormat; label: string; desc: string; icon: string; disabled?: boolean }[] = [
-    { value: "round_robin", label: "พบกันหมด (Round Robin)", desc: "ทุกคนแข่งกับทุกคน คิดคะแนนรวม", icon: "🔄" },
+    { value: "round_robin", label: "พบกันหมด (Round Robin)", desc: "ทุกคนแข่งกับทุกคน คิดคะแนนรวม", icon: "🔄", disabled: true },
     { value: "endless_mode", label: "โหมดไร้สิ้นสุด (Endless Mode)", desc: "สุ่มจบคู่แข่งทีละคู่ไปเรื่อยๆ โดยเฉลี่ยการเล่นให้เท่ากัน", icon: "♾️" },
-    // { value: "knockout", label: "แพ้คัดออก (Knockout)", desc: "แพ้ปุ๊บตกรอบทันที", icon: "⚡" },
+    { value: "knockout", label: "แพ้คัดออก (Knockout)", desc: "แพ้ปุ๊บตกรอบทันที", icon: "⚡", disabled: true },
     { value: "americano", label: "อเมริกาโน (Americano)", desc: "สลับคู่แข่งทุกเซต คิดคะแนนสะสมส่วนตัว", icon: "🌀", disabled: true },
 ];
 

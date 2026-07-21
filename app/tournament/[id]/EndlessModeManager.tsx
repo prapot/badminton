@@ -331,25 +331,28 @@ export default function EndlessModeManager({
                 return;
             }
 
-            // 1. Sort available players by effective match count
+            // 1. Sort available players by actual match count first
             const sortedByCount = [...availablePlayers].sort((a, b) => {
-                const effA = effectivePlayerCounts.get(a.id) || 0;
-                const effB = effectivePlayerCounts.get(b.id) || 0;
-                if (effA !== effB) return effA - effB;
-                // If effective counts are equal, prioritize newbies (lower actual count)
                 const actA = actualPlayerCounts.get(a.id) || 0;
                 const actB = actualPlayerCounts.get(b.id) || 0;
-                return actA - actB;
+                if (actA !== actB) return actA - actB;
+                // If actual counts are equal, shuffle randomly to add variety
+                return Math.random() - 0.5;
             });
 
-            // 2. Use all available players as pool — scoring will naturally prioritize low-count players
-            const pool = sortedByCount;
+            // 2. Create a smaller pool of eligible players to ensure the ones with lowest matches get picked
+            // Take players who have the minimum matches, plus those with slightly more (min + 1) to allow rank balancing
+            const minActCount = actualPlayerCounts.get(sortedByCount[0].id) || 0;
+            const candidatePool = sortedByCount.filter(p => (actualPlayerCounts.get(p.id) || 0) <= minActCount + 1);
+            
+            // If the filtered pool is too small, fallback to top N players
+            const pool = candidatePool.length >= (requiredCount * 2) ? candidatePool : sortedByCount.slice(0, Math.max(12, requiredCount * 2));
 
             let bestScore = Infinity;
             let bestPairing: { teamA: ApiPlayer[], teamB: ApiPlayer[] } | null = null;
 
             // 3. Try random combinations to find the best one
-            for (let i = 0; i < 200; i++) {
+            for (let i = 0; i < 500; i++) {
                 const shuffled = [...pool].sort(() => Math.random() - 0.5);
                 const p1 = shuffled[0];
                 const p2 = shuffled[1];
@@ -364,39 +367,37 @@ export default function EndlessModeManager({
                 // Calculate Score (Lower is better)
                 let score = 0;
 
-                // Priority 1: Players with fewer ACTUAL matches get picked first
-                // (use actual counts, NOT effective — so new players with 0 matches are strongly prioritized)
+                // Priority 1: Players with fewer ACTUAL matches get picked first (Huge penalty)
                 [...teamA, ...teamB].forEach(p => {
-                    score += (actualPlayerCounts.get(p.id) || 0) * 10000;
+                    score += (actualPlayerCounts.get(p.id) || 0) * 1000000;
                 });
 
                 if (tournamentType === "double") {
-                    // Priority 2: Avoid repeat partners (exponential penalty)
-                    const partnerHistA = getPartnerHistory(teamA[0].id, teamA[1].id);
-                    const partnerHistB = getPartnerHistory(teamB[0].id, teamB[1].id);
-                    score += Math.pow(partnerHistA + 1, 2) * 2000;
-                    score += Math.pow(partnerHistB + 1, 2) * 2000;
-
-                    // Priority 3: Avoid repeat faceoffs (exponential penalty)
-                    const faceoffCount = getFaceoffCount(teamA.map(p => p.id), teamB.map(p => p.id));
-                    score += Math.pow(faceoffCount + 1, 2) * 1000;
-
-                    // Priority 4: Rank Balance (high+low in same team — critical for fair games)
+                    // Priority 2: Rank Balance MUST be as equal as possible (High penalty for diff)
                     const avgSkillA = teamA.reduce((s, p) => s + getSkillScore(p), 0) / teamA.length;
                     const avgSkillB = teamB.reduce((s, p) => s + getSkillScore(p), 0) / teamB.length;
                     const skillDiff = Math.abs(avgSkillA - avgSkillB);
-                    score += skillDiff * 2;
-                } else {
-                    const faceoffCount = getFaceoffCount([teamA[0].id], [teamB[0].id]);
-                    score += Math.pow(faceoffCount + 1, 2) * 1000;
+                    score += skillDiff * 10000;
 
+                    // Priority 3: Swap smoothly
+                    // We don't care if they paired before, BUT a small penalty helps rotate players
+                    const partnerHistA = getPartnerHistory(teamA[0].id, teamA[1].id);
+                    const partnerHistB = getPartnerHistory(teamB[0].id, teamB[1].id);
+                    score += (partnerHistA + partnerHistB) * 100;
+
+                    const faceoffCount = getFaceoffCount(teamA.map(p => p.id), teamB.map(p => p.id));
+                    score += faceoffCount * 50;
+                } else {
                     // Rank Balance for singles
                     const skillDiff = Math.abs(getSkillScore(teamA[0]) - getSkillScore(teamB[0]));
-                    score += skillDiff * 2;
+                    score += skillDiff * 10000;
+
+                    const faceoffCount = getFaceoffCount([teamA[0].id], [teamB[0].id]);
+                    score += faceoffCount * 50;
                 }
 
                 // Small random jitter to break ties → ensures different pairings on re-roll
-                score += Math.random() * 99;
+                score += Math.random() * 10;
 
                 if (score < bestScore) {
                     bestScore = score;

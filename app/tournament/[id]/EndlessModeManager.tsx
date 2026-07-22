@@ -324,137 +324,147 @@ export default function EndlessModeManager({
 
     // ── FRONTEND MATCHMAKING ────────────────────────────────────────────────
     const calculateNextMatch = () => {
-        if (pairingMode === "auto") {
-            const requiredCount = tournamentType === "double" ? 4 : 2;
-            if (availablePlayers.length < requiredCount) {
-                showToast(`ผู้เล่นไม่พอ (ต้องการ ${requiredCount} คน)`, "error");
-                return;
-            }
+        const requiredCount = tournamentType === "double" ? 4 : 2;
+        if (availablePlayers.length < requiredCount) {
+            showToast(`ผู้เล่นไม่พอ (ต้องการ ${requiredCount} คน)`, "error");
+            return;
+        }
 
-            // 1. Sort available players by actual match count first
-            const sortedByCount = [...availablePlayers].sort((a, b) => {
-                const actA = actualPlayerCounts.get(a.id) || 0;
-                const actB = actualPlayerCounts.get(b.id) || 0;
-                if (actA !== actB) return actA - actB;
-                // If actual counts are equal, shuffle randomly to add variety
-                return Math.random() - 0.5;
+        // 1. Build available entities (Fixed Pairs and Solos)
+        type Entity = { type: "team" | "solo", players: ApiPlayer[], matchCount: number };
+        const availableEntities: Entity[] = [];
+        const usedInTeam = new Set<number>();
+
+        if (tournamentType === "double") {
+            permanentTeams.forEach(team => {
+                const isAvailable = team.players.every(p => !busyPlayerIds.has(p.id) && !pausedPlayerIds.has(p.id));
+                if (isAvailable && team.players.length === 2) {
+                    const maxCount = Math.max(...team.players.map(p => actualPlayerCounts.get(p.id) || 0));
+                    availableEntities.push({ type: "team", players: team.players, matchCount: maxCount });
+                    team.players.forEach(p => usedInTeam.add(p.id));
+                }
             });
+        }
 
-            // 2. Create a smaller pool of eligible players to ensure the ones with lowest matches get picked
-            // Take players who have the minimum matches, plus those with slightly more (min + 1) to allow rank balancing
-            const minActCount = actualPlayerCounts.get(sortedByCount[0].id) || 0;
-            const candidatePool = sortedByCount.filter(p => (actualPlayerCounts.get(p.id) || 0) <= minActCount + 1);
+        availablePlayers.forEach(p => {
+            // If they are part of a permanent team but the team isn't available (e.g. partner busy/paused),
+            // they cannot play. Fixed pair means they ONLY play with their partner.
+            if (tournamentType === "double" && assignedPlayerIds.has(p.id) && !usedInTeam.has(p.id)) {
+                return; 
+            }
+            if (!usedInTeam.has(p.id)) {
+                availableEntities.push({ type: "solo", players: [p], matchCount: actualPlayerCounts.get(p.id) || 0 });
+            }
+        });
+
+        const eligiblePlayersCount = availableEntities.reduce((sum, e) => sum + e.players.length, 0);
+        if (eligiblePlayersCount < requiredCount) {
+            showToast(`ผู้เล่นที่พร้อมจับคู่ไม่พอ (คู่หูบางคนอาจกำลังแข่งหรือพักอยู่)`, "error");
+            return;
+        }
+
+        // 2. Sort entities by actual match count first
+        const sortedEntities = [...availableEntities].sort((a, b) => {
+            if (a.matchCount !== b.matchCount) return a.matchCount - b.matchCount;
+            // If actual counts are equal, shuffle randomly to add variety
+            return Math.random() - 0.5;
+        });
+
+        // Create a smaller pool of eligible entities to ensure the ones with lowest matches get picked
+        const minActCount = sortedEntities[0]?.matchCount || 0;
+        const candidatePool = sortedEntities.filter(e => e.matchCount <= minActCount + 1);
+        
+        // If the filtered pool is too small, fallback to top N entities
+        const pool = candidatePool.length >= (requiredCount * 1.5) ? candidatePool : sortedEntities.slice(0, Math.max(8, requiredCount * 1.5));
+
+        let bestScore = Infinity;
+        let bestPairing: { teamA: ApiPlayer[], teamB: ApiPlayer[] } | null = null;
+
+        // 3. Try random combinations to find the best one
+        for (let i = 0; i < 500; i++) {
+            const shuffled = [...pool].sort(() => Math.random() - 0.5);
             
-            // If the filtered pool is too small, fallback to top N players
-            const pool = candidatePool.length >= (requiredCount * 2) ? candidatePool : sortedByCount.slice(0, Math.max(12, requiredCount * 2));
+            let teamA: ApiPlayer[] = [];
+            let teamB: ApiPlayer[] = [];
+            let playersNeeded = requiredCount;
 
-            let bestScore = Infinity;
-            let bestPairing: { teamA: ApiPlayer[], teamB: ApiPlayer[] } | null = null;
-
-            // 3. Try random combinations to find the best one
-            for (let i = 0; i < 500; i++) {
-                const shuffled = [...pool].sort(() => Math.random() - 0.5);
-                const p1 = shuffled[0];
-                const p2 = shuffled[1];
-                let teamA: ApiPlayer[] = [p1];
-                let teamB: ApiPlayer[] = [p2];
-
-                if (tournamentType === "double") {
-                    teamA.push(shuffled[2]);
-                    teamB.push(shuffled[3]);
-                }
-
-                // Calculate Score (Lower is better)
-                let score = 0;
-
-                // Priority 1: Players with fewer ACTUAL matches get picked first (Huge penalty)
-                [...teamA, ...teamB].forEach(p => {
-                    score += (actualPlayerCounts.get(p.id) || 0) * 1000000;
-                });
-
-                if (tournamentType === "double") {
-                    // Priority 2: Rank Balance MUST be as equal as possible (High penalty for diff)
-                    const avgSkillA = teamA.reduce((s, p) => s + getSkillScore(p), 0) / teamA.length;
-                    const avgSkillB = teamB.reduce((s, p) => s + getSkillScore(p), 0) / teamB.length;
-                    const skillDiff = Math.abs(avgSkillA - avgSkillB);
-                    score += skillDiff * 10000;
-
-                    // Priority 3: Swap smoothly
-                    // We don't care if they paired before, BUT a small penalty helps rotate players
-                    const partnerHistA = getPartnerHistory(teamA[0].id, teamA[1].id);
-                    const partnerHistB = getPartnerHistory(teamB[0].id, teamB[1].id);
-                    score += (partnerHistA + partnerHistB) * 100;
-
-                    const faceoffCount = getFaceoffCount(teamA.map(p => p.id), teamB.map(p => p.id));
-                    score += faceoffCount * 50;
+            for (const entity of shuffled) {
+                if (playersNeeded === 0) break;
+                if (entity.type === "team") {
+                    if (playersNeeded >= 2) {
+                        if (teamA.length === 0) teamA.push(...entity.players);
+                        else if (teamB.length === 0) teamB.push(...entity.players);
+                        else continue;
+                        playersNeeded -= 2;
+                    }
                 } else {
-                    // Rank Balance for singles
-                    const skillDiff = Math.abs(getSkillScore(teamA[0]) - getSkillScore(teamB[0]));
-                    score += skillDiff * 10000;
-
-                    const faceoffCount = getFaceoffCount([teamA[0].id], [teamB[0].id]);
-                    score += faceoffCount * 50;
-                }
-
-                // Small random jitter to break ties → ensures different pairings on re-roll
-                score += Math.random() * 10;
-
-                if (score < bestScore) {
-                    bestScore = score;
-                    bestPairing = { teamA, teamB };
+                    if (tournamentType === "double") {
+                        if (teamA.length < 2) teamA.push(entity.players[0]);
+                        else if (teamB.length < 2) teamB.push(entity.players[0]);
+                        else continue;
+                    } else {
+                        if (teamA.length === 0) teamA.push(entity.players[0]);
+                        else if (teamB.length === 0) teamB.push(entity.players[0]);
+                        else continue;
+                    }
+                    playersNeeded -= 1;
                 }
             }
 
-            if (bestPairing) {
-                setPreviewMatch(bestPairing);
-                setTimeout(() => {
-                    document.getElementById("endless-manager")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }, 100);
-            }
+            if (playersNeeded > 0) continue; // Invalid combination (could not fill teams)
 
-        } else {
-            // Locked Mode Pairing
-            const availableTeams = permanentTeams.filter(t =>
-                t.players.every(p => !busyPlayerIds.has(p.id) && !pausedPlayerIds.has(p.id))
-            );
+            // Calculate Score (Lower is better)
+            let score = 0;
 
-            if (availableTeams.length < 2) {
-                showToast("ทีมถาวรไม่พอ (ต้องการอย่างน้อย 2 ทีมที่ว่าง)", "error");
-                return;
-            }
-
-            // Pick 2 teams with lowest average match counts
-            const sortedTeams = [...availableTeams].sort((a, b) => {
-                const countA = teamMatchCounts.get(a.id) || 0;
-                const countB = teamMatchCounts.get(b.id) || 0;
-                if (countA !== countB) return countA - countB;
-                // If same match count, pick least faceoff
-                return 0;
+            // Priority 0: Players with fewer ACTUAL matches get picked first (Absolute MUST)
+            [...teamA, ...teamB].forEach(p => {
+                score += (actualPlayerCounts.get(p.id) || 0) * 100000000; // 100 Million
             });
 
-            // Find best pair of teams
-            let bestScore = Infinity;
-            let bestPair: { teamA: ApiPlayer[], teamB: ApiPlayer[] } | null = null;
+            if (tournamentType === "double") {
+                // Priority 1: Never repeat partners if possible (exempt Fixed Pairs)
+                const isFixedA = permanentTeams.some(t => t.players.some(p => p.id === teamA[0].id) && t.players.some(p => p.id === teamA[1].id));
+                const isFixedB = permanentTeams.some(t => t.players.some(p => p.id === teamB[0].id) && t.players.some(p => p.id === teamB[1].id));
+                
+                const partnerHistA = isFixedA ? 0 : getPartnerHistory(teamA[0].id, teamA[1].id);
+                const partnerHistB = isFixedB ? 0 : getPartnerHistory(teamB[0].id, teamB[1].id);
+                score += (partnerHistA + partnerHistB) * 10000000; // 10 Million
 
-            for (let i = 0; i < sortedTeams.length; i++) {
-                for (let j = i + 1; j < Math.min(sortedTeams.length, 5); j++) {
-                    const t1 = sortedTeams[i];
-                    const t2 = sortedTeams[j];
-                    const faceoffCount = getFaceoffCount(t1.players.map(p => p.id), t2.players.map(p => p.id));
-                    const score = (teamMatchCounts.get(t1.id)! + teamMatchCounts.get(t2.id)!) * 100 + faceoffCount * 500;
+                // Priority 2: Never repeat opponents if possible
+                const faceoffCount = getFaceoffCount(teamA.map(p => p.id), teamB.map(p => p.id));
+                score += faceoffCount * 1000000; // 1 Million
 
-                    if (score < bestScore) {
-                        bestScore = score;
-                        bestPair = { teamA: t1.players, teamB: t2.players };
-                    }
-                }
+                // Priority 3: Rank Balance (Important, but less than variety)
+                const avgSkillA = teamA.reduce((s, p) => s + getSkillScore(p), 0) / teamA.length;
+                const avgSkillB = teamB.reduce((s, p) => s + getSkillScore(p), 0) / teamB.length;
+                const skillDiff = Math.abs(avgSkillA - avgSkillB);
+                score += skillDiff * 10;
+            } else {
+                // Priority 1: Never repeat opponents if possible
+                const faceoffCount = getFaceoffCount([teamA[0].id], [teamB[0].id]);
+                score += faceoffCount * 1000000; // 1 Million
+
+                // Priority 2: Rank Balance
+                const skillDiff = Math.abs(getSkillScore(teamA[0]) - getSkillScore(teamB[0]));
+                score += skillDiff * 10;
             }
-            if (bestPair) {
-                setPreviewMatch(bestPair);
-                setTimeout(() => {
-                    document.getElementById("endless-manager")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }, 100);
+
+            // Small random jitter to break ties → ensures different pairings on re-roll
+            score += Math.random() * 10;
+
+            if (score < bestScore) {
+                bestScore = score;
+                bestPairing = { teamA, teamB };
             }
+        }
+
+        if (bestPairing) {
+            setPreviewMatch(bestPairing);
+            setTimeout(() => {
+                document.getElementById("endless-manager")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }, 100);
+        } else {
+            showToast("ไม่สามารถจับคู่ได้ (อาจมีผู้เล่นว่างไม่พอดีกับรูปแบบคู่/เดี่ยว)", "error");
         }
     };
 
@@ -573,36 +583,8 @@ export default function EndlessModeManager({
                     </div>
                 </div>
 
-                {/* ── Mode Toggle ── */}
-                <div className="px-4 pt-3 pb-2">
-                    <div className="flex gap-1 p-1 bg-black/40 rounded-xl border border-white/5">
-                        <button
-                            onClick={() => setPairingMode("auto")}
-                            className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${pairingMode === "auto"
-                                ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/30"
-                                : "text-slate-500 hover:text-slate-300"}`}
-                        >
-                            🎲 อัตโนมัติ
-                        </button>
-                        <button
-                            onClick={() => setPairingMode("locked")}
-                            className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${pairingMode === "locked"
-                                ? "bg-amber-500 text-white shadow-lg shadow-amber-500/30"
-                                : "text-slate-500 hover:text-slate-300"}`}
-                        >
-                            🔒 ล็อคทีม
-                            {permanentTeams.length > 0 && (
-                                <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-black ${pairingMode === "locked" ? "bg-white/25 text-white" : "bg-amber-500/20 text-amber-400"}`}>
-                                    {permanentTeams.length}
-                                </span>
-                            )}
-                        </button>
-                    </div>
-                </div>
-
-                {/* ══════════════════ AUTO MODE ══════════════════ */}
-                {pairingMode === "auto" && (
-                    <div className="px-4 pb-4 pt-1 space-y-2">
+                {/* ══════════════════ MATCHMAKER ══════════════════ */}
+                <div className="px-4 pb-4 pt-4 space-y-2">
                         {/* Preview Match Card */}
                         {previewMatch && (
                             <div className="mb-4 animate-in fade-in slide-in-from-top-4 duration-300">
@@ -810,12 +792,10 @@ export default function EndlessModeManager({
                             </button>
                         )}
                     </div>
-                )}
 
-                {/* ══════════════════ LOCKED MODE ══════════════════ */}
-                {pairingMode === "locked" && (
-                    <div>
-                        {/* ── Existing permanent teams ── */}
+                {/* ══════════════════ FIXED PAIRS ══════════════════ */}
+                <div className="pb-4">
+                    {/* ── Existing permanent teams ── */}
                         {permanentTeams.length > 0 && (
                             <div className="px-4 pt-2 pb-3">
                                 <div className="flex items-center justify-between mb-2">
@@ -988,129 +968,7 @@ export default function EndlessModeManager({
                                 )}
                             </div>
                         </div>
-
-                        {/* ── Draw + Faceoff (shown when ≥2 teams) ── */}
-                        {permanentTeams.length >= 2 && (
-                            <>
-                                <div className="mx-4 border-t border-white/5" />
-                                <div className="px-4 pt-3 pb-4 space-y-3">
-                                    {/* Preview Match Card for Locked Mode */}
-                                    {previewMatch && (
-                                        <div className="mb-4 animate-in fade-in slide-in-from-top-4 duration-300">
-                                            <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl overflow-hidden shadow-lg shadow-amber-500/10">
-                                                <div className="px-4 py-2.5 bg-amber-500/20 border-b border-amber-500/20 flex justify-between items-center">
-                                                    <span className="text-[10px] font-black text-amber-300 uppercase tracking-widest">🏸 คู่แข่งขันทีมถาวร</span>
-                                                    <button onClick={() => setPreviewMatch(null)} className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all active:scale-90">✕</button>
-                                                </div>
-                                                <div className="p-3 space-y-3">
-                                                    {/* Team A */}
-                                                    <div>
-                                                        <div className="text-[9px] text-amber-400 uppercase font-black mb-2 tracking-[0.2em] px-1">ทีม A</div>
-                                                        <div className="space-y-2">
-                                                            {previewMatch.teamA.map(p => (
-                                                                <div key={p.id} className="flex items-center gap-3 bg-white/[0.04] py-2.5 px-4 rounded-2xl border border-white/[0.06] shadow-inner">
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <div className="flex items-center justify-between gap-2">
-                                                                            <span className="text-sm font-bold text-white truncate">{p.username}</span>
-                                                                            <span className="text-[10px] text-slate-500 font-bold shrink-0">{actualPlayerCounts.get(p.id) || 0} แมตซ์</span>
-                                                                        </div>
-                                                                        <div className="mt-1 flex items-center gap-2">
-                                                                            {tournamentMode === 'ranking' && <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* VS Divider */}
-                                                    <div className="py-2 flex items-center gap-3">
-                                                        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
-                                                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[11px] font-black text-white shadow-xl shadow-amber-500/20 rotate-45">
-                                                            <span className="-rotate-45">VS</span>
-                                                        </div>
-                                                        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
-                                                    </div>
-
-                                                    {/* Team B */}
-                                                    <div>
-                                                        <div className="text-[9px] text-amber-400 uppercase font-black mb-2 tracking-[0.2em] px-1">ทีม B</div>
-                                                        <div className="space-y-2">
-                                                            {previewMatch.teamB.map(p => (
-                                                                <div key={p.id} className="flex items-center gap-3 bg-white/[0.04] py-2.5 px-4 rounded-2xl border border-white/[0.06] shadow-inner">
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <div className="flex items-center justify-between gap-2">
-                                                                            <span className="text-sm font-bold text-white truncate">{p.username}</span>
-                                                                            <span className="text-[10px] text-slate-500 font-bold shrink-0">{actualPlayerCounts.get(p.id) || 0} แมตซ์</span>
-                                                                        </div>
-                                                                        <div className="mt-1 flex items-center gap-2">
-                                                                            {tournamentMode === 'ranking' && <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Action Buttons */}
-                                                    <div className="flex gap-2 pt-1">
-                                                        <button
-                                                            onClick={handleConfirmMatch}
-                                                            disabled={drawing}
-                                                            className="flex-1 min-h-[44px] rounded-xl bg-green-500 hover:bg-green-400 active:scale-[0.97] text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20"
-                                                        >
-                                                            {drawing ? spinnerSvg : "✅ เริ่มแข่งคู่นี้"}
-                                                        </button>
-                                                        <button
-                                                            onClick={() => calculateNextMatch()}
-                                                            className="min-w-[44px] min-h-[44px] rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all text-lg"
-                                                        >
-                                                            🔄
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {!previewMatch && (
-                                        <button
-                                            onClick={calculateNextMatch}
-                                            disabled={drawing || !jwt}
-                                            className="w-full min-h-[52px] rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 active:scale-[0.98] text-white font-black text-sm transition-all shadow-lg shadow-amber-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
-                                        >
-                                            {drawing ? <>{spinnerSvg}<span>กำลังสุ่ม...</span></>
-                                                : <><span>🎲 สุ่มคู่จากทีมถาวร</span></>}
-                                        </button>
-                                    )}
-
-                                    {/* Faceoff history — wrap chips */}
-                                    <div>
-                                        <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mb-1.5">ประวัติการเจอกัน</p>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {permanentTeams.flatMap((tA, i) =>
-                                                permanentTeams.slice(i + 1).map(tB => {
-                                                    const count = getFaceoffCount(tA.players.map(p => p.id), tB.players.map(p => p.id));
-                                                    return (
-                                                        <div
-                                                            key={`${tA.id}-${tB.id}`}
-                                                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/8 text-[10px]"
-                                                        >
-                                                            <span className="text-slate-400">{tA.label} vs {tB.label}</span>
-                                                            <span className={`font-black ${count === 0 ? "text-green-400" : count <= 2 ? "text-amber-400" : "text-red-400"}`}>
-                                                                {count}×
-                                                            </span>
-                                                        </div>
-                                                    );
-                                                })
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </>
-                        )}
                     </div>
-                )}
 
             </div>
         </div>

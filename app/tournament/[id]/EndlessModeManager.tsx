@@ -486,6 +486,24 @@ export default function EndlessModeManager({
             const json = await res.json();
             if (!res.ok) throw new Error(json.error?.message || "Error creating match");
 
+            // Trigger Pusher notification
+            try {
+                await fetch('/api/pusher/trigger', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        playerIds: [...previewMatch.teamA.map(p => p.id), ...previewMatch.teamB.map(p => p.id)],
+                        matchData: {
+                            matchId: json.data?.id || json.id || 0,
+                            teamA: previewMatch.teamA.map(p => ({ id: p.id, name: p.username || p.guest_name })),
+                            teamB: previewMatch.teamB.map(p => ({ id: p.id, name: p.username || p.guest_name }))
+                        }
+                    })
+                });
+            } catch (pusherErr) {
+                console.error("Failed to trigger pusher:", pusherErr);
+            }
+
             showToast("สร้างแมตซ์เรียบร้อยแล้ว", "success");
             setPreviewMatch(null);
             await refreshInfo();

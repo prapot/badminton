@@ -35,7 +35,7 @@ export function useTournamentData(id: string, jwt: string | null) {
                     name: data.name ?? "",
                     tournament_status: data.tournament_status ?? "upcoming",
                     type: data.type ?? "single",
-                    format: data.format ?? "round_robin",
+                    format: data.format ?? "endless_mode",
                     startDate: data.startDate ?? "",
                     mode: data.mode ?? "ranking",
                     players: tpArr

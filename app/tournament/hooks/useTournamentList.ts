@@ -43,7 +43,7 @@ export function useTournamentList() {
                     documentId: item.documentId,
                     name: item.name ?? "",
                     type: item.type ?? "single",
-                    format: item.format ?? "round_robin",
+                    format: item.format ?? "endless_mode",
                     tournament_status: item.tournament_status ?? "upcoming",
                     startDate: item.startDate ?? "",
                     createdAt: item.createdAt ?? "",

@@ -15,7 +15,7 @@ export function useCreateTournament() {
     const [form, setForm] = useState<FormData>({
         name: "",
         type: "single",
-        format: "round_robin",
+        format: "endless_mode",
         startDate: new Date().toISOString().split('T')[0],
         mode: "ranking",
     });

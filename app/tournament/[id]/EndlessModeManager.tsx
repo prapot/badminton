@@ -16,6 +16,7 @@ interface ApiPlayer {
 }
 
 interface ApiMatch {
+    match_no: number;
     match_status: "upcoming" | "live" | "done" | "cancelled";
     team_a_id: { team_players: Array<{ user_id: { id: number } | null }> } | null;
     team_b_id: { team_players: Array<{ user_id: { id: number } | null }> } | null;
@@ -98,20 +99,29 @@ export default function EndlessModeManager({
     // ── Compute busy & match counts ───────────────────────────────────────
     const getUnifiedPlayerId = (tp: any) => tp.user_id?.id || (tp.guest_name ? players.find(p => p.guest_name === tp.guest_name)?.id : null);
 
-    const { busyPlayerIds, actualPlayerCounts, effectivePlayerCounts } = useMemo(() => {
+    const { busyPlayerIds, actualPlayerCounts, effectivePlayerCounts, lastMatchPlayed } = useMemo(() => {
         const actualCounts = new Map<number, number>();
         const busy = new Set<number>();
-        players.forEach(p => actualCounts.set(p.id, p.match_offset || 0));
+        const lastPlayed = new Map<number, number>();
+        
+        players.forEach(p => {
+            actualCounts.set(p.id, p.match_offset || 0);
+            lastPlayed.set(p.id, -1);
+        });
 
         apiMatches.forEach(m => {
             if (m.match_status === "cancelled") return;
             const pids = [
-                ...(m.team_a_id?.team_players.map(getUnifiedPlayerId) || []),
-                ...(m.team_b_id?.team_players.map(getUnifiedPlayerId) || [])
+                ...(m.team_a_id?.team_players?.map(getUnifiedPlayerId) || []),
+                ...(m.team_b_id?.team_players?.map(getUnifiedPlayerId) || [])
             ].filter(Boolean) as number[];
 
             pids.forEach(id => {
                 if (actualCounts.has(id)) actualCounts.set(id, actualCounts.get(id)! + 1);
+                // Track the highest match_no they played in
+                if (!lastPlayed.has(id) || (m.match_no > lastPlayed.get(id)!)) {
+                    lastPlayed.set(id, m.match_no);
+                }
             });
 
             if (m.match_status === "live" || m.match_status === "upcoming") {
@@ -128,13 +138,14 @@ export default function EndlessModeManager({
 
             players.forEach(p => {
                 const actual = actualCounts.get(p.id) || 0;
-                if (actual < minPlayed) {
+                // ให้ผู้เล่นที่ยังไม่เคยลงเล่นเลย (actual === 0) ได้รับสิทธิ์ลงสนามเป็นคิวแรกเสมอ
+                if (actual > 0 && actual < minPlayed) {
                     effectiveCounts.set(p.id, minPlayed);
                 }
             });
         }
 
-        return { busyPlayerIds: busy, actualPlayerCounts: actualCounts, effectivePlayerCounts: effectiveCounts };
+        return { busyPlayerIds: busy, actualPlayerCounts: actualCounts, effectivePlayerCounts: effectiveCounts, lastMatchPlayed: lastPlayed };
     }, [players, apiMatches]);
 
     const availablePlayers = useMemo(
@@ -380,8 +391,10 @@ export default function EndlessModeManager({
         }
 
         // 2. HARD CONSTRAINTS: Find candidate sets of entities that sum exactly to requiredCount
+        // Shuffle first to ensure fairness among players with the same matchCount (since JS sort is stable)
+        const shuffledEntities = [...availableEntities].sort(() => Math.random() - 0.5);
         // Sort entities by effective matchCount ascending to prioritize players with fewest games
-        const sortedEntities = [...availableEntities].sort((a, b) => a.matchCount - b.matchCount);
+        const sortedEntities = shuffledEntities.sort((a, b) => a.matchCount - b.matchCount);
         // Take a sufficient slice of lowest-count entities (up to 16) to guarantee fast exhaustive search
         const pool = sortedEntities.slice(0, Math.min(16, sortedEntities.length));
 
@@ -454,6 +467,22 @@ export default function EndlessModeManager({
             // Calculate Weighted Penalty Score for each generated pairing
             pairings.forEach(({ teamA, teamB }) => {
                 let penaltyScore = 0;
+
+                // Add a penalty for players who played recently to prevent back-to-back games
+                const maxMatchNo = Math.max(...apiMatches.map(m => m.match_no), 0);
+                let recentPlayPenalty = 0;
+                [...teamA, ...teamB].forEach(p => {
+                    const last = lastMatchPlayed.get(p.id) || -1;
+                    if (last > 0 && maxMatchNo > 0) {
+                        // If they played very recently, penalty is high
+                        const matchesAgo = maxMatchNo - last;
+                        if (matchesAgo === 0) recentPlayPenalty += 5000; // Just finished the LAST match
+                        else if (matchesAgo === 1) recentPlayPenalty += 2000;
+                        else if (matchesAgo === 2) recentPlayPenalty += 500;
+                    }
+                });
+                penaltyScore += recentPlayPenalty;
+
                 if (tournamentType === "double") {
                     // Partner Rotation (× 10,000)
                     const isFixedA = permanentTeams.some(t => t.players.some(p => p.id === teamA[0].id) && t.players.some(p => p.id === teamA[1].id));
@@ -464,6 +493,7 @@ export default function EndlessModeManager({
                     penaltyScore += (partnerHistA + partnerHistB) * 10000;
 
                     // Team Matchup Rotation (× 1,000)
+
                     const teamMatchupCount = getFaceoffCount(teamA.map(p => p.id), teamB.map(p => p.id));
                     penaltyScore += teamMatchupCount * 1000;
 
@@ -548,13 +578,14 @@ export default function EndlessModeManager({
                 document.getElementById("match-schedule")?.scrollIntoView({ behavior: "smooth" });
             }, 300);
         } catch (e: any) {
-            console.error(e);
-            Swal.fire({
+            await Swal.fire({
                 title: "ไม่สามารถสุ่มคู่ได้",
                 text: e.message || "เกิดข้อผิดพลาด",
                 icon: "warning",
                 confirmButtonColor: "#6366f1"
             });
+            setPreviewMatch(null);
+            refreshInfo();
         } finally {
             setDrawing(false);
         }

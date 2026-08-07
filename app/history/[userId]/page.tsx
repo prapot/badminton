@@ -8,6 +8,7 @@ import { StatsSummary } from "../components/StatsSummary";
 import { MatchHistoryList } from "../components/MatchHistoryList";
 import { HistoryAnalytics } from "../components/HistoryAnalytics";
 import { BestPartners } from "../components/BestPartners";
+import { Nemesis } from "../components/Nemesis";
 
 export default function HistoryPage({ params }: { params: Promise<{ userId: string }> }) {
     const { userId } = use(params);
@@ -28,6 +29,7 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
     } = useHistoryData(userId);
 
     const [activeTab, setActiveTab] = useState<'history' | 'analytics'>('history');
+    const [analyticsTab, setAnalyticsTab] = useState<'partners' | 'nemesis'>('partners');
 
     if (!user) return null;
 
@@ -50,7 +52,7 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
                     rankingStats={rankingStats}
                 />
 
-                {/* Tab Navigation */}
+                {/* Main Tab Navigation */}
                 <div className="flex gap-4 mb-6 border-b border-white/10">
                     <button 
                         onClick={() => setActiveTab('history')}
@@ -86,7 +88,28 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
                                 rankingStats={rankingStats}
                             />
                         )}
-                        <BestPartners userId={userId} selectedSeason={selectedSeason} />
+                        
+                        {/* Sub-tab Navigation for Partners / Nemesis */}
+                        <div className="flex gap-4 mt-8 mb-2 border-b border-white/10">
+                            <button 
+                                onClick={() => setAnalyticsTab('partners')}
+                                className={`pb-3 px-4 font-semibold text-sm transition-colors border-b-2 flex items-center gap-2 ${analyticsTab === 'partners' ? 'border-green-500 text-green-400' : 'border-transparent text-slate-400 hover:text-white'}`}
+                            >
+                                <span>🏆</span> คู่หูรู้ใจ
+                            </button>
+                            <button 
+                                onClick={() => setAnalyticsTab('nemesis')}
+                                className={`pb-3 px-4 font-semibold text-sm transition-colors border-b-2 flex items-center gap-2 ${analyticsTab === 'nemesis' ? 'border-red-500 text-red-400' : 'border-transparent text-slate-400 hover:text-white'}`}
+                            >
+                                <span>👿</span> คู่แค้น
+                            </button>
+                        </div>
+
+                        {analyticsTab === 'partners' ? (
+                            <BestPartners userId={userId} selectedSeason={selectedSeason} />
+                        ) : (
+                            <Nemesis userId={userId} selectedSeason={selectedSeason} />
+                        )}
                     </div>
                 )}
 

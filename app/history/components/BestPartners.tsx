@@ -37,7 +37,7 @@ export function BestPartners({ userId, selectedSeason }: BestPartnersProps) {
             setLoading(true);
             setError(null);
             try {
-                let url = `/api/analytics/partner/${userId}?page=${page}&limit=10`;
+                let url = `${STRAPI_BASE_URL}/api/match-histories/partner-analytics?userId=${userId}&pagination[page]=${page}&pagination[pageSize]=10`;
                 if (selectedSeason !== "all") {
                     url += `&seasonId=${selectedSeason}`;
                 }
@@ -82,7 +82,7 @@ export function BestPartners({ userId, selectedSeason }: BestPartnersProps) {
         return (
             <div className="bg-[#131e2b] rounded-2xl p-6 border border-white/5 shadow-xl mt-6">
                 <h3 className="text-xl font-bold text-white mb-4">🏆 คู่หูรู้ใจ (Best Partners)</h3>
-                <p className="text-slate-400 text-center py-6">ยังไม่มีข้อมูลการตีคู่มากกว่า 1 ครั้งในฤดูกาลนี้</p>
+                <p className="text-slate-400 text-center py-6">ยังไม่มีข้อมูลคู่หูในฤดูกาลนี้</p>
             </div>
         );
     }

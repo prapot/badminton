@@ -501,18 +501,18 @@ export default function EndlessModeManager({
                     const individualOpponentCount = getIndividualOpponentHistory(teamA.map(p => p.id), teamB.map(p => p.id));
                     penaltyScore += individualOpponentCount * 100;
 
-                    // Skill Balance (× 10)
+                    // Skill Balance (× 50)
                     const avgSkillA = teamA.reduce((s, p) => s + getSkillScore(p), 0) / teamA.length;
                     const avgSkillB = teamB.reduce((s, p) => s + getSkillScore(p), 0) / teamB.length;
                     const skillDiff = Math.abs(avgSkillA - avgSkillB);
-                    penaltyScore += skillDiff * 10;
+                    penaltyScore += skillDiff * 50;
                 } else {
                     // Single match (1v1)
                     const opponentCount = getFaceoffCount([teamA[0].id], [teamB[0].id]);
                     penaltyScore += opponentCount * 1000;
                     
                     const skillDiff = Math.abs(getSkillScore(teamA[0]) - getSkillScore(teamB[0]));
-                    penaltyScore += skillDiff * 10;
+                    penaltyScore += skillDiff * 50;
                 }
 
                 evaluatedMatchups.push({ teamA, teamB, penaltyScore });

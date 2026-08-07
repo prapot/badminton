@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/useAuth";
-import { MatchHistory, PaginationMeta, TargetUser, ApiSeason, RankingStats } from "../types";
+import { MatchHistory, PaginationMeta, TargetUser, ApiSeason, RankingStats, AnalyticsData } from "../types";
 
 const STRAPI_BASE_URL = process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
 
 export function useHistoryData(userId: string) {
     const { user, jwt } = useAuth();
-    
+
     const [targetUser, setTargetUser] = useState<TargetUser | null>(null);
     const [histories, setHistories] = useState<MatchHistory[]>([]);
     const [loading, setLoading] = useState(true);
@@ -16,6 +16,7 @@ export function useHistoryData(userId: string) {
     const [seasons, setSeasons] = useState<ApiSeason[]>([]);
     const [selectedSeason, setSelectedSeason] = useState<string>("all");
     const [rankingStats, setRankingStats] = useState<RankingStats | null>(null);
+    const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
 
     const fetchData = useCallback(async (pageNum: number = 1) => {
         if (!jwt) return;
@@ -31,31 +32,43 @@ export function useHistoryData(userId: string) {
                 setTargetUser(userData);
             }
 
-            // 2. Fetch match histories with pagination and seasonal filter
+            // 2. Fetch match histories (No season filter)
             let url = `${STRAPI_BASE_URL}/api/match-histories?filters[users][id]=${userId}&populate[matches][populate][team_a_id][populate][team_players][populate]=user_id&populate[matches][populate][team_b_id][populate][team_players][populate]=user_id&populate[matches][populate]=tournament_id&populate[ranking][populate]=season&sort=createdAt:desc&pagination[page]=${pageNum}&pagination[pageSize]=10`;
 
+            // 3. Fetch ranking stats for summary
+            let rankingUrl = `${STRAPI_BASE_URL}/api/rankings?filters[user_id][id]=${userId}`;
             if (selectedSeason !== "all") {
-                url += `&filters[ranking][season][documentId][$eq]=${selectedSeason}`;
+                rankingUrl += `&filters[season][documentId][$eq]=${selectedSeason}`;
+            } else {
+                rankingUrl += `&sort=createdAt:desc&pagination[pageSize]=1`;
             }
 
-            const historyRes = await fetch(url, { headers: { Authorization: `Bearer ${jwt}` } });
+            // 4. Fetch Analytics Data
+            let analyticsUrl = `${STRAPI_BASE_URL}/api/match-histories/analytics?userId=${userId}`;
+            if (selectedSeason !== "all") {
+                analyticsUrl += `&seasonId=${selectedSeason}`;
+            }
+
+            // Execute all fetches in parallel
+            const [historyRes, rankingRes, analyticsRes] = await Promise.all([
+                fetch(url, { headers: { Authorization: `Bearer ${jwt}` } }),
+                fetch(rankingUrl, { headers: { Authorization: `Bearer ${jwt}` } }),
+                fetch(analyticsUrl, { headers: { Authorization: `Bearer ${jwt}` } })
+            ]);
+
             if (!historyRes.ok) throw new Error("ไม่สามารถโหลดประวัติได้");
             const historyData = await historyRes.json();
             setHistories(historyData.data || []);
             setMeta(historyData.meta.pagination);
 
-            // 3. Fetch ranking stats for summary
-            let rankingUrl = `${STRAPI_BASE_URL}/api/rankings?filters[user_id][id]=${userId}`;
-            if (selectedSeason !== "all") {
-                rankingUrl += `&filters[season][documentId]=${selectedSeason}`;
-            } else {
-                rankingUrl += `&sort=createdAt:desc&pagination[pageSize]=1`;
-            }
-
-            const rankingRes = await fetch(rankingUrl, { headers: { Authorization: `Bearer ${jwt}` } });
             if (rankingRes.ok) {
                 const rData = await rankingRes.json();
                 setRankingStats(rData.data?.[0] || null);
+            }
+
+            if (analyticsRes.ok) {
+                const aData = await analyticsRes.json();
+                setAnalyticsData(aData.data || null);
             }
 
         } catch (e: any) {
@@ -71,7 +84,16 @@ export function useHistoryData(userId: string) {
             headers: { Authorization: `Bearer ${jwt}` }
         })
             .then(r => r.json())
-            .then(json => setSeasons(json.data || []));
+            .then(json => {
+                const data = json.data || [];
+                setSeasons(data);
+
+                // Default to the active season
+                const activeSeason = data.find((s: ApiSeason) => s.is_active);
+                if (activeSeason) {
+                    setSelectedSeason(activeSeason.documentId);
+                }
+            });
     }, [jwt]);
 
     useEffect(() => {
@@ -91,6 +113,7 @@ export function useHistoryData(userId: string) {
         seasons,
         selectedSeason,
         setSelectedSeason,
-        rankingStats
+        rankingStats,
+        analyticsData
     };
 }

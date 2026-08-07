@@ -65,3 +65,25 @@ export interface RankingStats {
     lose?: number;
     brave_points?: number;
 }
+
+export interface AnalyticsSummary {
+    date: string;
+    fullDate: string;
+    rp: number;
+    matchCount: number;
+}
+
+export interface AnalyticsDetails {
+    id: number;
+    documentId: string;
+    rp: number;
+    time: string;
+    is_win: boolean;
+    rp_change: number;
+    fullDate: string;
+}
+
+export interface AnalyticsData {
+    summary: AnalyticsSummary[];
+    details: Record<string, AnalyticsDetails[]>;
+}

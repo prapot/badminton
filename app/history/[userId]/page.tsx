@@ -6,6 +6,7 @@ import { useHistoryData } from "../hooks/useHistoryData";
 import { HistoryHeader } from "../components/HistoryHeader";
 import { StatsSummary } from "../components/StatsSummary";
 import { MatchHistoryList } from "../components/MatchHistoryList";
+import { HistoryAnalytics } from "../components/HistoryAnalytics";
 
 export default function HistoryPage({ params }: { params: Promise<{ userId: string }> }) {
     const { userId } = use(params);
@@ -21,7 +22,8 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
         rankingStats, 
         histories, 
         error, 
-        meta 
+        meta,
+        analyticsData 
     } = useHistoryData(userId);
 
     if (!user) return null;
@@ -44,6 +46,13 @@ export default function HistoryPage({ params }: { params: Promise<{ userId: stri
                     loading={loading}
                     rankingStats={rankingStats}
                 />
+
+                {!loading && (
+                    <HistoryAnalytics 
+                        analyticsData={analyticsData}
+                        rankingStats={rankingStats}
+                    />
+                )}
 
                 <MatchHistoryList 
                     histories={histories}

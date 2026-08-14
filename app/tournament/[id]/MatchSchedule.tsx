@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import Image from 'next/image';
 import { TournamentInfo, User, ApiMatch } from '../TournamentTypes';
 import { getRankInfoFromPoints } from '../TournamentUtils';
 import RankBadge from '../RankBadge';
+import { cn } from '@/lib/utils';
+import { cva } from 'class-variance-authority';
+import { ClipboardList, RefreshCw, XCircle, CheckCircle, Activity, Trophy, Play } from 'lucide-react';
 
 interface MatchScheduleProps {
     tournamentInfo: TournamentInfo;
@@ -16,6 +19,36 @@ interface MatchScheduleProps {
     setScoreB: (score: number) => void;
     STRAPI_BASE_URL: string;
 }
+
+const matchCardVariants = cva(
+    "group relative overflow-hidden border rounded-2xl transition-all duration-300",
+    {
+        variants: {
+            state: {
+                default: "bg-black/20 border-white/5 hover:bg-black/40 hover:-translate-y-0.5 hover:shadow-xl hover:border-white/10 cursor-pointer active:scale-[0.99]",
+                userInMatch: "bg-accent-yellow/5 border-accent-yellow ring-1 ring-accent-yellow/50 shadow-match-active hover:-translate-y-0.5 cursor-pointer active:scale-[0.99]",
+                cancelled: "bg-black/20 border-white/5 opacity-60 grayscale cursor-not-allowed",
+            }
+        },
+        defaultVariants: {
+            state: "default",
+        }
+    }
+);
+
+const statusBadgeVariants = cva(
+    "text-[10px] px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border",
+    {
+        variants: {
+            status: {
+                cancelled: "bg-red-500/10 text-red-400 border-red-500/20",
+                done: "bg-accent-green/20 text-accent-green border-accent-green/30 shadow-badge-green",
+                ongoing: "bg-accent-blue/20 text-accent-blue border-accent-blue/30 animate-pulse",
+                upcoming: "bg-white/5 text-slate-400 border-white/10"
+            }
+        }
+    }
+);
 
 const MatchSchedule: React.FC<MatchScheduleProps> = ({
     tournamentInfo,
@@ -34,32 +67,31 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
     if (tournamentInfo.tournament_status !== "ongoing" && tournamentInfo.tournament_status !== "completed") return null;
 
     return (
-        <div id="match-schedule" className="bg-gradient-to-br from-[#1a2535] to-[#0f1923] border border-white/10 rounded-3xl overflow-hidden shadow-2xl relative">
+        <div id="match-schedule" className="bg-gradient-to-br from-brand-dark to-brand-darker border border-white/10 rounded-3xl overflow-hidden shadow-2xl relative">
             {/* Background Decoration */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-[80px] pointer-events-none" />
+            <div className="absolute top-0 right-0 w-64 h-64 bg-accent-blue/5 rounded-full blur-[80px] pointer-events-none" />
 
-            <div className="px-4 py-3.5 border-b border-white/10 flex items-center justify-between gap-2 relative z-10 bg-white/5 flex-wrap">
-                <h2 className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 flex items-center gap-2 text-base cursor-default">
-                    <span className="p-1.5 bg-gradient-to-br from-[#3498db] to-[#2980b9] rounded-xl shadow-lg shadow-blue-900/20 text-white shrink-0">📋</span>
+            {/* Header: Glassmorphism */}
+            <div className="px-4 py-4 sm:px-6 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10 bg-white/5 backdrop-blur-md">
+                <h2 className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 flex items-center gap-2.5 text-base sm:text-lg cursor-default">
+                    <div className="p-2 bg-gradient-to-br from-accent-blue to-accent-blue-dark rounded-xl shadow-lg shadow-blue-900/20 text-white shrink-0">
+                        <ClipboardList size={18} strokeWidth={2.5} />
+                    </div>
                     ตารางแมตซ์
                 </h2>
-                <div className="flex items-center gap-2 ml-auto">
+                <div className="flex items-center gap-2 self-end sm:self-auto">
                     <button onClick={() => fetchMatches()}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-slate-300 text-xs font-semibold transition-all">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        <span className="hidden sm:inline">รีเฟรช</span>
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-slate-300 text-xs font-semibold transition-all">
+                        <RefreshCw size={14} />
+                        <span>รีเฟรช</span>
                     </button>
                     {tournamentInfo.tournament_status === "ongoing" && isOwner && (
                         <button
                             onClick={handleFinishTournament}
                             disabled={starting}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 active:scale-95 border border-orange-500/30 text-orange-400 text-xs font-bold transition-all disabled:opacity-50"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 active:scale-95 border border-orange-500/30 text-orange-400 text-xs font-bold transition-all disabled:opacity-50"
                         >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
+                            <Trophy size={14} />
                             <span>จบการแข่งขัน</span>
                         </button>
                     )}
@@ -67,24 +99,26 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
             </div>
 
             {apiMatches.length === 0 ? (
-                <div className="py-16 text-center text-slate-500 relative z-10">
-                    <p className="text-5xl mb-3 opacity-50">🏟️</p>
+                <div className="py-20 text-center text-slate-500 relative z-10 flex flex-col items-center gap-4">
+                    <div className="p-4 bg-white/5 rounded-full">
+                        <ClipboardList size={48} className="opacity-50" />
+                    </div>
                     <p className="text-sm font-medium">ยังไม่มีข้อมูลแมตซ์การแข่งขัน</p>
                 </div>
             ) : (
-                <div className="p-4 sm:p-6 space-y-6 relative z-10">
+                <div className="p-3 sm:p-6 space-y-8 relative z-10">
                     {/* Group by round */}
                     {Array.from(new Set(apiMatches.map(m => m.round))).map(round => (
-                        <div key={round} className="space-y-3">
-                            <div className="flex items-center gap-3">
+                        <div key={round} className="space-y-4">
+                            <div className="flex items-center gap-4">
                                 <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent flex-1" />
-                                <span className="px-3 text-xs font-bold text-slate-400 uppercase tracking-widest text-center">
+                                <span className="px-4 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-slate-400 uppercase tracking-widest text-center shadow-inner">
                                     แมตซ์ #{round}
                                 </span>
                                 <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent flex-1" />
                             </div>
 
-                            <div className="grid gap-3">
+                            <div className="grid gap-4">
                                 {apiMatches
                                     .filter(m => m.round === round)
                                     .sort((a, b) => {
@@ -109,45 +143,51 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                             match.team_b_id?.team_players.some(tp => tp.user_id?.id === user.id)
                                         );
 
+                                        const matchState = match.match_status === "cancelled" ? "cancelled" : (isUserInMatch ? "userInMatch" : "default");
+
                                         return (
                                             <div key={match.id}
-                                                className={`group relative overflow-hidden ${isUserInMatch ? 'bg-yellow-500/5 border-yellow-400 ring-1 ring-yellow-400/50 shadow-[0_0_15px_rgba(250,204,21,0.15)]' : 'bg-black/20 border-white/5'} border rounded-2xl transition-all duration-300 ${match.match_status !== "cancelled" ? `hover:bg-black/40 hover:-translate-y-0.5 hover:shadow-xl cursor-pointer active:scale-[0.99] ${!isUserInMatch ? 'hover:border-white/10' : ''}` : ""} ${match.match_status === "cancelled" ? "opacity-60 grayscale" : ""}`}
+                                                className={matchCardVariants({ state: matchState })}
                                                 onClick={() => {
-                                                    if (match.match_status === "cancelled") return;
+                                                    if (match.match_status === "cancelled" || match.match_status === "done") return;
                                                     setScoreEditing(match);
                                                     setScoreA(match.score_a ?? 0);
                                                     setScoreB(match.score_b ?? 0);
                                                 }}>
 
                                                 {/* Top info row: match no + status badge */}
-                                                <div className="flex items-center justify-between px-4 pt-3 pb-0">
-                                                    <span className="text-[10px] font-bold text-slate-500 bg-white/5 border border-white/10 px-2 py-0.5 rounded-md">
-                                                        แมตซ์ #{match.match_no}
+                                                <div className="flex items-center justify-between px-3 pt-3 pb-2 sm:px-5 sm:pt-4 border-b border-white/5 bg-black/10">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                        MATCH #{match.match_no}
                                                     </span>
                                                     <div>
                                                         {match.match_status === "cancelled" ? (
-                                                            <span className="text-[10px] px-2.5 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-bold flex items-center gap-1">
-                                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                                                            <div className={statusBadgeVariants({ status: "cancelled" })}>
+                                                                <XCircle size={12} strokeWidth={2.5} />
                                                                 ยกเลิกแล้ว
-                                                            </span>
+                                                            </div>
                                                         ) : isCompleted ? (
-                                                            <span className="text-[10px] px-2.5 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 font-bold shadow-[0_0_10px_rgba(46,204,113,0.15)] flex items-center gap-1">
-                                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                            <div className={statusBadgeVariants({ status: "done" })}>
+                                                                <CheckCircle size={12} strokeWidth={3} />
                                                                 จบแล้ว
-                                                            </span>
+                                                            </div>
                                                         ) : tournamentInfo.tournament_status === "ongoing" ? (
-                                                            <span className="text-[10px] px-2.5 py-1 rounded-full bg-[#3498db]/20 text-[#3498db] border border-[#3498db]/30 font-bold animate-pulse flex items-center gap-1">
-                                                                <div className="w-1.5 h-1.5 rounded-full bg-[#3498db]" />
-                                                                อยู่ระหว่าง
-                                                            </span>
-                                                        ) : null}
+                                                            <div className={statusBadgeVariants({ status: "ongoing" })}>
+                                                                <Activity size={12} />
+                                                                กำลังแข่ง
+                                                            </div>
+                                                        ) : (
+                                                            <div className={statusBadgeVariants({ status: "upcoming" })}>
+                                                                รอแข่ง
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
 
-                                                <div className="mt-2 flex items-center justify-between gap-1.5 sm:gap-4 px-3 sm:px-4 pb-3 sm:pb-4">
+                                                <div className="flex flex-row items-center justify-between gap-16 sm:gap-4 px-2 py-3 sm:px-5 sm:py-5 relative">
                                                     {/* Team A */}
-                                                    <div className={`flex-1 min-w-0 transition-colors ${winnerA ? "text-green-400" : isCompleted && !winnerA ? "text-slate-500" : "text-white"}`}>
-                                                        <div className="flex flex-col gap-2 sm:gap-3 justify-center h-full">
+                                                    <div className={cn("flex-1 min-w-0 transition-colors", winnerA ? "text-accent-green" : (isCompleted && !winnerA ? "text-slate-500" : "text-white"))}>
+                                                        <div className="flex flex-col gap-3 justify-center h-full">
                                                             {match.team_a_id?.team_players.map((tp, idx) => {
                                                                 const u = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
                                                                 if (!u) return null;
@@ -155,35 +195,38 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                 const rp_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.rp_change;
                                                                 return (
                                                                     <div key={idx} className="flex items-center justify-end gap-2 sm:gap-3 relative">
-                                                                        <div className="flex flex-col items-end min-w-0 flex-1">
-                                                                            <div className="flex items-center justify-end gap-1.5 mb-1">
-                                                                                {winnerA && idx === 0 && <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded-md">Winner</span>}
-                                                                                <p className="font-bold text-xs sm:text-sm truncate text-white">{u.username}</p>
+                                                                        <div className="flex flex-col items-end justify-center min-w-0 shrink">
+                                                                            <div className="flex items-center justify-end gap-1.5 sm:gap-2 mb-1">
+                                                                                {winnerA && idx === 0 && <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-wider text-accent-green bg-accent-green/10 px-1 py-0.5 rounded-md">Win</span>}
+                                                                                <p className="font-bold text-xs sm:text-sm truncate text-white text-right">{u.username}</p>
                                                                             </div>
                                                                             {/* Stats - ranking mode only */}
                                                                             {tournamentInfo.mode === "ranking" && (
-                                                                                <div className="flex items-center gap-2 bg-black/30 px-2 py-1 rounded-lg border border-white/5">
-                                                                                    <RankBadge
-                                                                                        rank={u.rankings?.[0]?.rank}
-                                                                                        stars={u.rankings?.[0]?.stars}
-                                                                                        size="sm"
-                                                                                        showName={true}
-                                                                                    />
+                                                                                <div className="flex flex-wrap items-center justify-end gap-1.5 mt-0.5">
+                                                                                    <RankBadge rank={u.rankings?.[0]?.rank} stars={u.rankings?.[0]?.stars} size="sm" showName={true} />
+                                                                                    {rp_change !== undefined && (
+                                                                                        <span className={cn(
+                                                                                            "text-[10px] font-bold px-1.5 py-0.5 rounded border",
+                                                                                            rp_change > 0 ? "bg-accent-green/10 border-accent-green/30 text-accent-green" 
+                                                                                            : rp_change < 0 ? "bg-red-500/10 border-red-500/30 text-red-400" 
+                                                                                            : "bg-slate-500/10 border-slate-500/30 text-slate-400"
+                                                                                        )}>
+                                                                                            {rp_change > 0 ? "+" : rp_change < 0 ? "-" : "+"}{Math.abs(Math.floor(rp_change / 100))}
+                                                                                        </span>
+                                                                                    )}
                                                                                 </div>
                                                                             )}
                                                                         </div>
                                                                         <div className="relative flex items-center shrink-0">
-                                                                            <div className={`w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner ${match.first_serve === "A" && idx === 0 ? "border-[#2ecc71] shadow-[0_0_20px_rgba(46,204,113,0.5)] scale-105" : "border-slate-700/50"}`}>
-                                                                                {pUrl ? <Image src={pUrl} alt={u.username} width={32} height={32} className="w-full h-full object-cover" /> : <span className="text-[10px] sm:text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                                                            <div className={cn(
+                                                                                "w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner",
+                                                                                match.first_serve === "A" && idx === 0 ? "border-accent-green shadow-bounce-green scale-105" : "border-slate-700/50"
+                                                                            )}>
+                                                                                {pUrl ? <Image src={pUrl} alt={u.username} width={48} height={48} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                                                             </div>
                                                                             {match.first_serve === "A" && idx === 0 && (
-                                                                                <div className="absolute -right-6 z-30 w-7 h-7 bg-[#2ecc71] rounded-full border-2 border-[#1a2535] flex items-center justify-center shadow-[0_0_15px_rgba(46,204,113,0.8)] animate-bounce-subtle">
-                                                                                    <span className="text-[14px] filter drop-shadow-md">🏸</span>
-                                                                                </div>
-                                                                            )}
-                                                                            {rp_change !== undefined && (
-                                                                                <div className={`absolute -bottom-3 sm:-bottom-4 left-1/2 -translate-x-1/2 z-20 px-2 sm:px-3 py-0.5 rounded-full text-[8px] sm:text-[9px] font-black border shadow-lg whitespace-nowrap ${rp_change > 0 ? "bg-[#0f2a1a] border-green-500 text-green-400 shadow-green-900/40" : rp_change < 0 ? "bg-[#2a0f0f] border-red-500 text-red-400 shadow-red-900/40" : "bg-slate-800 border-slate-500 text-slate-300 shadow-black/40"}`}>
-                                                                                    {rp_change > 0 ? "+" : rp_change < 0 ? "-" : "+"}{Math.abs(Math.floor(rp_change / 100))} ⭐
+                                                                                <div className="absolute -top-1.5 -right-1.5 z-30 w-5 h-5 bg-accent-green rounded-full border-2 border-brand-dark shadow-[0_0_8px_rgba(46,204,113,0.8)] animate-pulse flex items-center justify-center" title="First Serve">
+                                                                                    <span className="text-[10px]">🏸</span>
                                                                                 </div>
                                                                             )}
                                                                             {(() => {
@@ -193,9 +236,8 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                     const potentialRank = getRankInfoFromPoints(currentRp + 100);
                                                                                     if (potentialRank.weight > currentRank.weight) {
                                                                                         return (
-                                                                                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-yellow-400 to-amber-600 text-white text-[7px] sm:text-[8px] font-black px-1.5 py-0.5 rounded-md shadow-xl border border-white/20 animate-pulse whitespace-nowrap">
-                                                                                                RANK UP!
-                                                                                                <div className="absolute -inset-1 bg-yellow-400/20 blur-md rounded-full -z-10 animate-pulse" />
+                                                                                            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-accent-yellow to-orange-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xl border border-white/20 whitespace-nowrap">
+                                                                                                RANK UP
                                                                                             </div>
                                                                                         );
                                                                                     }
@@ -213,29 +255,30 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                     </div>
 
                                                     {/* Score / VS */}
-                                                    <div className="shrink-0 flex flex-col items-center justify-center self-stretch">
+                                                    <div className="absolute sm:relative left-1/2 sm:left-auto top-1/2 sm:top-auto -translate-x-1/2 sm:translate-x-0 -translate-y-1/2 sm:translate-y-0 z-10 shrink-0 flex flex-col items-center justify-center">
                                                         {isCompleted ? (
-                                                            <div className="flex items-center gap-1.5 sm:gap-3 bg-[#0f1923] px-2.5 sm:px-4 py-1.5 sm:py-3 rounded-xl sm:rounded-2xl border border-white/10 shadow-inner">
-                                                                <span className={`text-lg sm:text-3xl font-black ${winnerA ? "text-green-400" : "text-white"}`}>{match.score_a}</span>
-                                                                <div className="flex flex-col items-center gap-0.5">
-                                                                    <div className="w-px h-1.5 sm:h-2 bg-white/10" />
-                                                                    <span className="text-[8px] sm:text-[10px] font-bold text-slate-600">VS</span>
-                                                                    <div className="w-px h-1.5 sm:h-2 bg-white/10" />
+                                                            <div className="flex items-center gap-1.5 sm:gap-4 bg-black/40 px-2 py-1 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-2xl border border-white/5 shadow-inner">
+                                                                <span className={cn("text-base sm:text-3xl font-black tabular-nums", winnerA ? "text-accent-green" : "text-white")}>{match.score_a}</span>
+                                                                <div className="flex flex-col items-center gap-0.5 sm:gap-1 opacity-50">
+                                                                    <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-white/40" />
+                                                                    <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-white/40" />
                                                                 </div>
-                                                                <span className={`text-lg sm:text-3xl font-black ${winnerB ? "text-green-400" : "text-white"}`}>{match.score_b}</span>
+                                                                <span className={cn("text-base sm:text-3xl font-black tabular-nums", winnerB ? "text-accent-green" : "text-white")}>{match.score_b}</span>
                                                             </div>
                                                         ) : (
                                                             <div className="flex flex-col items-center gap-1">
-                                                                <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center relative">
-                                                                    <span className="text-[8px] sm:text-xs font-black text-slate-500">VS</span>
-                                                                    <div className="absolute inset-0 rounded-full border border-[#3498db]/30 animate-ping opacity-20" />
+                                                                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center relative backdrop-blur-md">
+                                                                    <span className="text-[10px] font-black text-slate-400">VS</span>
+                                                                    {tournamentInfo.tournament_status === "ongoing" && (
+                                                                        <div className="absolute inset-0 rounded-full border border-accent-blue/30 animate-ping opacity-30" />
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         )}
                                                     </div>
 
                                                     {/* Team B */}
-                                                    <div className={`flex-1 min-w-0 transition-colors ${winnerB ? "text-green-400" : isCompleted && !winnerB ? "text-slate-500" : "text-white"}`}>
+                                                    <div className={cn("flex-1 min-w-0 transition-colors", winnerB ? "text-accent-green" : (isCompleted && !winnerB ? "text-slate-500" : "text-white"))}>
                                                         <div className="flex flex-col gap-3 justify-center h-full">
                                                             {match.team_b_id ? (
                                                                 <>
@@ -247,17 +290,15 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                         return (
                                                                             <div key={idx} className="flex items-center justify-start gap-2 sm:gap-3 relative">
                                                                                 <div className="relative flex items-center shrink-0">
-                                                                                    <div className={`w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner ${match.first_serve === "B" && idx === 0 ? "border-[#2ecc71] shadow-[0_0_20px_rgba(46,204,113,0.5)] scale-105" : "border-slate-700/50"}`}>
-                                                                                        {pUrl ? <Image src={pUrl} alt={u.username} width={32} height={32} className="w-full h-full object-cover" /> : <span className="text-[10px] sm:text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                                                                    <div className={cn(
+                                                                                        "w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner",
+                                                                                        match.first_serve === "B" && idx === 0 ? "border-accent-green shadow-bounce-green scale-105" : "border-slate-700/50"
+                                                                                    )}>
+                                                                                        {pUrl ? <Image src={pUrl} alt={u.username} width={48} height={48} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                                                                     </div>
                                                                                     {match.first_serve === "B" && idx === 0 && (
-                                                                                        <div className="absolute -left-6 z-30 w-7 h-7 bg-[#2ecc71] rounded-full border-2 border-[#1a2535] flex items-center justify-center shadow-[0_0_15px_rgba(46,204,113,0.8)] animate-bounce-subtle">
-                                                                                            <span className="text-[14px] filter drop-shadow-md">🏸</span>
-                                                                                        </div>
-                                                                                    )}
-                                                                                    {rp_change !== undefined && (
-                                                                                        <div className={`absolute -bottom-3 sm:-bottom-4 left-1/2 -translate-x-1/2 z-20 px-2 sm:px-3 py-0.5 rounded-full text-[8px] sm:text-[9px] font-black border shadow-lg whitespace-nowrap ${rp_change > 0 ? "bg-[#0f2a1a] border-green-500 text-green-400 shadow-green-900/40" : rp_change < 0 ? "bg-[#2a0f0f] border-red-500 text-red-400 shadow-red-900/40" : "bg-slate-800 border-slate-500 text-slate-300 shadow-black/40"}`}>
-                                                                                            {rp_change > 0 ? "+" : rp_change < 0 ? "-" : "+"}{Math.abs(Math.floor(rp_change / 100))} ⭐
+                                                                                        <div className="absolute -top-1.5 -right-1.5 z-30 w-5 h-5 bg-accent-green rounded-full border-2 border-brand-dark shadow-[0_0_8px_rgba(46,204,113,0.8)] animate-pulse flex items-center justify-center" title="First Serve">
+                                                                                            <span className="text-[10px]">🏸</span>
                                                                                         </div>
                                                                                     )}
                                                                                     {(() => {
@@ -267,9 +308,8 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                             const potentialRank = getRankInfoFromPoints(currentRp + 100);
                                                                                             if (potentialRank.weight > currentRank.weight) {
                                                                                                 return (
-                                                                                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-yellow-400 to-amber-600 text-white text-[7px] sm:text-[8px] font-black px-1.5 py-0.5 rounded-md shadow-xl border border-white/20 animate-pulse whitespace-nowrap">
-                                                                                                        RANK UP!
-                                                                                                        <div className="absolute -inset-1 bg-yellow-400/20 blur-md rounded-full -z-10 animate-pulse" />
+                                                                                                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-accent-yellow to-orange-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xl border border-white/20 whitespace-nowrap">
+                                                                                                        RANK UP
                                                                                                     </div>
                                                                                                 );
                                                                                             }
@@ -277,20 +317,25 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                         return null;
                                                                                     })()}
                                                                                 </div>
-                                                                                <div className="flex flex-col items-start min-w-0 flex-1">
-                                                                                    <div className="flex items-center justify-start gap-1.5 mb-1">
+                                                                                <div className="flex flex-col items-start justify-center min-w-0 shrink">
+                                                                                    <div className="flex items-center justify-start gap-1.5 sm:gap-2 mb-1">
                                                                                         <p className="font-bold text-xs sm:text-sm truncate text-white">{u.username}</p>
-                                                                                        {winnerB && idx === 0 && <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-wider text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded-md">Winner</span>}
+                                                                                        {winnerB && idx === 0 && <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-wider text-accent-green bg-accent-green/10 px-1 py-0.5 rounded-md">Win</span>}
                                                                                     </div>
                                                                                     {/* Stats - ranking mode only */}
                                                                                     {tournamentInfo.mode === "ranking" && (
-                                                                                        <div className="flex items-center gap-2 bg-black/30 px-2 py-1 rounded-lg border border-white/5">
-                                                                                            <RankBadge
-                                                                                                rank={u.rankings?.[0]?.rank}
-                                                                                                stars={u.rankings?.[0]?.stars}
-                                                                                                size="sm"
-                                                                                                showName={true}
-                                                                                            />
+                                                                                        <div className="flex flex-wrap items-center justify-start gap-1.5 mt-0.5">
+                                                                                            <RankBadge rank={u.rankings?.[0]?.rank} stars={u.rankings?.[0]?.stars} size="sm" showName={true} />
+                                                                                            {rp_change !== undefined && (
+                                                                                                <span className={cn(
+                                                                                                    "text-[10px] font-bold px-1.5 py-0.5 rounded border",
+                                                                                                    rp_change > 0 ? "bg-accent-green/10 border-accent-green/30 text-accent-green" 
+                                                                                                    : rp_change < 0 ? "bg-red-500/10 border-red-500/30 text-red-400" 
+                                                                                                    : "bg-slate-500/10 border-slate-500/30 text-slate-400"
+                                                                                                )}>
+                                                                                                    {rp_change > 0 ? "+" : rp_change < 0 ? "-" : "+"}{Math.abs(Math.floor(rp_change / 100))}
+                                                                                                </span>
+                                                                                            )}
                                                                                         </div>
                                                                                     )}
                                                                                 </div>
@@ -299,9 +344,9 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                     })}
                                                                 </>
                                                             ) : (
-                                                                <div className="flex flex-col items-start gap-1">
-                                                                    <span className="text-xl sm:text-2xl">💤</span>
-                                                                    <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest">พักรอบพักผ่อน</p>
+                                                                <div className="flex flex-col items-start gap-1 p-3 sm:p-4 bg-white/5 rounded-xl border border-white/5 border-dashed">
+                                                                    <Play className="text-slate-500" size={14} />
+                                                                    <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">รอบบาย / พัก</p>
                                                                 </div>
                                                             )}
                                                         </div>

@@ -10,6 +10,23 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  
+  /* Brand Tokens */
+  --color-brand-dark: #1a2535;
+  --color-brand-darker: #0f1923;
+  --color-brand-surface: #1a2236;
+  
+  /* Semantic Accents */
+  --color-accent-blue: #3498db;
+  --color-accent-blue-dark: #2980b9;
+  --color-accent-green: #2ecc71;
+  --color-accent-green-dark: #27ae60;
+  --color-accent-yellow: #f1c40f;
+  
+  /* Glowing / Shadows */
+  --shadow-match-active: 0 0 15px rgba(250, 204, 21, 0.15);
+  --shadow-badge-green: 0 0 10px rgba(46, 204, 113, 0.15);
+  --shadow-bounce-green: 0 0 15px rgba(46, 204, 113, 0.8);
 }
 
 @media (prefers-color-scheme: dark) {

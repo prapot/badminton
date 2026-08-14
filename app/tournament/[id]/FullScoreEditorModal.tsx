@@ -1,5 +1,6 @@
 import { ApiMatch, TournamentInfo } from "../TournamentTypes";
 import Swal from "sweetalert2";
+import Image from 'next/image';
 
 interface FullScoreEditorModalProps {
     match: ApiMatch;
@@ -86,7 +87,7 @@ export default function FullScoreEditorModal({
                                 return (
                                     <div key={idx} className="flex items-center gap-3 bg-white/5 p-3 rounded-2xl border border-white/5 hover:border-white/10 transition-all">
                                         <div className="w-12 h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 border-[#2ecc71]/30 flex items-center justify-center shadow-lg">
-                                            {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                            {pUrl ? <Image src={pUrl} alt={u.username} width={32} height={32} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                         </div>
                                         <div className="min-w-0">
                                             <p className="font-bold text-sm text-white truncate">{u.username}</p>
@@ -141,7 +142,7 @@ export default function FullScoreEditorModal({
                                 return (
                                     <div key={idx} className="flex items-center gap-3 bg-white/5 p-3 rounded-2xl border border-white/5 hover:border-white/10 transition-all">
                                         <div className="w-12 h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 border-[#3498db]/30 flex items-center justify-center shadow-lg">
-                                            {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                            {pUrl ? <Image src={pUrl} alt={u.username} width={32} height={32} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                         </div>
                                         <div className="min-w-0">
                                             <p className="font-bold text-sm text-white truncate">{u.username}</p>

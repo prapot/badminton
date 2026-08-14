@@ -1,20 +1,25 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { useAuth } from "@/lib/useAuth";
 import { ListTournament, TournamentStatus, PaginationMeta } from "@/app/tournament/TournamentTypes";
 
 const STRAPI_BASE_URL = process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
 
+const fetcher = async ([url, token]: [string, string]) => {
+    const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+};
+
 export function useTournamentList() {
     const { user, jwt } = useAuth();
 
     const [filter, setFilter] = useState<"all" | TournamentStatus>("all");
-    const [tournaments, setTournaments] = useState<ListTournament[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [joiningId, setJoiningId] = useState<string | null>(null);
     const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
     const [page, setPage] = useState(1);
-    const [meta, setMeta] = useState<PaginationMeta | null>(null);
     const [search, setSearch] = useState("");
 
     const showToast = (msg: string, type: "success" | "error" = "success") => {
@@ -22,49 +27,40 @@ export function useTournamentList() {
         setTimeout(() => setToast(null), 3500);
     };
 
-    const fetchTournaments = async (pageNum: number = 1, currentFilter: string = filter) => {
-        if (!jwt || !user) return;
-        setLoading(true);
-        try {
-            const filterQuery = currentFilter !== "all" ? `&filters[tournament_status][$eq]=${currentFilter}` : "";
-            const searchQuery = search ? `&filters[name][$containsi]=${search}` : "";
-            const res = await fetch(
-                `${STRAPI_BASE_URL}/api/tournaments?populate[tournament_players][populate]=user&populate[user_created][populate]=picture&sort=createdAt:desc&pagination[page]=${pageNum}&pagination[pageSize]=10&pagination[withCount]=true${filterQuery}${searchQuery}`,
-                { headers: { Authorization: `Bearer ${jwt}` } }
-            );
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const json = await res.json();
-            setMeta(json.meta.pagination);
+    const filterQuery = filter !== "all" ? `&filters[tournament_status][$eq]=${filter}` : "";
+    const searchQuery = search ? `&filters[name][$containsi]=${search}` : "";
+    const url = `${STRAPI_BASE_URL}/api/tournaments?populate[tournament_players][populate]=user&populate[user_created][populate]=picture&sort=createdAt:desc&pagination[page]=${page}&pagination[pageSize]=10&pagination[withCount]=true${filterQuery}${searchQuery}`;
 
-            const items: ListTournament[] = (json.data ?? []).map((item: any) => {
-                const players = item.tournament_players ?? [];
-                return {
-                    id: item.id,
-                    documentId: item.documentId,
-                    name: item.name ?? "",
-                    type: item.type ?? "single",
-                    format: item.format ?? "endless_mode",
-                    tournament_status: item.tournament_status ?? "upcoming",
-                    startDate: item.startDate ?? "",
-                    createdAt: item.createdAt ?? "",
-                    playerCount: players.length,
-                    isJoined: players.some((p: any) => p.user?.id === user.id),
-                    mode: item.mode ?? "ranking",
-                    user_created: item.user_created,
-                };
-            });
-            setTournaments(items);
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : "โหลดไม่สำเร็จ");
-        } finally {
-            setLoading(false);
+    const { data, error, mutate, isLoading, isValidating } = useSWR(
+        (jwt && user) ? [url, jwt] : null,
+        fetcher,
+        {
+            revalidateOnFocus: true,
+            dedupingInterval: 5000,
         }
-    };
+    );
 
-    useEffect(() => {
-        fetchTournaments(page, filter);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [jwt, page, filter]);
+    const meta: PaginationMeta | null = data?.meta?.pagination ?? null;
+
+    const tournaments: ListTournament[] = (data?.data ?? []).map((item: any) => {
+        const players = item.tournament_players ?? [];
+        return {
+            id: item.id,
+            documentId: item.documentId,
+            name: item.name ?? "",
+            type: item.type ?? "single",
+            format: item.format ?? "endless_mode",
+            tournament_status: item.tournament_status ?? "upcoming",
+            startDate: item.startDate ?? "",
+            createdAt: item.createdAt ?? "",
+            playerCount: players.length,
+            isJoined: players.some((p: any) => p.user?.id === user?.id),
+            mode: item.mode ?? "ranking",
+            user_created: item.user_created,
+        };
+    });
+
+    const loading = isLoading || (!data && !error && !!jwt);
 
     const handleJoin = async (tournamentId: string, isJoined: boolean) => {
         if (!jwt || !user) return;
@@ -100,7 +96,7 @@ export function useTournamentList() {
                 }
                 return;
             }
-            await fetchTournaments(page, filter);
+            await mutate(); // Re-fetch SWR data
             showToast("เข้าร่วมรายการสำเร็จแล้ว! 🏈", "success");
         } catch (e: unknown) {
             showToast(e instanceof Error ? e.message : "เข้าร่วมไม่สำเร็จ", "error");
@@ -115,7 +111,7 @@ export function useTournamentList() {
         setFilter,
         tournaments,
         loading,
-        error,
+        error: error ? error.message : null,
         joiningId,
         toast,
         page,
@@ -123,7 +119,7 @@ export function useTournamentList() {
         meta,
         search,
         setSearch,
-        fetchTournaments,
+        fetchTournaments: mutate,
         handleJoin
     };
 }

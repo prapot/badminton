@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import Image from 'next/image';
 import { TournamentInfo, User, ApiMatch } from '../TournamentTypes';
 import { getRankInfoFromPoints } from '../TournamentUtils';
 import RankBadge from '../RankBadge';
@@ -173,7 +174,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                         </div>
                                                                         <div className="relative flex items-center shrink-0">
                                                                             <div className={`w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner ${match.first_serve === "A" && idx === 0 ? "border-[#2ecc71] shadow-[0_0_20px_rgba(46,204,113,0.5)] scale-105" : "border-slate-700/50"}`}>
-                                                                                {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-[10px] sm:text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                                                                {pUrl ? <Image src={pUrl} alt={u.username} width={32} height={32} className="w-full h-full object-cover" /> : <span className="text-[10px] sm:text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                                                             </div>
                                                                             {match.first_serve === "A" && idx === 0 && (
                                                                                 <div className="absolute -right-6 z-30 w-7 h-7 bg-[#2ecc71] rounded-full border-2 border-[#1a2535] flex items-center justify-center shadow-[0_0_15px_rgba(46,204,113,0.8)] animate-bounce-subtle">
@@ -247,7 +248,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                             <div key={idx} className="flex items-center justify-start gap-2 sm:gap-3 relative">
                                                                                 <div className="relative flex items-center shrink-0">
                                                                                     <div className={`w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner ${match.first_serve === "B" && idx === 0 ? "border-[#2ecc71] shadow-[0_0_20px_rgba(46,204,113,0.5)] scale-105" : "border-slate-700/50"}`}>
-                                                                                        {pUrl ? <img src={pUrl} alt={u.username} className="w-full h-full object-cover" /> : <span className="text-[10px] sm:text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                                                                        {pUrl ? <Image src={pUrl} alt={u.username} width={32} height={32} className="w-full h-full object-cover" /> : <span className="text-[10px] sm:text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                                                                     </div>
                                                                                     {match.first_serve === "B" && idx === 0 && (
                                                                                         <div className="absolute -left-6 z-30 w-7 h-7 bg-[#2ecc71] rounded-full border-2 border-[#1a2535] flex items-center justify-center shadow-[0_0_15px_rgba(46,204,113,0.8)] animate-bounce-subtle">

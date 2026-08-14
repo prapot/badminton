@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/useAuth';
+import Image from 'next/image';
 
 interface BestPartnerData {
     partnerId: number;
@@ -115,9 +116,11 @@ export function BestPartners({ userId, selectedSeason }: BestPartnersProps) {
                             
                             <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-[#2ecc71] to-[#27ae60] flex items-center justify-center text-white font-bold text-base shrink-0 overflow-hidden border-2 border-[#131e2b] shadow-md">
                                 {partner.picture ? (
-                                    <img 
+                                    <Image 
                                         src={partner.picture.startsWith("http") ? partner.picture : `${STRAPI_BASE_URL}${partner.picture}`} 
                                         alt={partner.username} 
+                                        width={48}
+                                        height={48}
                                         className="w-full h-full object-cover" 
                                     />
                                 ) : (

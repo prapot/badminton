@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import { TournamentInfo, User, DrawnPair } from '../TournamentTypes';
 import { lcm, getPartnerRepeats } from '../TournamentUtils';
 
@@ -177,7 +178,7 @@ const DrawSection: React.FC<DrawSectionProps> = ({
                                                         return (
                                                             <div key={`${p.id}-${pIdx}`} className="flex items-center gap-2 min-w-0">
                                                                 <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold text-[10px] sm:text-xs shrink-0 overflow-hidden border border-green-500/20 shadow-sm relative">
-                                                                    {pUrl ? <img src={pUrl} alt={p.username} className="w-full h-full object-cover" /> : p.username.charAt(0).toUpperCase()}
+                                                                    {pUrl ? <Image src={pUrl} alt={p.username} width={24} height={24} className="w-full h-full object-cover" /> : p.username.charAt(0).toUpperCase()}
                                                                 </div>
                                                                 <div className="min-w-0">
                                                                     <p className="text-xs sm:text-sm font-semibold text-white truncate">{p.username}</p>
@@ -222,7 +223,7 @@ const DrawSection: React.FC<DrawSectionProps> = ({
                                                                             {p.id === user?.id && <span className="text-[9px] text-green-400 font-bold">คุณ</span>}
                                                                         </div>
                                                                         <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold text-[10px] sm:text-xs shrink-0 overflow-hidden border border-purple-500/20 shadow-sm">
-                                                                            {pUrl ? <img src={pUrl} alt={p.username} className="w-full h-full object-cover" /> : p.username.charAt(0).toUpperCase()}
+                                                                            {pUrl ? <Image src={pUrl} alt={p.username} width={24} height={24} className="w-full h-full object-cover" /> : p.username.charAt(0).toUpperCase()}
                                                                         </div>
                                                                     </div>
                                                                 );

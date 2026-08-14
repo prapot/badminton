@@ -19,7 +19,8 @@
     "react-router-dom": "^6.30.3",
     "recharts": "^3.10.1",
     "styled-components": "^6.4.1",
-    "sweetalert2": "^11.26.20"
+    "sweetalert2": "^11.26.20",
+    "swr": "^2.5.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

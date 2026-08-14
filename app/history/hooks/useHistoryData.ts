@@ -1,109 +1,88 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
+import useSWR from "swr";
 import { useAuth } from "@/lib/useAuth";
 import { MatchHistory, PaginationMeta, TargetUser, ApiSeason, RankingStats, AnalyticsData } from "../types";
 
 const STRAPI_BASE_URL = process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
 
+const fetcher = async ([url, token]: [string, string]) => {
+    const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+};
+
 export function useHistoryData(userId: string) {
     const { user, jwt } = useAuth();
-
-    const [targetUser, setTargetUser] = useState<TargetUser | null>(null);
-    const [histories, setHistories] = useState<MatchHistory[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [page, setPage] = useState(1);
-    const [meta, setMeta] = useState<PaginationMeta | null>(null);
-    const [seasons, setSeasons] = useState<ApiSeason[]>([]);
     const [selectedSeason, setSelectedSeason] = useState<string>("all");
-    const [rankingStats, setRankingStats] = useState<RankingStats | null>(null);
-    const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
 
-    const fetchData = useCallback(async (pageNum: number = 1) => {
-        if (!jwt) return;
-        setLoading(true);
-        try {
-            // 1. Fetch target user info (only once)
-            if (!targetUser) {
-                const userRes = await fetch(`${STRAPI_BASE_URL}/api/users/${userId}?populate=picture`, {
-                    headers: { Authorization: `Bearer ${jwt}` }
-                });
-                if (!userRes.ok) throw new Error("ไม่พบข้อมูลผู้ใช้");
-                const userData = await userRes.json();
-                setTargetUser(userData);
+    // 1. Fetch Seasons
+    const { data: seasonsJson, isLoading: seasonsLoading } = useSWR(
+        jwt ? [`${STRAPI_BASE_URL}/api/seasons?sort=createdAt:desc`, jwt] : null,
+        fetcher,
+        { revalidateOnFocus: false }
+    );
+    const seasons: ApiSeason[] = seasonsJson?.data ?? [];
+
+    // Default season
+    useEffect(() => {
+        if (seasons.length > 0 && selectedSeason === "all") {
+            const activeSeason = seasons.find((s) => s.is_active);
+            if (activeSeason) {
+                // Keep "all" or set it to active season depending on logic
+                // But in original code, it sets it to activeSeason initially:
+                setSelectedSeason(activeSeason.documentId);
             }
-
-            // 2. Fetch match histories (No season filter)
-            let url = `${STRAPI_BASE_URL}/api/match-histories?filters[users][id]=${userId}&populate[matches][populate][team_a_id][populate][team_players][populate]=user_id&populate[matches][populate][team_b_id][populate][team_players][populate]=user_id&populate[matches][populate]=tournament_id&populate[ranking][populate]=season&sort=createdAt:desc&pagination[page]=${pageNum}&pagination[pageSize]=10`;
-
-            // 3. Fetch ranking stats for summary
-            let rankingUrl = `${STRAPI_BASE_URL}/api/rankings?filters[user_id][id]=${userId}`;
-            if (selectedSeason !== "all") {
-                rankingUrl += `&filters[season][documentId][$eq]=${selectedSeason}`;
-            } else {
-                rankingUrl += `&sort=createdAt:desc&pagination[pageSize]=1`;
-            }
-
-            // 4. Fetch Analytics Data
-            let analyticsUrl = `${STRAPI_BASE_URL}/api/match-histories/analytics?userId=${userId}`;
-            if (selectedSeason !== "all") {
-                analyticsUrl += `&seasonId=${selectedSeason}`;
-            }
-
-            // Execute all fetches in parallel
-            const [historyRes, rankingRes, analyticsRes] = await Promise.all([
-                fetch(url, { headers: { Authorization: `Bearer ${jwt}` } }),
-                fetch(rankingUrl, { headers: { Authorization: `Bearer ${jwt}` } }),
-                fetch(analyticsUrl, { headers: { Authorization: `Bearer ${jwt}` } })
-            ]);
-
-            if (!historyRes.ok) throw new Error("ไม่สามารถโหลดประวัติได้");
-            const historyData = await historyRes.json();
-            setHistories(historyData.data || []);
-            setMeta(historyData.meta.pagination);
-
-            if (rankingRes.ok) {
-                const rData = await rankingRes.json();
-                setRankingStats(rData.data?.[0] || null);
-            }
-
-            if (analyticsRes.ok) {
-                const aData = await analyticsRes.json();
-                setAnalyticsData(aData.data || null);
-            }
-
-        } catch (e: any) {
-            setError(e.message);
-        } finally {
-            setLoading(false);
         }
-    }, [userId, jwt, targetUser, selectedSeason]);
+    }, [seasons, selectedSeason]);
 
-    useEffect(() => {
-        if (!jwt) return;
-        fetch(`${STRAPI_BASE_URL}/api/seasons?sort=createdAt:desc`, {
-            headers: { Authorization: `Bearer ${jwt}` }
-        })
-            .then(r => r.json())
-            .then(json => {
-                const data = json.data || [];
-                setSeasons(data);
+    // 2. Fetch Target User
+    const { data: targetUser, isLoading: userLoading } = useSWR<TargetUser>(
+        jwt ? [`${STRAPI_BASE_URL}/api/users/${userId}?populate=picture`, jwt] : null,
+        fetcher,
+        { revalidateOnFocus: false }
+    );
 
-                // Default to the active season
-                const activeSeason = data.find((s: ApiSeason) => s.is_active);
-                if (activeSeason) {
-                    setSelectedSeason(activeSeason.documentId);
-                }
-            });
-    }, [jwt]);
+    // 3. Fetch Match Histories (No season filter)
+    const historiesUrl = `${STRAPI_BASE_URL}/api/match-histories?filters[users][id]=${userId}&populate[matches][populate][team_a_id][populate][team_players][populate]=user_id&populate[matches][populate][team_b_id][populate][team_players][populate]=user_id&populate[matches][populate]=tournament_id&populate[ranking][populate]=season&sort=createdAt:desc&pagination[page]=${page}&pagination[pageSize]=10`;
+    const { data: historiesJson, isLoading: historiesLoading, error: historiesError } = useSWR(
+        jwt ? [historiesUrl, jwt] : null,
+        fetcher
+    );
+    const histories: MatchHistory[] = historiesJson?.data ?? [];
+    const meta: PaginationMeta | null = historiesJson?.meta?.pagination ?? null;
 
-    useEffect(() => {
-        fetchData(page);
-    }, [page, jwt, userId, selectedSeason, fetchData]);
+    // 4. Fetch Ranking Stats
+    const rankingUrl = selectedSeason !== "all"
+        ? `${STRAPI_BASE_URL}/api/rankings?filters[user_id][id]=${userId}&filters[season][documentId][$eq]=${selectedSeason}`
+        : `${STRAPI_BASE_URL}/api/rankings?filters[user_id][id]=${userId}&sort=createdAt:desc&pagination[pageSize]=1`;
+        
+    const { data: rankingJson, isLoading: rankingLoading } = useSWR(
+        jwt ? [rankingUrl, jwt] : null,
+        fetcher
+    );
+    const rankingStats: RankingStats | null = rankingJson?.data?.[0] ?? null;
+
+    // 5. Fetch Analytics Data
+    const analyticsUrl = selectedSeason !== "all"
+        ? `${STRAPI_BASE_URL}/api/match-histories/analytics?userId=${userId}&seasonId=${selectedSeason}`
+        : `${STRAPI_BASE_URL}/api/match-histories/analytics?userId=${userId}`;
+
+    const { data: analyticsJson, isLoading: analyticsLoading } = useSWR(
+        jwt ? [analyticsUrl, jwt] : null,
+        fetcher
+    );
+    const analyticsData: AnalyticsData | null = analyticsJson?.data ?? null;
+
+    const loading = seasonsLoading || userLoading || historiesLoading || rankingLoading || analyticsLoading;
+    const error = historiesError ? historiesError.message : null;
 
     return {
         user,
         jwt,
-        targetUser,
+        targetUser: targetUser || null,
         histories,
         loading,
         error,

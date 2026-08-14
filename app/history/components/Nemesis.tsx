@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/useAuth';
+import Image from 'next/image';
 
 interface NemesisData {
     opponentId: number;
@@ -123,9 +124,11 @@ export function Nemesis({ userId, selectedSeason }: NemesisProps) {
                             
                             <div className={`relative w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-base shrink-0 overflow-hidden border-2 border-[#131e2b] shadow-md ${isFirst ? 'bg-gradient-to-br from-red-500 to-orange-600' : 'bg-gradient-to-br from-slate-600 to-slate-800'}`}>
                                 {opponent.picture ? (
-                                    <img 
+                                    <Image 
                                         src={opponent.picture.startsWith("http") ? opponent.picture : `${STRAPI_BASE_URL}${opponent.picture}`} 
                                         alt={opponent.username} 
+                                        width={48}
+                                        height={48}
                                         className="w-full h-full object-cover" 
                                     />
                                 ) : (

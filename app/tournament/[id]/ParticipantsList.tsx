@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import Image from 'next/image';
 import { TournamentInfo, User } from '../TournamentTypes';
 import Swal from 'sweetalert2';
 import RankBadge from '../RankBadge';
@@ -283,7 +284,7 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                                     className="w-9 h-9 rounded-xl shrink-0 overflow-hidden border border-[#2ecc71]/40 cursor-pointer hover:scale-110 active:scale-95 transition-transform"
                                 >
                                     {pUrl
-                                        ? <img src={pUrl} alt={player.username} className="w-full h-full object-cover" />
+                                        ? <Image src={pUrl} alt={player.username} width={40} height={40} className="w-full h-full object-cover" />
                                         : <div className="w-full h-full bg-gradient-to-br from-[#2ecc71] to-[#27ae60] flex items-center justify-center text-white font-bold text-sm">
                                             {player.username.charAt(0).toUpperCase()}
                                         </div>}

@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 import RankBadge from "@/app/tournament/RankBadge";
 import { UserRankingStats } from "../types";
 
@@ -17,7 +18,7 @@ export function ProfileAvatarCard({ user, userRanking, previewObjUrl, onFileChan
             <div className="relative group h-24 w-24 shrink-0">
                 <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-[#2ecc71] to-[#27ae60] flex items-center justify-center text-white font-black text-4xl shadow-2xl shadow-green-900/40 overflow-hidden border-4 border-white/10 relative">
                     {previewObjUrl ? (
-                        <img src={previewObjUrl} alt="Profile" className="w-full h-full object-cover" />
+                        <Image src={previewObjUrl} alt="Profile" width={96} height={96} unoptimized={previewObjUrl.startsWith("blob:")} className="w-full h-full object-cover" />
                     ) : (
                         initial
                     )}

@@ -1,4 +1,6 @@
+import React from 'react';
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import RankBadge from "../../tournament/RankBadge";
 import { PlayerRow } from "@/app/ranking/types";
 
@@ -39,7 +41,7 @@ export function Podium({ top3, user }: Props) {
                             <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
 
                             <div className={`w-12 h-12 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-slate-800 ring-2 sm:ring-4 ${c.ring} flex items-center justify-center text-xl sm:text-3xl font-bold overflow-hidden shrink-0 shadow-inner relative z-10`}>
-                                {pUrl ? <img src={pUrl} alt={p.username} className="w-full h-full object-cover" /> : <span className={c.text}>{p.username.charAt(0).toUpperCase()}</span>}
+                                {pUrl ? <Image src={pUrl} alt={p.username} width={96} height={96} className="w-full h-full object-cover" /> : <span className={c.text}>{p.username.charAt(0).toUpperCase()}</span>}
                             </div>
 
                             <div className="text-center relative z-10 min-w-0 w-full">

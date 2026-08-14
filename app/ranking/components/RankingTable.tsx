@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import RankBadge from "../../tournament/RankBadge";
 import { PlayerRow, ApiSeason } from "@/app/ranking/types";
@@ -89,7 +90,7 @@ export function RankingTable({
                                                         rank === 3 && p.hasRanking ? "bg-gradient-to-br from-orange-400 to-orange-600 ring-2 ring-orange-500/50" :
                                                             "bg-slate-800 border border-white/10"
                                                     }`}>
-                                                    {pUrl ? <img src={pUrl} alt={p.username} className="w-full h-full object-cover" /> : <span className="text-white">{p.username?.charAt(0).toUpperCase()}</span>}
+                                                    {pUrl ? <Image src={pUrl} alt={p.username} width={40} height={40} className="w-full h-full object-cover" /> : <span className="text-white">{p.username?.charAt(0).toUpperCase()}</span>}
                                                 </div>
                                                 <div className="flex flex-col min-w-0">
                                                     <span className="text-sm sm:text-base font-bold text-white group-hover:text-green-400 transition-colors truncate">

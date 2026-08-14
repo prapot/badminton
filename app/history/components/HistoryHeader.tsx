@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 import { TargetUser, ApiSeason } from "../types";
 
 const STRAPI_BASE_URL = process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
@@ -17,9 +18,11 @@ export function HistoryHeader({ targetUser, seasons, selectedSeason, setSelected
             <div className="flex items-center gap-6">
                 <div className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-2xl bg-gradient-to-br from-[#2ecc71] to-[#27ae60] flex items-center justify-center text-3xl font-bold shadow-lg shadow-green-900/40 overflow-hidden border border-white/20">
                     {targetUser?.picture?.url ? (
-                        <img
+                        <Image
                             src={targetUser.picture.url.startsWith("http") ? targetUser.picture.url : `${STRAPI_BASE_URL}${targetUser.picture.url}`}
-                            alt={targetUser.username}
+                            alt={targetUser.username || "User"}
+                            width={80}
+                            height={80}
                             className="w-full h-full object-cover"
                         />
                     ) : (

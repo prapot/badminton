@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 interface User {
     id: number;
@@ -118,7 +119,7 @@ export default function Navbar() {
                             title="แก้ไขโปรไฟล์"
                         >
                             {user?.picture?.url ? (
-                                <img src={user.picture.url.startsWith("http") ? user.picture.url : `${process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337"}${user.picture.url}`} alt={user.username} className="w-full h-full object-cover" />
+                                <Image src={user.picture.url.startsWith("http") ? user.picture.url : `${process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337"}${user.picture.url}`} alt={user.username} width={32} height={32} className="w-full h-full object-cover" />
                             ) : (
                                 user ? user.username.charAt(0).toUpperCase() : "?"
                             )}
@@ -176,7 +177,7 @@ export default function Navbar() {
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2ecc71] to-[#27ae60] flex items-center justify-center text-white font-bold text-sm shrink-0 overflow-hidden border border-white/20">
                                 {user.picture?.url ? (
-                                    <img src={user.picture.url.startsWith("http") ? user.picture.url : `${process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337"}${user.picture.url}`} alt={user.username} className="w-full h-full object-cover" />
+                                    <Image src={user.picture.url.startsWith("http") ? user.picture.url : `${process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337"}${user.picture.url}`} alt={user.username} width={40} height={40} className="w-full h-full object-cover" />
                                 ) : (
                                     user.username.charAt(0).toUpperCase()
                                 )}

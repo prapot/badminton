@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import { ListTournament, PlayerType, TournamentFormat, TournamentStatus } from './TournamentTypes';
 import { useRouter } from 'next/navigation';
 
@@ -68,9 +69,11 @@ const TournamentCard: React.FC<TournamentCardProps> = ({
                         <span className="w-px h-3 bg-white/10 hidden sm:block" />
                         <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-lg border border-white/5">
                             {tournament.user_created?.picture?.url ? (
-                                <img
+                                <Image
                                     src={tournament.user_created.picture.url.startsWith("http") ? tournament.user_created.picture.url : `${STRAPI_BASE_URL}${tournament.user_created.picture.url}`}
                                     alt={tournament.user_created.username}
+                                    width={16}
+                                    height={16}
                                     className="w-4 h-4 rounded-full object-cover border border-white/20"
                                 />
                             ) : (

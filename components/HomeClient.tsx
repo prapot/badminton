@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import useSWR from "swr";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/lib/useAuth";
 import Footer from "@/components/Footer";
@@ -48,97 +50,82 @@ const news = [
   { title: "Workshop การจับแร็กเก็ตอย่างถูกวิธี โดยโค้ชมืออาชีพ", date: "18 ก.พ. 2026", tag: "อบรม" },
 ];
 
+const fetcher = async ([url, token]: [string, string]) => {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error("Fetch error");
+  return res.json();
+};
+
+const getTHDateStr = (date: Date) => {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(date);
+};
+
 export function HomeClient() {
   const { user, jwt } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [membersCount, setMembersCount] = useState(0);
-  const [todayTournaments, setTodayTournaments] = useState<Tournament[]>([]);
-  const [upcomingDays, setUpcomingDays] = useState<{ date: string; label: string; items: any[] }[]>([]);
+  
+  const { todayDateStr, tomorrowDateStr, in5DaysStr } = useMemo(() => {
+    const now = new Date();
+    const todayDateStr = getTHDateStr(now);
+    
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowDateStr = getTHDateStr(tomorrow);
+    
+    const in5Days = new Date(now);
+    in5Days.setDate(in5Days.getDate() + 6);
+    const in5DaysStr = getTHDateStr(in5Days);
+    
+    return { todayDateStr, tomorrowDateStr, in5DaysStr };
+  }, []);
 
-  useEffect(() => {
-    if (jwt) {
-      fetchHomeData();
-    }
-  }, [jwt]);
+  const urlUsersCount = `${STRAPI_BASE_URL}/api/users/count`;
+  const urlToday = `${STRAPI_BASE_URL}/api/tournaments?filters[$or][0][startDate]=${todayDateStr}&filters[$or][1][tournament_status]=ongoing&populate[matches][populate][team_a_id][populate][team_players][populate]=user_id&populate[matches][populate][team_b_id][populate][team_players][populate]=user_id&populate[tournament_players][count]=true&populate[user_created][populate]=picture`;
+  const urlUpcoming = `${STRAPI_BASE_URL}/api/tournaments?filters[startDate][$gte]=${tomorrowDateStr}&filters[startDate][$lt]=${in5DaysStr}&sort[0]=startDate:asc&populate[tournament_players][count]=true&populate[user_created][populate]=picture`;
 
-  const fetchHomeData = async () => {
-    setLoading(true);
-    try {
-      // 1. Members count
-      const usersRes = await fetch(`${STRAPI_BASE_URL}/api/users/count`, {
-        headers: { Authorization: `Bearer ${jwt}` }
-      });
-      const usersCount = await usersRes.json();
-      setMembersCount(typeof usersCount === "number" ? usersCount : 0);
+  const { data: usersCountData, isLoading: loadingUsers } = useSWR(jwt ? [urlUsersCount, jwt] : null, fetcher);
+  const { data: todayTourneysData, isLoading: loadingToday } = useSWR(jwt ? [urlToday, jwt] : null, fetcher);
+  const { data: upcomingTourneysData, isLoading: loadingUpcoming } = useSWR(jwt ? [urlUpcoming, jwt] : null, fetcher);
 
-      // Current Time for filters (UTC+7 Thailand)
-      const getTHDateStr = (date: Date) => {
-        return new Intl.DateTimeFormat('en-CA', {
-          timeZone: 'Asia/Bangkok',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        }).format(date);
-      };
+  const membersCount = typeof usersCountData === "number" ? usersCountData : 0;
+  
+  const todayTournaments = useMemo(() => {
+    return (todayTourneysData?.data || []).map((t: any) => ({
+      ...t,
+      tournament_players_count: t.tournament_players?.count || 0
+    }));
+  }, [todayTourneysData]);
 
-      const now = new Date();
-      const todayDateStr = getTHDateStr(now);
+  const upcomingDays = useMemo(() => {
+    const upcomingItems = (upcomingTourneysData?.data || []).map((t: any) => ({
+      ...t,
+      tournament_players_count: t.tournament_players?.count || 0
+    }));
 
-      const tomorrow = new Date(now);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowDateStr = getTHDateStr(tomorrow);
+    const now = new Date();
+    const days = [];
+    for (let i = 1; i < 6; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + i);
+      const dStr = getTHDateStr(d);
 
-      // 2. Today's Tournaments (Accordion)
-      const todayTourneysRes = await fetch(
-        `${STRAPI_BASE_URL}/api/tournaments?filters[$or][0][startDate]=${todayDateStr}&filters[$or][1][tournament_status]=ongoing&populate[matches][populate][team_a_id][populate][team_players][populate]=user_id&populate[matches][populate][team_b_id][populate][team_players][populate]=user_id&populate[tournament_players][count]=true&populate[user_created][populate]=picture`,
-        { headers: { Authorization: `Bearer ${jwt}` } }
-      );
-      const todayTourneysData = await todayTourneysRes.json();
-      const mappedToday = (todayTourneysData.data || []).map((t: any) => ({
-        ...t,
-        tournament_players_count: t.tournament_players?.count || 0
-      }));
-      setTodayTournaments(mappedToday);
-
-      // 3. Upcoming 5 days
-      const in5Days = new Date(now);
-      in5Days.setDate(in5Days.getDate() + 6);
-      const in5DaysStr = getTHDateStr(in5Days);
-
-      const upcomingTourneysRes = await fetch(
-        `${STRAPI_BASE_URL}/api/tournaments?filters[startDate][$gte]=${tomorrowDateStr}&filters[startDate][$lt]=${in5DaysStr}&sort[0]=startDate:asc&populate[tournament_players][count]=true&populate[user_created][populate]=picture`,
-        { headers: { Authorization: `Bearer ${jwt}` } }
-      );
-      const tourneysData = await upcomingTourneysRes.json();
-      const upcomingItems = (tourneysData.data || []).map((t: any) => ({
-        ...t,
-        tournament_players_count: t.tournament_players?.count || 0
-      }));
-
-      const days = [];
-      for (let i = 1; i < 6; i++) {
-        const d = new Date(now);
-        d.setDate(d.getDate() + i);
-        const dStr = getTHDateStr(d);
-
-        const dayTourneys = upcomingItems.filter((t: any) => t.startDate === dStr);
-
-        if (dayTourneys.length > 0) {
-          days.push({
-            date: dStr,
-            label: i === 1 ? "พรุ่งนี้" : d.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'Asia/Bangkok' }),
-            items: dayTourneys.map((t: any) => ({ ...t, kind: 'tournament' }))
-          });
-        }
+      const dayTourneys = upcomingItems.filter((t: any) => t.startDate === dStr);
+      if (dayTourneys.length > 0) {
+        days.push({
+          date: dStr,
+          label: i === 1 ? "พรุ่งนี้" : d.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'Asia/Bangkok' }),
+          items: dayTourneys.map((t: any) => ({ ...t, kind: 'tournament' }))
+        });
       }
-      setUpcomingDays(days);
-
-    } catch (error) {
-      console.error("Home fetch error:", error);
-    } finally {
-      setLoading(false);
     }
-  };
+    return days;
+  }, [upcomingTourneysData]);
+
+  const loading = loadingUsers || loadingToday || loadingUpcoming;
 
   if (!user) return null;
 
@@ -209,7 +196,7 @@ export function HomeClient() {
               {loading ? (
                 Array(3).fill(0).map((_, i) => <div key={i} className="h-20 bg-white/5 animate-pulse rounded-2xl" />)
               ) : todayTournaments.length > 0 ? (
-                todayTournaments.map((t) => (
+                todayTournaments.map((t: any) => (
                   <Link
                     key={t.id}
                     href={`/tournament/${t.documentId}`}
@@ -239,9 +226,11 @@ export function HomeClient() {
                             </p>
                             <div className="flex items-center gap-1 mt-1 opacity-60">
                               {t.user_created?.picture?.url ? (
-                                <img
+                                <Image
                                   src={t.user_created.picture.url.startsWith("http") ? t.user_created.picture.url : `${STRAPI_BASE_URL}${t.user_created.picture.url}`}
                                   alt={t.user_created.username}
+                                  width={12}
+                                  height={12}
                                   className="w-3 h-3 rounded-full object-cover border border-white/10"
                                 />
                               ) : (
@@ -312,9 +301,11 @@ export function HomeClient() {
                                 </p>
                                 <div className="flex items-center gap-1 mt-1 opacity-50">
                                   {item.user_created?.picture?.url ? (
-                                    <img
+                                    <Image
                                       src={item.user_created.picture.url.startsWith("http") ? item.user_created.picture.url : `${STRAPI_BASE_URL}${item.user_created.picture.url}`}
                                       alt={item.user_created.username}
+                                      width={12}
+                                      height={12}
                                       className="w-3 h-3 rounded-full object-cover border border-white/10"
                                     />
                                   ) : (

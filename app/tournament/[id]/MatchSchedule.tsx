@@ -133,7 +133,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                         if (scoreA !== scoreB) return scoreA - scoreB;
                                         return (b.match_no ?? 0) - (a.match_no ?? 0);
                                     })
-                                    .map(match => {
+                                    .map((match, idx) => {
                                         const isCompleted = match.match_status === "done";
                                         const winnerA = isCompleted && match.score_a > match.score_b;
                                         const winnerB = isCompleted && match.score_b > match.score_a;
@@ -147,7 +147,8 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
 
                                         return (
                                             <div key={match.id}
-                                                className={matchCardVariants({ state: matchState })}
+                                                className={cn(matchCardVariants({ state: matchState }), "animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both")}
+                                                style={{ animationDelay: `${idx * 100}ms` }}
                                                 onClick={() => {
                                                     if (match.match_status === "cancelled" || match.match_status === "done") return;
                                                     setScoreEditing(match);

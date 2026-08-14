@@ -59,9 +59,9 @@ export default function FullScoreEditorModal({
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-start sm:items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md">
+        <div className="fixed inset-0 z-[100] flex items-start sm:items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
             <div className="absolute inset-0" onClick={onClose} />
-            <div className="relative z-10 w-full max-w-2xl bg-gradient-to-b from-[#1a2535] to-[#0f1923] border border-white/10 rounded-[2.5rem] p-6 sm:p-10 my-auto shadow-[0_0_60px_rgba(0,0,0,0.9)] flex flex-col gap-8" onClick={e => e.stopPropagation()}>
+            <div className="relative z-10 w-full max-w-2xl bg-gradient-to-b from-[#1a2535] to-[#0f1923] border border-white/10 rounded-[2.5rem] p-6 sm:p-10 my-auto shadow-[0_0_60px_rgba(0,0,0,0.9)] flex flex-col gap-8 animate-in zoom-in-95 fade-in duration-300 fill-mode-both" onClick={e => e.stopPropagation()}>
 
                 {/* Header */}
                 <div className="text-center space-y-3">
@@ -102,7 +102,7 @@ export default function FullScoreEditorModal({
                             <div className="relative group/input flex items-center">
                                 <button
                                     onClick={() => setScoreA(Math.max(0, scoreA - 1))}
-                                    className="absolute left-2 w-12 h-12 rounded-2xl bg-white/5 hover:bg-white/10 hover:text-red-400 border border-white/10 flex items-center justify-center text-2xl font-black transition-all active:scale-90"
+                                    className="absolute left-2 w-12 h-12 rounded-2xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 flex items-center justify-center text-3xl font-black transition-all active:scale-75 select-none"
                                 >
                                     −
                                 </button>
@@ -116,7 +116,7 @@ export default function FullScoreEditorModal({
                                 />
                                 <button
                                     onClick={() => setScoreA(scoreA + 1)}
-                                    className="absolute right-2 w-12 h-12 rounded-2xl bg-white/5 hover:bg-white/10 hover:text-[#2ecc71] border border-white/10 flex items-center justify-center text-2xl font-black transition-all active:scale-90"
+                                    className="absolute right-2 w-12 h-12 rounded-2xl bg-[#2ecc71]/10 hover:bg-[#2ecc71]/20 text-[#2ecc71] border border-[#2ecc71]/20 flex items-center justify-center text-3xl font-black transition-all active:scale-75 select-none"
                                 >
                                     +
                                 </button>
@@ -162,7 +162,7 @@ export default function FullScoreEditorModal({
                             <div className="relative group/input flex items-center">
                                 <button
                                     onClick={() => setScoreB(Math.max(0, scoreB - 1))}
-                                    className="absolute left-2 w-12 h-12 rounded-2xl bg-white/5 hover:bg-white/10 hover:text-red-400 border border-white/10 flex items-center justify-center text-2xl font-black transition-all active:scale-90"
+                                    className="absolute left-2 w-12 h-12 rounded-2xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 flex items-center justify-center text-3xl font-black transition-all active:scale-75 select-none"
                                 >
                                     −
                                 </button>
@@ -176,7 +176,7 @@ export default function FullScoreEditorModal({
                                 />
                                 <button
                                     onClick={() => setScoreB(scoreB + 1)}
-                                    className="absolute right-2 w-12 h-12 rounded-2xl bg-white/5 hover:bg-white/10 hover:text-[#3498db] border border-white/10 flex items-center justify-center text-2xl font-black transition-all active:scale-90"
+                                    className="absolute right-2 w-12 h-12 rounded-2xl bg-[#3498db]/10 hover:bg-[#3498db]/20 text-[#3498db] border border-[#3498db]/20 flex items-center justify-center text-3xl font-black transition-all active:scale-75 select-none"
                                 >
                                     +
                                 </button>

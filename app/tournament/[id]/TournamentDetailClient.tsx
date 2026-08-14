@@ -126,11 +126,12 @@ export function TournamentDetailClient({ id }: { id: string }) {
 
             {/* Toast */}
             {toast && (
-                <div className={`fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-auto z-50 flex items-center gap-3 px-4 py-3.5 rounded-2xl shadow-2xl border text-sm font-medium ${toast.type === "success"
-                    ? "bg-[#0f2a1a] border-green-500/30 text-green-300"
-                    : "bg-[#2a0f0f] border-red-500/30 text-red-300"
+                <div className={`fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-auto z-50 flex items-center gap-3 px-4 py-3.5 rounded-2xl shadow-2xl backdrop-blur-xl border text-sm font-medium animate-in slide-in-from-bottom-8 fade-in duration-300 zoom-in-95 ${toast.type === "success"
+                    ? "bg-accent-green/10 border-accent-green/30 text-accent-green shadow-[0_4px_30px_rgba(46,204,113,0.15)]"
+                    : "bg-red-500/10 border-red-500/30 text-red-400 shadow-[0_4px_30px_rgba(239,68,68,0.15)]"
                     }`}>
-                    <span>{toast.type === "success" ? "✅" : "⚠️"}</span> {toast.msg}
+                    <span className="text-base">{toast.type === "success" ? "✨" : "⚠️"}</span> 
+                    <span>{toast.msg}</span>
                 </div>
             )}
 
@@ -167,17 +168,39 @@ export function TournamentDetailClient({ id }: { id: string }) {
             )}
 
             <main className="max-w-5xl mx-auto px-3 sm:px-4 pt-4 sm:pt-8 pb-8 space-y-4 sm:space-y-6">
-                <TournamentHeader
-                    id={id as string}
-                    tournamentInfo={tournamentInfo}
-                    user={user}
-                    setShowQR={setShowQR}
-                    setConfirmDelete={setConfirmDelete}
-                    pct={pct}
-                    done={done}
-                    total={total}
-                    cancelled={cancelled}
-                />
+                {!tournamentInfo ? (
+                    <div className="space-y-6 animate-pulse">
+                        <div className="flex gap-4 items-start">
+                            <div className="w-9 h-9 rounded-xl bg-white/5 shrink-0" />
+                            <div className="flex-1 space-y-3">
+                                <div className="h-6 bg-white/10 rounded w-1/3" />
+                                <div className="flex gap-2">
+                                    <div className="h-5 bg-white/5 rounded w-20" />
+                                    <div className="h-5 bg-white/5 rounded w-16" />
+                                    <div className="h-5 bg-white/5 rounded w-24" />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="h-40 bg-white/5 rounded-2xl border border-white/5" />
+                        <div className="grid gap-4">
+                            <div className="h-28 bg-white/5 rounded-2xl border border-white/5" />
+                            <div className="h-28 bg-white/5 rounded-2xl border border-white/5" />
+                            <div className="h-28 bg-white/5 rounded-2xl border border-white/5" />
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <TournamentHeader
+                            id={id as string}
+                            tournamentInfo={tournamentInfo}
+                            user={user}
+                            setShowQR={setShowQR}
+                            setConfirmDelete={setConfirmDelete}
+                            pct={pct}
+                            done={done}
+                            total={total}
+                            cancelled={cancelled}
+                        />
 
                 {tournamentInfo && (
                     <>
@@ -281,6 +304,8 @@ export function TournamentDetailClient({ id }: { id: string }) {
                 <div className="text-center text-xs text-slate-600 pb-4">
                     🏸 Badminton Club Management System · {new Date().getFullYear()}
                 </div>
+                    </>
+                )}
             </main>
 
             <QRInviteModal

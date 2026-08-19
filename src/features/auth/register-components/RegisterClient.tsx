@@ -63,7 +63,11 @@ function RegisterForm() {
                         <span className="text-3xl">🏸</span>
                     </div>
                     <h1 className="text-2xl font-bold text-white tracking-tight">สมัครสมาชิก</h1>
-                    <p className="text-green-400/70 text-sm mt-1">ร่วมเป็นส่วนหนึ่งของ Badminton Club</p>
+                    <p className="text-green-400/70 text-sm mt-1 mb-3">ร่วมเป็นส่วนหนึ่งของ Badminton Club</p>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#2ecc71]/10 border border-[#2ecc71]/20 text-[#2ecc71] text-xs font-medium">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        สามารถใช้ Username หรือ Email เพื่อเข้าสู่ระบบได้
+                    </div>
                 </div>
 
                 {/* Card */}

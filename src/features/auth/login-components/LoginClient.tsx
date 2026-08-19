@@ -4,13 +4,14 @@ import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { loginWithStrapi } from "@/features/auth/auth";
+import Swal from "sweetalert2";
 
 function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const redirectPath = searchParams.get("redirect") || "/";
 
-    const [email, setEmail] = useState("");
+    const [identifier, setIdentifier] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -21,7 +22,7 @@ function LoginForm() {
         setIsLoading(true);
         setError("");
         try {
-            const data = await loginWithStrapi(email, password);
+            const data = await loginWithStrapi(identifier, password);
             // Store JWT in localStorage
             localStorage.setItem("jwt", data.jwt);
             localStorage.setItem("user", JSON.stringify(data.user));
@@ -96,8 +97,8 @@ function LoginForm() {
                     <form onSubmit={handleSubmit} className="space-y-5">
                         {/* Email */}
                         <div className="space-y-1.5">
-                            <label htmlFor="email" className="block text-sm font-medium text-slate-300">
-                                Email
+                            <label htmlFor="identifier" className="block text-sm font-medium text-slate-300">
+                                Username หรือ Email
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -106,12 +107,12 @@ function LoginForm() {
                                     </svg>
                                 </div>
                                 <input
-                                    id="email"
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
+                                    id="identifier"
+                                    type="text"
+                                    value={identifier}
+                                    onChange={(e) => setIdentifier(e.target.value)}
                                     required
-                                    placeholder="you@example.com"
+                                    placeholder="ชื่อผู้ใช้ หรือ you@example.com"
                                     className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/40 transition-all duration-200"
                                 />
                             </div>
@@ -123,9 +124,24 @@ function LoginForm() {
                                 <label htmlFor="password" className="block text-sm font-medium text-slate-300">
                                     Password
                                 </label>
-                                <a href="#" className="text-xs text-green-400 hover:text-green-300 transition-colors">
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        Swal.fire({
+                                            icon: 'info',
+                                            title: 'ลืมรหัสผ่าน?',
+                                            text: 'กรุณาติดต่อแอดมินหรือหัวหน้าก๊วนเพื่อขอรีเซ็ตรหัสผ่านครับ',
+                                            confirmButtonColor: '#2ecc71',
+                                            background: '#1e293b',
+                                            color: '#fff',
+                                            confirmButtonText: 'รับทราบ'
+                                        });
+                                    }}
+                                    className="text-xs text-green-400 hover:text-green-300 transition-colors"
+                                >
                                     ลืมรหัสผ่าน?
-                                </a>
+                                </button>
                             </div>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">

@@ -26,13 +26,13 @@ export interface RegisterResponse {
 }
 
 export async function loginWithStrapi(
-    email: string,
+    identifier: string,
     password: string
 ): Promise<LoginResponse> {
     const res = await fetch(`${STRAPI_BASE_URL}/api/auth/local`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier: email, password }),
+        body: JSON.stringify({ identifier, password }),
     });
 
     if (!res.ok) {

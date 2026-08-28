@@ -13,9 +13,9 @@ export function RankGuide() {
                 {[
                     { name: 'Bronze', divs: 'III, II, I', stars: 3, color: 'from-[#cd7f32] to-[#8b4513]', icon: '🥉', desc: 'ระดับเริ่มต้นเพื่อฝึกฝนทักษะ', divArray: ['III', 'II', 'I'] },
                     { name: 'Silver', divs: 'III, II, I', stars: 3, color: 'from-slate-300 to-slate-500', icon: '🥈', desc: 'พิสูจน์ฝีมือก้าวสู่ระดับกลาง', divArray: ['III', 'II', 'I'] },
-                    { name: 'Gold', divs: 'IV, III, II, I', stars: 3, color: 'from-yellow-400 to-amber-600', icon: '🥇', desc: 'แมตช์ที่เข้มข้นขึ้นและความท้าทายใหม่', divArray: ['IV', 'III', 'II', 'I'] },
-                    { name: 'Platinum', divs: 'IV, III, II, I', stars: 4, color: 'from-cyan-400 to-blue-600', icon: '💎', desc: 'ก้าวเข้าสู่ทำเนียบยอดฝีมือ', divArray: ['IV', 'III', 'II', 'I'] },
-                    { name: 'Diamond', divs: 'IV, III, II, I', stars: 4, color: 'from-blue-600 to-indigo-800', icon: '💠', desc: 'ระดับสูงสุดก่อนเข้าสู่ทำเนียบแชมป์', divArray: ['IV', 'III', 'II', 'I'] },
+                    { name: 'Gold', divs: 'III, II, I', stars: 3, color: 'from-yellow-400 to-amber-600', icon: '🥇', desc: 'แมตช์ที่เข้มข้นขึ้นและความท้าทายใหม่', divArray: ['III', 'II', 'I'] },
+                    { name: 'Platinum', divs: 'III, II, I', stars: 3, color: 'from-cyan-400 to-blue-600', icon: '💎', desc: 'ก้าวเข้าสู่ทำเนียบยอดฝีมือ', divArray: ['III', 'II', 'I'] },
+                    { name: 'Diamond', divs: 'III, II, I', stars: 3, color: 'from-blue-600 to-indigo-800', icon: '💠', desc: 'ระดับสูงสุดก่อนเข้าสู่ทำเนียบแชมป์', divArray: ['III', 'II', 'I'] },
                     { name: 'Master', divs: 'Accumulate Stars', stars: '∞', color: 'from-red-500 to-purple-700', icon: '🏆', desc: 'ทำเนียบแชมป์เปี้ยนผู้ไร้ขีดจำกัด', isMaster: true, divArray: [] },
                 ].map((r) => (
                     <div key={r.name} className="relative group">

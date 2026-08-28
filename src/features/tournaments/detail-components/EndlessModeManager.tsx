@@ -22,7 +22,7 @@ interface ApiMatch {
     team_b_id: { team_players: Array<{ user_id: { id: number } | null }> } | null;
 }
 
-type PairingMode = "auto" | "locked";
+type PairingMode = "auto" | "manual";
 
 interface PermanentTeam {
     id: string; // local uuid for UI keying
@@ -78,6 +78,9 @@ export default function EndlessModeManager({
 }: EndlessModeManagerProps) {
     const [drawing, setDrawing] = useState(false);
     const [pairingMode, setPairingMode] = useState<PairingMode>("auto");
+    const [manualTeamA, setManualTeamA] = useState<ApiPlayer[]>([]);
+    const [manualTeamB, setManualTeamB] = useState<ApiPlayer[]>([]);
+    const [activeManualTeam, setActiveManualTeam] = useState<"A" | "B">("A");
     const [previewMatch, setPreviewMatch] = useState<{ teamA: ApiPlayer[], teamB: ApiPlayer[] } | null>(null);
     const [selectedSwapPlayer, setSelectedSwapPlayer] = useState<number | null>(null);
     const [showPlayerList, setShowPlayerList] = useState(false);
@@ -591,6 +594,60 @@ export default function EndlessModeManager({
         }
     };
 
+    const handleConfirmManualMatch = async () => {
+        if (manualTeamA.length !== playersPerTeam || manualTeamB.length !== playersPerTeam) return;
+        setDrawing(true);
+        try {
+            const res = await fetch(`${STRAPI_BASE_URL}/api/tournaments/${tournamentId}/create-endless-match`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+                body: JSON.stringify({
+                    data: {
+                        playerIdsA: manualTeamA.map(p => p.id),
+                        playerIdsB: manualTeamB.map(p => p.id)
+                    }
+                })
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error?.message || "Error creating match");
+
+            try {
+                await fetch('/api/pusher/trigger', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        playerIds: [...manualTeamA.map(p => p.id), ...manualTeamB.map(p => p.id)],
+                        matchData: {
+                            matchId: json.data?.id || json.id || 0,
+                            teamA: manualTeamA.map(p => ({ id: p.id, name: p.username || p.guest_name })),
+                            teamB: manualTeamB.map(p => ({ id: p.id, name: p.username || p.guest_name }))
+                        }
+                    })
+                });
+            } catch (pusherErr) {
+                console.error("Failed to trigger pusher:", pusherErr);
+            }
+
+            showToast("สร้างแมตซ์เรียบร้อยแล้ว", "success");
+            setManualTeamA([]);
+            setManualTeamB([]);
+            await refreshInfo();
+            setTimeout(() => {
+                document.getElementById("match-schedule")?.scrollIntoView({ behavior: "smooth" });
+            }, 300);
+        } catch (e: any) {
+            await Swal.fire({
+                title: "ไม่สามารถสร้างแมตซ์ได้",
+                text: e.message || "เกิดข้อผิดพลาด",
+                icon: "warning",
+                confirmButtonColor: "#6366f1"
+            });
+            refreshInfo();
+        } finally {
+            setDrawing(false);
+        }
+    };
+
     // ─────────────────────────────────────────────────────────────────────────
     // UI helpers
     const spinnerSvg = (
@@ -671,8 +728,24 @@ export default function EndlessModeManager({
 
                 {/* ══════════════════ MATCHMAKER ══════════════════ */}
                 <div className="px-4 pb-4 pt-4 space-y-2">
+                        {/* Tab Switcher */}
+                        <div className="flex bg-white/5 rounded-xl p-1 mb-3">
+                            <button
+                                onClick={() => setPairingMode('auto')}
+                                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${pairingMode === 'auto' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+                            >
+                                🎲 สุ่มอัตโนมัติ
+                            </button>
+                            <button
+                                onClick={() => { setPairingMode('manual'); setPreviewMatch(null); }}
+                                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${pairingMode === 'manual' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+                            >
+                                ✍️ จัดคู่เอง
+                            </button>
+                        </div>
+
                         {/* Preview Match Card */}
-                        {previewMatch && (
+                        {pairingMode === 'auto' && previewMatch && (
                             <div className="mb-4 animate-in fade-in slide-in-from-top-4 duration-300">
                                 <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-2xl overflow-hidden shadow-lg shadow-indigo-500/10">
                                     <div className="px-4 py-2.5 bg-indigo-500/20 border-b border-indigo-500/20 flex justify-between items-center">
@@ -865,7 +938,7 @@ export default function EndlessModeManager({
                         )}
 
                         {/* Draw button */}
-                        {!previewMatch && (
+                        {pairingMode === 'auto' && !previewMatch && (
                             <button
                                 onClick={calculateNextMatch}
                                 disabled={drawing || !jwt || availablePlayers.length < (tournamentType === "double" ? 4 : 2)}
@@ -876,6 +949,100 @@ export default function EndlessModeManager({
                                         : availablePlayers.length < (tournamentType === "double" ? 4 : 2) ? <span>⏳ รอผู้เล่นว่าง...</span>
                                             : <><span>🎲 สุ่มแมตซ์ถัดไป</span></>}
                             </button>
+                        )}
+
+                        {/* Manual Pairing UI */}
+                        {pairingMode === 'manual' && (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                                {/* Team Slots */}
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setActiveManualTeam("A")}
+                                        className={`flex-1 p-3 rounded-2xl border transition-all text-left ${activeManualTeam === "A" ? "bg-indigo-500/20 border-indigo-400 ring-2 ring-indigo-400/50 shadow-lg shadow-indigo-500/20" : "bg-white/[0.03] border-white/10 hover:bg-white/[0.08]"}`}
+                                    >
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">ทีม A</span>
+                                            <span className="text-[10px] text-slate-400">{manualTeamA.length}/{playersPerTeam}</span>
+                                        </div>
+                                        <div className="space-y-1">
+                                            {manualTeamA.length === 0 ? <div className="text-xs text-slate-500 italic py-1">เลือกผู้เล่น...</div> : null}
+                                            {manualTeamA.map(p => (
+                                                <div key={p.id} className="flex justify-between items-center bg-black/20 rounded-lg px-2 py-1.5" onClick={(e) => { e.stopPropagation(); setManualTeamA(manualTeamA.filter(x => x.id !== p.id)); }}>
+                                                    <span className="text-xs font-bold text-white truncate">{p.username}</span>
+                                                    <span className="text-slate-400 text-xs">✕</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </button>
+                                    
+                                    <button
+                                        onClick={() => setActiveManualTeam("B")}
+                                        className={`flex-1 p-3 rounded-2xl border transition-all text-left ${activeManualTeam === "B" ? "bg-rose-500/20 border-rose-400 ring-2 ring-rose-400/50 shadow-lg shadow-rose-500/20" : "bg-white/[0.03] border-white/10 hover:bg-white/[0.08]"}`}
+                                    >
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-rose-400">ทีม B</span>
+                                            <span className="text-[10px] text-slate-400">{manualTeamB.length}/{playersPerTeam}</span>
+                                        </div>
+                                        <div className="space-y-1">
+                                            {manualTeamB.length === 0 ? <div className="text-xs text-slate-500 italic py-1">เลือกผู้เล่น...</div> : null}
+                                            {manualTeamB.map(p => (
+                                                <div key={p.id} className="flex justify-between items-center bg-black/20 rounded-lg px-2 py-1.5" onClick={(e) => { e.stopPropagation(); setManualTeamB(manualTeamB.filter(x => x.id !== p.id)); }}>
+                                                    <span className="text-xs font-bold text-white truncate">{p.username}</span>
+                                                    <span className="text-slate-400 text-xs">✕</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </button>
+                                </div>
+
+                                {/* Confirm Button */}
+                                {manualTeamA.length === playersPerTeam && manualTeamB.length === playersPerTeam && (
+                                    <button
+                                        onClick={handleConfirmManualMatch}
+                                        disabled={drawing}
+                                        className="w-full min-h-[48px] rounded-xl bg-green-500 hover:bg-green-400 active:scale-[0.97] text-white font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20"
+                                    >
+                                        {drawing ? spinnerSvg : "✅ ยืนยันสร้างแมตซ์"}
+                                    </button>
+                                )}
+
+                                {/* Available Players List for Manual Mode */}
+                                <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-3">
+                                    <div className="text-[10px] text-slate-400 mb-2">เลือกผู้เล่นเข้า {activeManualTeam === "A" ? "ทีม A" : "ทีม B"} ({availablePlayers.length} ว่าง)</div>
+                                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                                        {[...availablePlayers]
+                                            .sort((a, b) => (actualPlayerCounts.get(a.id) || 0) - (actualPlayerCounts.get(b.id) || 0))
+                                            .map(p => {
+                                                const isInTeamA = manualTeamA.some(x => x.id === p.id);
+                                                const isInTeamB = manualTeamB.some(x => x.id === p.id);
+                                                const isSelected = isInTeamA || isInTeamB;
+                                                const teamIsFull = (activeManualTeam === "A" ? manualTeamA.length : manualTeamB.length) >= playersPerTeam;
+                                                
+                                                return (
+                                                    <button
+                                                        key={p.id}
+                                                        disabled={isSelected || teamIsFull}
+                                                        onClick={() => {
+                                                            if (activeManualTeam === "A") setManualTeamA([...manualTeamA, p]);
+                                                            else setManualTeamB([...manualTeamB, p]);
+                                                        }}
+                                                        className={`w-full flex justify-between items-center p-2 rounded-xl border text-left transition-all ${isSelected ? "opacity-30 bg-black/10 border-transparent" : "bg-white/[0.04] border-white/10 hover:bg-white/[0.08] active:scale-[0.98]"}`}
+                                                    >
+                                                        <div>
+                                                            <div className="text-xs font-bold text-slate-200">{p.username}</div>
+                                                            <div className="text-[9px] text-slate-500 mt-0.5">{actualPlayerCounts.get(p.id) || 0} แมตซ์</div>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            {tournamentMode === 'ranking' && <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} size="sm" showName={false} />}
+                                                            {isSelected && <span className="text-[9px] font-bold text-slate-500 bg-white/10 px-1.5 py-0.5 rounded">{isInTeamA ? "A" : "B"}</span>}
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })}
+                                        {availablePlayers.length === 0 && <div className="text-xs text-center text-slate-500 py-4">ไม่มีผู้เล่นว่าง</div>}
+                                    </div>
+                                </div>
+                            </div>
                         )}
                     </div>
 

@@ -102,6 +102,8 @@ export function TournamentDetailClient({ id }: { id: string }) {
     const total = totalEffectiveMatches;
     const cancelled = apiMatches.filter(m => m.match_status === "cancelled").length;
 
+    const isOwner = !!user?.id && Number(tournamentInfo?.user_created?.id) === Number(user?.id);
+
     return (
         <div className="min-h-screen bg-[#0f1923] text-slate-100 font-sans selection:bg-[#2ecc71]/30">
             <style dangerouslySetInnerHTML={{ __html: GRADIENT_ANIMATION_STYLE }} />
@@ -298,6 +300,7 @@ export function TournamentDetailClient({ id }: { id: string }) {
                         setScoreA={setScoreA}
                         setScoreB={setScoreB}
                         STRAPI_BASE_URL={STRAPI_BASE_URL}
+                        isOwner={isOwner}
                     />
                 )}
 

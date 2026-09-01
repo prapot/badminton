@@ -18,6 +18,7 @@ interface MatchScheduleProps {
     setScoreA: (score: number) => void;
     setScoreB: (score: number) => void;
     STRAPI_BASE_URL: string;
+    isOwner?: boolean;
 }
 
 const matchCardVariants = cva(
@@ -61,8 +62,9 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
     setScoreA,
     setScoreB,
     STRAPI_BASE_URL,
+    isOwner,
 }) => {
-    const isOwner = !!user?.id && Number(tournamentInfo.user_created?.id) === Number(user?.id);
+    const isOwnerOrAdmin = isOwner !== undefined ? isOwner : (!!user?.id && Number(tournamentInfo.user_created?.id) === Number(user?.id));
 
     if (tournamentInfo.tournament_status !== "ongoing" && tournamentInfo.tournament_status !== "completed") return null;
 
@@ -150,7 +152,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                 className={cn(matchCardVariants({ state: matchState }), "animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both")}
                                                 style={{ animationDelay: `${idx * 100}ms` }}
                                                 onClick={() => {
-                                                    if (match.match_status === "cancelled" || match.match_status === "done") return;
+                                                    if ((match.match_status === "cancelled" || match.match_status === "done") && !isOwnerOrAdmin) return;
                                                     setScoreEditing(match);
                                                     setScoreA(match.score_a ?? 0);
                                                     setScoreB(match.score_b ?? 0);

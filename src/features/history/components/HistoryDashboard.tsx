@@ -18,8 +18,11 @@ export function HistoryDashboard({ userId }: { userId: string }) {
         setSelectedSeason, 
         page, 
         setPage, 
+        filterDate,
+        setFilterDate,
         loading, 
         rankingStats, 
+        lifetimeStats,
         histories, 
         error, 
         meta,
@@ -50,6 +53,7 @@ export function HistoryDashboard({ userId }: { userId: string }) {
                 selectedSeason={selectedSeason}
                 setSelectedSeason={setSelectedSeason}
                 setPage={setPage}
+                lifetimeStats={lifetimeStats}
             />
 
             <StatsSummary 
@@ -82,6 +86,8 @@ export function HistoryDashboard({ userId }: { userId: string }) {
                     page={page}
                     setPage={setPage}
                     meta={meta}
+                    filterDate={filterDate}
+                    setFilterDate={setFilterDate}
                 />
             )}
 

@@ -10,11 +10,45 @@ interface Props {
     page: number;
     setPage: (page: number) => void;
     meta: PaginationMeta | null;
+    filterDate: string;
+    setFilterDate: (date: string) => void;
 }
 
-export function MatchHistoryList({ histories, loading, error, userId, page, setPage, meta }: Props) {
+export function MatchHistoryList({ histories, loading, error, userId, page, setPage, meta, filterDate, setFilterDate }: Props) {
     return (
         <>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <span className="text-xl">📅</span> ประวัติแมตช์ (Match History)
+                </h3>
+                <div className="w-full sm:w-auto flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2 backdrop-blur-md">
+                    <label htmlFor="history-date" className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        วันที่:
+                    </label>
+                    <input
+                        id="history-date"
+                        type="date"
+                        value={filterDate}
+                        onChange={(e) => {
+                            setFilterDate(e.target.value);
+                            setPage(1); // Reset page on filter change
+                        }}
+                        className="bg-transparent text-sm font-medium text-white outline-none cursor-pointer focus:ring-0 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+                    />
+                    {filterDate && (
+                        <button 
+                            onClick={() => {
+                                setFilterDate("");
+                                setPage(1);
+                            }}
+                            className="ml-2 w-5 h-5 flex items-center justify-center rounded-full bg-slate-700 hover:bg-slate-600 text-white text-[10px] transition-colors"
+                        >
+                            ✕
+                        </button>
+                    )}
+                </div>
+            </div>
+
             {loading ? (
                 <div className="space-y-4">
                     {[1, 2, 3].map(i => (

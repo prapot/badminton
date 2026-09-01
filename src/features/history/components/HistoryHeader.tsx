@@ -1,6 +1,6 @@
 import React from "react";
 import Image from "next/image";
-import { TargetUser, ApiSeason } from "../types";
+import { TargetUser, ApiSeason, RankingStats } from "../types";
 
 const STRAPI_BASE_URL = process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
 
@@ -10,9 +10,10 @@ interface Props {
     selectedSeason: string;
     setSelectedSeason: (season: string) => void;
     setPage: (page: number) => void;
+    lifetimeStats?: RankingStats | null;
 }
 
-export function HistoryHeader({ targetUser, seasons, selectedSeason, setSelectedSeason, setPage }: Props) {
+export function HistoryHeader({ targetUser, seasons, selectedSeason, setSelectedSeason, setPage, lifetimeStats }: Props) {
     return (
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center gap-6 bg-white/5 p-6 rounded-3xl border border-white/10 backdrop-blur-md shadow-xl">
             <div className="flex items-center gap-6">
@@ -31,7 +32,31 @@ export function HistoryHeader({ targetUser, seasons, selectedSeason, setSelected
                 </div>
                 <div>
                     <h1 className="text-xl sm:text-2xl font-bold text-white mb-1">ประวัติการแข่งขัน</h1>
-                    <p className="text-slate-400 font-medium text-sm sm:text-base">{targetUser?.username}</p>
+                    <p className="text-slate-400 font-medium text-sm sm:text-base mb-2">{targetUser?.username}</p>
+                    
+                    {/* Lifetime Stats */}
+                    {lifetimeStats && (
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[10px] sm:text-xs font-bold text-slate-300">
+                            <div className="bg-white/5 px-2.5 py-1 rounded-md border border-white/5 flex items-center gap-1.5">
+                                <span className="text-slate-500 uppercase">Matches</span>
+                                <span className="text-white">{lifetimeStats.match_played || 0}</span>
+                            </div>
+                            <div className="bg-white/5 px-2.5 py-1 rounded-md border border-white/5 flex items-center gap-1.5">
+                                <span className="text-slate-500 uppercase">Win</span>
+                                <span className="text-green-400">{lifetimeStats.win || 0}</span>
+                            </div>
+                            <div className="bg-white/5 px-2.5 py-1 rounded-md border border-white/5 flex items-center gap-1.5">
+                                <span className="text-slate-500 uppercase">Loss</span>
+                                <span className="text-red-400">{lifetimeStats.lose || 0}</span>
+                            </div>
+                            <div className="bg-white/5 px-2.5 py-1 rounded-md border border-white/5 flex items-center gap-1.5">
+                                <span className="text-slate-500 uppercase">Win Rate</span>
+                                <span className="text-blue-400">
+                                    {lifetimeStats.match_played ? Math.round(((lifetimeStats.win || 0) / lifetimeStats.match_played) * 100) : 0}%
+                                </span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

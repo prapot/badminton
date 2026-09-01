@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import useSWR from "swr";
 import { useAuth } from "@/features/auth/useAuth";
 import { MatchHistory, PaginationMeta, TargetUser, ApiSeason, RankingStats, AnalyticsData } from "../types";
@@ -17,6 +17,7 @@ export function useHistoryData(userId: string) {
     const { user, jwt } = useAuth();
     const [page, setPage] = useState(1);
     const [selectedSeason, setSelectedSeason] = useState<string>("all");
+    const [filterDate, setFilterDate] = useState<string>("");
 
     // 1. Fetch Seasons
     const { data: seasonsJson, isLoading: seasonsLoading } = useSWR(
@@ -45,8 +46,17 @@ export function useHistoryData(userId: string) {
         { revalidateOnFocus: false }
     );
 
-    // 3. Fetch Match Histories (No season filter)
-    const historiesUrl = `${STRAPI_BASE_URL}/api/match-histories?filters[users][id]=${userId}&populate[matches][populate][team_a_id][populate][team_players][populate]=user_id&populate[matches][populate][team_b_id][populate][team_players][populate]=user_id&populate[matches][populate]=tournament_id&populate[ranking][populate]=season&sort=createdAt:desc&pagination[page]=${page}&pagination[pageSize]=10`;
+    // 3. Fetch Match Histories (No season filter but support date filter)
+    let historiesUrl = `${STRAPI_BASE_URL}/api/match-histories?filters[users][id]=${userId}&populate[matches][populate][team_a_id][populate][team_players][populate]=user_id&populate[matches][populate][team_b_id][populate][team_players][populate]=user_id&populate[matches][populate]=tournament_id&populate[ranking][populate]=season&sort=createdAt:desc&pagination[page]=${page}&pagination[pageSize]=10`;
+    
+    if (filterDate) {
+        const startOfDay = new Date(filterDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(filterDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        historiesUrl += `&filters[createdAt][$gte]=${startOfDay.toISOString()}&filters[createdAt][$lte]=${endOfDay.toISOString()}`;
+    }
+
     const { data: historiesJson, isLoading: historiesLoading, error: historiesError } = useSWR(
         jwt ? [historiesUrl, jwt] : null,
         fetcher
@@ -54,16 +64,30 @@ export function useHistoryData(userId: string) {
     const histories: MatchHistory[] = historiesJson?.data ?? [];
     const meta: PaginationMeta | null = historiesJson?.meta?.pagination ?? null;
 
-    // 4. Fetch Ranking Stats
-    const rankingUrl = selectedSeason !== "all"
-        ? `${STRAPI_BASE_URL}/api/rankings?filters[user_id][id]=${userId}&filters[season][documentId][$eq]=${selectedSeason}`
-        : `${STRAPI_BASE_URL}/api/rankings?filters[user_id][id]=${userId}&sort=createdAt:desc&pagination[pageSize]=1`;
-        
-    const { data: rankingJson, isLoading: rankingLoading } = useSWR(
-        jwt ? [rankingUrl, jwt] : null,
+    // 4. Fetch Lifetime Stats from API
+    const lifetimeStatsUrl = `${STRAPI_BASE_URL}/api/rankings/lifetime-stats?userId=${userId}`;
+    const { data: lifetimeJson, isLoading: lifetimeLoading } = useSWR(
+        jwt ? [lifetimeStatsUrl, jwt] : null,
         fetcher
     );
-    const rankingStats: RankingStats | null = rankingJson?.data?.[0] ?? null;
+    const lifetimeStats: RankingStats | null = lifetimeJson?.data ?? null;
+
+    // 5. Fetch Ranking Stats for Selected Season
+    const rankingUrl = selectedSeason !== "all"
+        ? `${STRAPI_BASE_URL}/api/rankings?filters[user_id][id]=${userId}&filters[season][documentId][$eq]=${selectedSeason}`
+        : null; // If "all", we don't need a specific season ranking, we use lifetimeStats
+
+    const { data: rankingJson, isLoading: rankingLoading } = useSWR(
+        jwt && rankingUrl ? [rankingUrl, jwt] : null,
+        fetcher
+    );
+
+    const rankingStats: RankingStats | null = useMemo(() => {
+        if (selectedSeason === "all") {
+            return lifetimeStats;
+        }
+        return rankingJson?.data?.[0] || { match_played: 0, win: 0, lose: 0 };
+    }, [selectedSeason, lifetimeStats, rankingJson]);
 
     // 5. Fetch Analytics Data
     const analyticsUrl = selectedSeason !== "all"
@@ -76,7 +100,7 @@ export function useHistoryData(userId: string) {
     );
     const analyticsData: AnalyticsData | null = analyticsJson?.data ?? null;
 
-    const loading = seasonsLoading || userLoading || historiesLoading || rankingLoading || analyticsLoading;
+    const loading = seasonsLoading || userLoading || historiesLoading || rankingLoading || lifetimeLoading || analyticsLoading;
     const error = historiesError ? historiesError.message : null;
 
     return {
@@ -92,7 +116,10 @@ export function useHistoryData(userId: string) {
         seasons,
         selectedSeason,
         setSelectedSeason,
+        filterDate,
+        setFilterDate,
         rankingStats,
+        lifetimeStats,
         analyticsData
     };
 }

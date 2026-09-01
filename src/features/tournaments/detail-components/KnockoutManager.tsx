@@ -211,6 +211,7 @@ const KnockoutManager: React.FC<KnockoutManagerProps> = ({
 
                                                 <div
                                                     onClick={() => {
+                                                        if (tournamentInfo.tournament_status === "completed") return;
                                                         if (isOwner) {
                                                             setScoreEditing(m);
                                                             setScoreA(m.score_a || 0);

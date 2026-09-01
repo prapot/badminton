@@ -152,6 +152,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                 className={cn(matchCardVariants({ state: matchState }), "animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both")}
                                                 style={{ animationDelay: `${idx * 100}ms` }}
                                                 onClick={() => {
+                                                    if (tournamentInfo.tournament_status === "completed") return;
                                                     if ((match.match_status === "cancelled" || match.match_status === "done") && !isOwnerOrAdmin) return;
                                                     setScoreEditing(match);
                                                     setScoreA(match.score_a ?? 0);

@@ -33,7 +33,10 @@ export function ProfileAvatarCard({ user, userRanking, previewObjUrl, onFileChan
             </div>
             <div className="text-center sm:text-left mt-2 sm:mt-0 flex flex-col gap-2 flex-1">
                 <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
-                    <p className="text-white font-black text-2xl sm:text-3xl tracking-tight">{user.username}</p>
+                    <div className="flex flex-col">
+                        <p className="text-white font-black text-2xl sm:text-3xl tracking-tight">{user.username}</p>
+                        {user.nickname && <p className="text-slate-400 text-sm font-medium">{user.nickname}</p>}
+                    </div>
                     <RankBadge
                         rank={userRanking?.rank || "Unranked"}
                         stars={userRanking?.stars || 0}

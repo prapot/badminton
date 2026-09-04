@@ -46,6 +46,7 @@ export function Podium({ top3, user }: Props) {
 
                             <div className="text-center relative z-10 min-w-0 w-full">
                                 <p className="font-black text-white text-xs sm:text-base leading-tight truncate px-1">{p.username}</p>
+                                {p.nickname && <p className="text-[10px] sm:text-xs text-slate-300 font-medium truncate px-1 mt-0.5">{p.nickname}</p>}
                             </div>
 
                             <div className="text-xl sm:text-3xl relative z-10 filter drop-shadow-md">{c.icon}</div>

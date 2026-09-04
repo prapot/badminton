@@ -234,9 +234,14 @@ const KnockoutManager: React.FC<KnockoutManagerProps> = ({
                                                             <div className={`w-2 h-2 rounded-full ${isWinnerA ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-slate-700'}`}></div>
                                                             <div className="flex flex-col min-w-0">
                                                                 {m.team_a_id?.team_players?.map((tp, idx) => (
-                                                                    <span key={idx} className={`text-xs font-bold truncate ${isWinnerA ? 'text-green-300' : m.team_a_id ? 'text-slate-200' : 'text-slate-600 italic'}`}>
-                                                                        {tp.user_id?.username || tp.guest_name || "Guest"}
-                                                                    </span>
+                                                                    <div key={idx} className="flex flex-col">
+                                                                        <span className={`text-xs font-bold truncate ${isWinnerA ? 'text-green-300' : m.team_a_id ? 'text-slate-200' : 'text-slate-600 italic'}`}>
+                                                                            {tp.user_id?.username || tp.guest_name || "Guest"}
+                                                                        </span>
+                                                                        {tp.user_id?.nickname && (
+                                                                            <span className="text-[9px] text-slate-400 truncate">{tp.user_id.nickname}</span>
+                                                                        )}
+                                                                    </div>
                                                                 )) || <span className="text-xs font-bold text-slate-600 italic">{m.round === "1" ? "Bye" : "TBD"}</span>}
                                                             </div>
                                                         </div>
@@ -249,9 +254,14 @@ const KnockoutManager: React.FC<KnockoutManagerProps> = ({
                                                             <div className={`w-2 h-2 rounded-full ${isWinnerB ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-slate-700'}`}></div>
                                                             <div className="flex flex-col min-w-0">
                                                                 {m.team_b_id?.team_players?.map((tp, idx) => (
-                                                                    <span key={idx} className={`text-xs font-bold truncate ${isWinnerB ? 'text-green-300' : m.team_b_id ? 'text-slate-200' : 'text-slate-600 italic'}`}>
-                                                                        {tp.user_id?.username || tp.guest_name || "Guest"}
-                                                                    </span>
+                                                                    <div key={idx} className="flex flex-col">
+                                                                        <span className={`text-xs font-bold truncate ${isWinnerB ? 'text-green-300' : m.team_b_id ? 'text-slate-200' : 'text-slate-600 italic'}`}>
+                                                                            {tp.user_id?.username || tp.guest_name || "Guest"}
+                                                                        </span>
+                                                                        {tp.user_id?.nickname && (
+                                                                            <span className="text-[9px] text-slate-400 truncate">{tp.user_id.nickname}</span>
+                                                                        )}
+                                                                    </div>
                                                                 )) || <span className="text-xs font-bold text-slate-600 italic">{m.round === "1" ? "Bye" : "TBD"}</span>}
                                                             </div>
                                                         </div>

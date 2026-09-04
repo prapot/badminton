@@ -93,19 +93,22 @@ export function RankingTable({
                                                     {pUrl ? <Image src={pUrl} alt={p.username} width={40} height={40} className="w-full h-full object-cover" /> : <span className="text-white">{p.username?.charAt(0).toUpperCase()}</span>}
                                                 </div>
                                                 <div className="flex flex-col min-w-0">
-                                                    <span className="text-sm sm:text-base font-bold text-white group-hover:text-green-400 transition-colors truncate">
-                                                        {p.username || "Unknown"}
-                                                        {p.userId === user?.id && (
-                                                            <span className="ml-2 text-[8px] px-1.5 py-0.5 rounded-md bg-green-500/20 text-green-400 border border-green-500/30 uppercase tracking-tighter">
-                                                                ฉัน
-                                                            </span>
-                                                        )}
-                                                        {!p.hasRanking && (
-                                                            <span className="ml-2 text-[8px] px-1.5 py-0.5 rounded-md bg-slate-500/20 text-slate-400 border border-slate-500/30 uppercase tracking-tighter">
-                                                                ยังไม่มีคะแนน
-                                                            </span>
-                                                        )}
-                                                    </span>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-sm sm:text-base font-bold text-white group-hover:text-green-400 transition-colors truncate">
+                                                            {p.username || "Unknown"}
+                                                            {p.userId === user?.id && (
+                                                                <span className="ml-2 text-[8px] px-1.5 py-0.5 rounded-md bg-green-500/20 text-green-400 border border-green-500/30 uppercase tracking-tighter">
+                                                                    ฉัน
+                                                                </span>
+                                                            )}
+                                                            {!p.hasRanking && (
+                                                                <span className="ml-2 text-[8px] px-1.5 py-0.5 rounded-md bg-slate-500/20 text-slate-400 border border-slate-500/30 uppercase tracking-tighter">
+                                                                    ยังไม่มีคะแนน
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                        {p.nickname && <span className="text-[11px] text-slate-400 truncate">{p.nickname}</span>}
+                                                    </div>
                                                     <span className="text-[10px] text-slate-500 truncate">{p.email}</span>
                                                 </div>
                                             </div>

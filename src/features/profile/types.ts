@@ -2,6 +2,7 @@ export interface ProfileFormState {
     documentId: string;
     picture: string;
     username: string;
+    nickname: string;
     email: string;
     password: string;
     confirmPassword: string;

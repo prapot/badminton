@@ -89,9 +89,10 @@ export default function FullScoreEditorModal({
                                         <div className="w-12 h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 border-[#2ecc71]/30 flex items-center justify-center shadow-lg">
                                             {pUrl ? <Image src={pUrl} alt={u.username} width={32} height={32} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                         </div>
-                                        <div className="min-w-0">
+                                        <div className="min-w-0 flex flex-col justify-center">
                                             <p className="font-bold text-sm text-white truncate">{u.username}</p>
-                                            <p className="text-[10px] text-slate-500 font-medium">TEAM {match.team_a_id?.team_no}</p>
+                                            {u.nickname && <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{u.nickname}</p>}
+                                            <p className="text-[10px] text-slate-500 font-medium mt-1">TEAM {match.team_a_id?.team_no}</p>
                                         </div>
                                     </div>
                                 );
@@ -144,9 +145,10 @@ export default function FullScoreEditorModal({
                                         <div className="w-12 h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 border-[#3498db]/30 flex items-center justify-center shadow-lg">
                                             {pUrl ? <Image src={pUrl} alt={u.username} width={32} height={32} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                         </div>
-                                        <div className="min-w-0">
+                                        <div className="min-w-0 flex flex-col justify-center">
                                             <p className="font-bold text-sm text-white truncate">{u.username}</p>
-                                            <p className="text-[10px] text-slate-500 font-medium">TEAM {match.team_b_id?.team_no}</p>
+                                            {u.nickname && <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{u.nickname}</p>}
+                                            <p className="text-[10px] text-slate-500 font-medium mt-1">TEAM {match.team_b_id?.team_no}</p>
                                         </div>
                                     </div>
                                 );

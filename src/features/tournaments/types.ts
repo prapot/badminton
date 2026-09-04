@@ -18,6 +18,7 @@ export interface ListTournament {
     user_created?: {
         id: number;
         username: string;
+        nickname?: string;
         picture?: { url: string } | null;
     } | null;
 }
@@ -25,6 +26,7 @@ export interface ListTournament {
 export interface User {
     id: number;
     username?: string;
+    nickname?: string;
     email?: string;
 }
 
@@ -32,6 +34,7 @@ export interface User {
 export interface RegisteredPlayer {
     id: number;
     username: string;
+    nickname?: string;
     email: string;
     tpDocumentId: string;
     picture?: { url: string } | null;
@@ -50,7 +53,7 @@ export interface TournamentInfo {
     startDate: string;
     mode: "ranking" | "casual" | "party";
     players: RegisteredPlayer[];
-    user_created?: { id: number; username?: string } | null;
+    user_created?: { id: number; username?: string; nickname?: string } | null;
     permanent_teams?: any[];
 }
 
@@ -67,6 +70,7 @@ export interface ApiRanking {
 export interface ApiPlayer {
     id: number;
     username: string;
+    nickname?: string;
     picture?: { url: string } | null;
     rankings?: ApiRanking[] | null;
     guest_name?: string | null;

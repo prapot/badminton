@@ -6,6 +6,7 @@ export interface ApiUser {
     id: number;
     documentId: string;
     username: string;
+    nickname?: string;
     email: string;
     picture?: ApiPicture | null;
 }
@@ -34,6 +35,7 @@ export interface ApiSeason {
 export interface PlayerRow {
     userId: number;
     username: string;
+    nickname?: string;
     email: string;
     picture?: ApiPicture | null;
     ranking_points: number;

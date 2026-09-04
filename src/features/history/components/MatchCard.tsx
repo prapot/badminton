@@ -24,8 +24,23 @@ export function MatchCard({ history: h, userId }: Props) {
     const tournament = match.tournament_id;
     const isRanking = tournament?.mode === "ranking";
 
-    const userTeamNames = userTeam?.team_players?.map(p => p.user_id?.username).join(" / ") || "รอยืนยัน";
-    const oppTeamNames = oppTeam?.team_players?.map(p => p.user_id?.username).join(" / ") || "รอยืนยัน";
+    const renderTeamPlayers = (team: any, colorClass: string) => {
+        if (!team?.team_players || team.team_players.length === 0) return <span className={`italic text-slate-500`}>รอยืนยัน</span>;
+        
+        return (
+            <div className={`flex items-center flex-wrap gap-y-1`}>
+                {team.team_players.map((p: any, idx: number) => (
+                    <React.Fragment key={idx}>
+                        {idx > 0 && <span className="text-slate-600 text-[10px] mx-1.5 self-center">/</span>}
+                        <div className="flex flex-col justify-center">
+                            <span className={`font-bold ${colorClass}`}>{p.user_id?.username || "Unknown"}</span>
+                            {p.user_id?.nickname && <span className="text-[9px] text-slate-500 font-normal mt-0.5">{p.user_id.nickname}</span>}
+                        </div>
+                    </React.Fragment>
+                ))}
+            </div>
+        );
+    };
 
     return (
         <div
@@ -76,10 +91,10 @@ export function MatchCard({ history: h, userId }: Props) {
                         {tournament?.name || "รายการแข่งขันถ้วยรางวัล"}
                     </p>
 
-                    <div className="flex items-center gap-3 text-xs text-slate-400">
-                        <span className="font-semibold text-green-300">{userTeamNames}</span>
-                        <span className="text-[9px] text-slate-600 italic">vs</span>
-                        <span className="font-semibold">{oppTeamNames}</span>
+                    <div className="flex items-center gap-2 text-xs text-slate-400 mt-2">
+                        {renderTeamPlayers(userTeam, 'text-green-300')}
+                        <span className="text-[9px] text-slate-600 italic px-1 self-center">vs</span>
+                        {renderTeamPlayers(oppTeam, 'text-slate-300')}
                     </div>
                 </div>
 

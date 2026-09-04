@@ -90,6 +90,7 @@ export default function TournamentHeader({
                         {tournamentInfo.user_created?.username && (
                             <span className="text-[10px] sm:text-xs px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-400">
                                 👤 {tournamentInfo.user_created.username}
+                                {tournamentInfo.user_created.nickname && ` (${tournamentInfo.user_created.nickname})`}
                             </span>
                         )}
                         {/* Invite button */}

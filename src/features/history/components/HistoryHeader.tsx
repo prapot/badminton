@@ -32,7 +32,10 @@ export function HistoryHeader({ targetUser, seasons, selectedSeason, setSelected
                 </div>
                 <div>
                     <h1 className="text-xl sm:text-2xl font-bold text-white mb-1">ประวัติการแข่งขัน</h1>
-                    <p className="text-slate-400 font-medium text-sm sm:text-base mb-2">{targetUser?.username}</p>
+                    <div className="flex items-center gap-2 mb-2">
+                        <p className="text-slate-400 font-medium text-sm sm:text-base">{targetUser?.username}</p>
+                        {targetUser?.nickname && <p className="text-slate-500 font-medium text-[11px] mt-0.5">({targetUser.nickname})</p>}
+                    </div>
                     
                     {/* Lifetime Stats */}
                     {lifetimeStats && (

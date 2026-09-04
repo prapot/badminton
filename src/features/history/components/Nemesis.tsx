@@ -10,6 +10,7 @@ interface NemesisData {
     wins: number; // Target user's wins against this opponent
     losses: number; // Target user's losses against this opponent
     winRate: number; // Target user's win rate
+    nickname?: string;
 }
 
 interface NemesisProps {
@@ -139,6 +140,7 @@ export function Nemesis({ userId, selectedSeason }: NemesisProps) {
                             <div className="flex-1 min-w-0 flex items-center justify-between">
                                 <div className="flex flex-col">
                                     <h4 className="font-semibold text-white truncate text-base">{opponent.username}</h4>
+                                    {opponent.nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{opponent.nickname}</span>}
                                     <span className="text-xs text-slate-400 truncate mt-0.5">
                                         แพ้ {opponent.losses}/{opponent.matchesPlayed} แมทช์
                                     </span>

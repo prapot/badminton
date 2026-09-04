@@ -22,11 +22,11 @@ export interface MatchHistory {
         } | null;
         team_a_id?: {
             name: string;
-            team_players: Array<{ user_id?: { id: number; username: string } }>;
+            team_players: Array<{ user_id?: { id: number; username: string; nickname?: string } }>;
         } | null;
         team_b_id?: {
             name: string;
-            team_players: Array<{ user_id?: { id: number; username: string } }>;
+            team_players: Array<{ user_id?: { id: number; username: string; nickname?: string } }>;
         } | null;
     }>;
     ranking?: {
@@ -47,6 +47,7 @@ export interface PaginationMeta {
 export interface TargetUser {
     id: number;
     username: string;
+    nickname?: string;
     picture?: { url: string } | null;
 }
 

@@ -202,7 +202,10 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                         <div className="flex flex-col items-end justify-center min-w-0 shrink">
                                                                             <div className="flex items-center justify-end gap-1.5 sm:gap-2 mb-1">
                                                                                 {winnerA && idx === 0 && <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-wider text-accent-green bg-accent-green/10 px-1 py-0.5 rounded-md">Win</span>}
-                                                                                <p className="font-bold text-xs sm:text-sm truncate text-white text-right">{u.username}</p>
+                                                                                <div className="flex flex-col items-end">
+                                                                                    <p className="font-bold text-xs sm:text-sm truncate text-white text-right">{u.username}</p>
+                                                                                    {u.nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{u.nickname}</span>}
+                                                                                </div>
                                                                             </div>
                                                                             {/* Stats - ranking mode only */}
                                                                             {tournamentInfo.mode === "ranking" && (
@@ -323,7 +326,10 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                 </div>
                                                                                 <div className="flex flex-col items-start justify-center min-w-0 shrink">
                                                                                     <div className="flex items-center justify-start gap-1.5 sm:gap-2 mb-1">
-                                                                                        <p className="font-bold text-xs sm:text-sm truncate text-white">{u.username}</p>
+                                                                                        <div className="flex flex-col">
+                                                                                            <p className="font-bold text-xs sm:text-sm truncate text-white">{u.username}</p>
+                                                                                            {u.nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{u.nickname}</span>}
+                                                                                        </div>
                                                                                         {winnerB && idx === 0 && <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-wider text-accent-green bg-accent-green/10 px-1 py-0.5 rounded-md">Win</span>}
                                                                                     </div>
                                                                                     {/* Stats - ranking mode only */}

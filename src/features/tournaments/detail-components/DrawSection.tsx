@@ -181,8 +181,13 @@ const DrawSection: React.FC<DrawSectionProps> = ({
                                                                     {pUrl ? <Image src={pUrl} alt={p.username} width={24} height={24} className="w-full h-full object-cover" /> : p.username.charAt(0).toUpperCase()}
                                                                 </div>
                                                                 <div className="min-w-0">
-                                                                    <p className="text-xs sm:text-sm font-semibold text-white truncate">{p.username}</p>
-                                                                    {p.id === user?.id && <span className="text-[9px] text-green-400 font-bold">คุณ</span>}
+                                                                    <div className="flex flex-col">
+                                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                                            <p className="text-xs sm:text-sm font-semibold text-white truncate">{p.username}</p>
+                                                                            {p.id === user?.id && <span className="text-[9px] text-green-400 font-bold shrink-0">คุณ</span>}
+                                                                        </div>
+                                                                        {p.nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{p.nickname}</span>}
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         );
@@ -219,8 +224,13 @@ const DrawSection: React.FC<DrawSectionProps> = ({
                                                                 return (
                                                                     <div key={`${p.id}-${pIdx}`} className="flex items-center justify-end gap-2 min-w-0 w-full">
                                                                         <div className="min-w-0 text-right">
-                                                                            <p className="text-xs sm:text-sm font-semibold text-white truncate">{p.username}</p>
-                                                                            {p.id === user?.id && <span className="text-[9px] text-green-400 font-bold">คุณ</span>}
+                                                                            <div className="flex flex-col items-end">
+                                                                                <div className="flex items-center justify-end gap-1.5 min-w-0">
+                                                                                    {p.id === user?.id && <span className="text-[9px] text-green-400 font-bold shrink-0">คุณ</span>}
+                                                                                    <p className="text-xs sm:text-sm font-semibold text-white truncate">{p.username}</p>
+                                                                                </div>
+                                                                                {p.nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{p.nickname}</span>}
+                                                                            </div>
                                                                         </div>
                                                                         <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold text-[10px] sm:text-xs shrink-0 overflow-hidden border border-purple-500/20 shadow-sm">
                                                                             {pUrl ? <Image src={pUrl} alt={p.username} width={24} height={24} className="w-full h-full object-cover" /> : p.username.charAt(0).toUpperCase()}

@@ -27,6 +27,19 @@ export function ProfileAccountForm({ form, setForm }: Props) {
 
             <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1.5">
+                    ฉายา
+                </label>
+                <input
+                    type="text"
+                    value={form.nickname}
+                    onChange={(e) => setForm({ ...form, nickname: e.target.value })}
+                    placeholder="ใส่ฉายาของคุณ (เช่น เทพสายฟ้า)"
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500/50 text-sm focus:outline-none focus:border-green-500/50 focus:bg-white/8 transition-all"
+                />
+            </div>
+
+            <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">
                     อีเมล <span className="text-red-400">*</span>
                 </label>
                 <input

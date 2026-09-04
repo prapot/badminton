@@ -296,7 +296,10 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                                     className="flex-1 min-w-0 cursor-pointer"
                                 >
                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                        <p className="text-sm font-bold text-white truncate">{player.username}</p>
+                                        <div className="flex flex-col">
+                                            <p className="text-sm font-bold text-white truncate">{player.username}</p>
+                                            {player.nickname && <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{player.nickname}</p>}
+                                        </div>
                                         {isPaused && (
                                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 font-bold shrink-0">⏸ พัก</span>
                                         )}

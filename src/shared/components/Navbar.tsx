@@ -8,6 +8,7 @@ import Image from "next/image";
 interface User {
     id: number;
     username: string;
+    nickname?: string;
     email: string;
     picture?: { url: string } | null;
 }
@@ -110,6 +111,7 @@ export default function Navbar() {
                         {user && (
                             <span className="text-sm text-slate-400 hidden sm:block mr-2">
                                 สวัสดี, <span className="text-white font-medium">{user.username}</span>
+                                {user.nickname && <span className="text-[11px] text-slate-500 ml-1">({user.nickname})</span>}
                             </span>
                         )}
                         {/* Profile button */}
@@ -182,9 +184,10 @@ export default function Navbar() {
                                     user.username.charAt(0).toUpperCase()
                                 )}
                             </div>
-                            <div className="min-w-0">
+                            <div className="min-w-0 flex flex-col justify-center">
                                 <p className="text-sm font-semibold text-white truncate">{user.username}</p>
-                                <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                                {user.nickname && <p className="text-[10px] text-slate-300 font-medium truncate mt-0.5">{user.nickname}</p>}
+                                <p className="text-[11px] text-slate-400/80 truncate mt-0.5">{user.email}</p>
                             </div>
                         </div>
                     </div>

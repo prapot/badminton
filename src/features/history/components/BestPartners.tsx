@@ -9,6 +9,7 @@ interface BestPartnerData {
     matchesPlayed: number;
     wins: number;
     winRate: number;
+    nickname?: string;
 }
 
 interface BestPartnersProps {
@@ -131,6 +132,7 @@ export function BestPartners({ userId, selectedSeason }: BestPartnersProps) {
                             <div className="flex-1 min-w-0 flex items-center justify-between">
                                 <div className="flex flex-col">
                                     <h4 className="font-semibold text-white truncate text-base">{partner.username}</h4>
+                                    {partner.nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{partner.nickname}</span>}
                                     <span className="text-xs text-slate-400 truncate mt-0.5">
                                         ชนะ {partner.wins}/{partner.matchesPlayed} แมทช์
                                     </span>

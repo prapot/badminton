@@ -9,6 +9,7 @@ export function useProfileForm(user: any, jwt: string | null, initialPictureUrl:
         documentId: "",
         picture: "",
         username: "",
+        nickname: "",
         email: "",
         password: "",
         confirmPassword: "",
@@ -26,6 +27,7 @@ export function useProfileForm(user: any, jwt: string | null, initialPictureUrl:
             setForm((f) => ({
                 ...f,
                 username: user.username,
+                nickname: user.nickname || "",
                 email: user.email
             }));
         }
@@ -77,6 +79,7 @@ export function useProfileForm(user: any, jwt: string | null, initialPictureUrl:
 
             const payload: Record<string, any> = {
                 username: form.username.trim(),
+                nickname: form.nickname.trim(),
                 email: form.email.trim(),
             };
             if (form.password) payload.password = form.password;
@@ -106,6 +109,7 @@ export function useProfileForm(user: any, jwt: string | null, initialPictureUrl:
             localStorage.setItem("user", JSON.stringify({
                 ...stored,
                 username: updated.username ?? form.username,
+                nickname: updated.nickname ?? form.nickname,
                 email: updated.email ?? form.email,
                 picture: updated.picture ?? stored.picture,
             }));

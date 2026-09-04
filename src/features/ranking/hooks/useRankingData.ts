@@ -74,6 +74,7 @@ export function useRankingData() {
             merged.push({
                 userId: u.id,
                 username: u.username || "Unknown",
+                nickname: u.nickname,
                 email: u.email || "",
                 picture: u.picture,
                 ranking_points: r.ranking_points,
@@ -92,6 +93,7 @@ export function useRankingData() {
                 merged.push({
                     userId: u.id,
                     username: u.username,
+                    nickname: u.nickname,
                     email: u.email,
                     picture: u.picture,
                     ranking_points: 0,

@@ -47,7 +47,7 @@ export function useHistoryData(userId: string) {
     );
 
     // 3. Fetch Match Histories (No season filter but support date filter)
-    let historiesUrl = `${STRAPI_BASE_URL}/api/match-histories?filters[users][id]=${userId}&populate[matches][populate][team_a_id][populate][team_players][populate]=user_id&populate[matches][populate][team_b_id][populate][team_players][populate]=user_id&populate[matches][populate]=tournament_id&populate[ranking][populate]=season&sort=createdAt:desc&pagination[page]=${page}&pagination[pageSize]=10`;
+    let historiesUrl = `${STRAPI_BASE_URL}/api/match-histories?filters[users][id]=${userId}&populate[matches][populate][team_a_id][populate][team_players][populate]=user_id&populate[matches][populate][team_b_id][populate][team_players][populate]=user_id&populate[matches][populate][tournament_id][populate][tournament_players][populate]=user&populate[ranking][populate]=season&sort=createdAt:desc&pagination[page]=${page}&pagination[pageSize]=10`;
     
     if (filterDate) {
         const startOfDay = new Date(filterDate);

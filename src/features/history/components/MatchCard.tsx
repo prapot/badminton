@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import RankBadge from "@/features/tournaments/components/RankBadge";
+import SkillBadge from "@/features/tournaments/components/SkillBadge";
 import { getRankInfoFromPoints } from "@/features/tournaments/utils/TournamentUtils";
 import { MatchHistory } from "../types";
 
@@ -29,15 +30,26 @@ export function MatchCard({ history: h, userId }: Props) {
         
         return (
             <div className={`flex items-center flex-wrap gap-y-1`}>
-                {team.team_players.map((p: any, idx: number) => (
-                    <React.Fragment key={idx}>
-                        {idx > 0 && <span className="text-slate-600 text-[10px] mx-1.5 self-center">/</span>}
-                        <div className="flex flex-col justify-center">
-                            <span className={`font-bold ${colorClass}`}>{p.user_id?.username || "Unknown"}</span>
-                            {p.user_id?.nickname && <span className="text-[9px] text-slate-500 font-normal mt-0.5">{p.user_id.nickname}</span>}
-                        </div>
-                    </React.Fragment>
-                ))}
+                {team.team_players.map((p: any, idx: number) => {
+                    let skillLevel = p.skill_level;
+                    if (!skillLevel && p.user_id?.id && tournament?.tournament_players) {
+                        const tp = tournament.tournament_players.find((t: any) => t.user?.id === p.user_id.id);
+                        if (tp?.skill_level) skillLevel = tp.skill_level;
+                    }
+                    
+                    return (
+                        <React.Fragment key={idx}>
+                            {idx > 0 && <span className="text-slate-600 text-[10px] mx-1.5 self-center">/</span>}
+                            <div className="flex flex-col justify-center">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className={`font-bold ${colorClass}`}>{p.user_id?.username || "Unknown"}</span>
+                                    {skillLevel && <SkillBadge skillLevel={skillLevel} showLabel={false} />}
+                                </div>
+                                {p.user_id?.nickname && <span className="text-[9px] text-slate-500 font-normal mt-0.5">{p.user_id.nickname}</span>}
+                            </div>
+                        </React.Fragment>
+                    );
+                })}
             </div>
         );
     };

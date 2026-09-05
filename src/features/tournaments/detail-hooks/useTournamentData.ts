@@ -30,7 +30,7 @@ export function useTournamentData(id: string, jwt: string | null) {
             .then((r) => r.json())
             .then((json) => {
                 const data = json.data ?? json;
-                const tpArr: Array<{ documentId?: string; id?: number | string; is_paused?: boolean; match_offset?: number; guest_name?: string; user?: Omit<RegisteredPlayer, "tpDocumentId" | "is_paused" | "match_offset"> }> = data.tournament_players ?? [];
+                const tpArr: Array<{ documentId?: string; id?: number | string; is_paused?: boolean; match_offset?: number; guest_name?: string; skill_level?: string; user?: Omit<RegisteredPlayer, "tpDocumentId" | "is_paused" | "match_offset" | "skill_level"> }> = data.tournament_players ?? [];
                 setTournamentInfo({
                     name: data.name ?? "",
                     tournament_status: data.tournament_status ?? "upcoming",
@@ -44,11 +44,11 @@ export function useTournamentData(id: string, jwt: string | null) {
                             if (current.user) {
                                 const x = acc.find(item => item.id === current.user!.id);
                                 if (!x) {
-                                    return acc.concat([{ ...current.user!, tpDocumentId: String(current.documentId || current.id || ""), is_paused: current.is_paused || false, match_offset: current.match_offset || 0 }]);
+                                    return acc.concat([{ ...current.user!, tpDocumentId: String(current.documentId || current.id || ""), is_paused: current.is_paused || false, match_offset: current.match_offset || 0, skill_level: current.skill_level }]);
                                 }
                             } else if (current.guest_name) {
                                 const fauxId = -(Number(current.id) || Math.floor(Math.random() * 10000));
-                                return acc.concat([{ id: fauxId, username: current.guest_name, email: "", tpDocumentId: String(current.documentId || current.id || ""), is_paused: current.is_paused || false, match_offset: current.match_offset || 0, is_guest: true, guest_name: current.guest_name }]);
+                                return acc.concat([{ id: fauxId, username: current.guest_name, email: "", tpDocumentId: String(current.documentId || current.id || ""), is_paused: current.is_paused || false, match_offset: current.match_offset || 0, is_guest: true, guest_name: current.guest_name, skill_level: current.skill_level }]);
                             }
                             return acc;
                         }, [] as RegisteredPlayer[]),
@@ -83,7 +83,7 @@ export function useTournamentData(id: string, jwt: string | null) {
             .then((r) => r.json())
             .then((json) => {
                 const data = json.data ?? json;
-                const tpArr: Array<{ documentId?: string; id?: number | string; is_paused?: boolean; match_offset?: number; guest_name?: string; user?: Omit<RegisteredPlayer, "tpDocumentId" | "is_paused" | "match_offset"> }> = data.tournament_players ?? [];
+                const tpArr: Array<{ documentId?: string; id?: number | string; is_paused?: boolean; match_offset?: number; guest_name?: string; skill_level?: string; user?: Omit<RegisteredPlayer, "tpDocumentId" | "is_paused" | "match_offset" | "skill_level"> }> = data.tournament_players ?? [];
                 setTournamentInfo((prev) => prev ? {
                     ...prev,
                     startDate: data.startDate ?? prev.startDate,
@@ -94,11 +94,11 @@ export function useTournamentData(id: string, jwt: string | null) {
                             if (current.user) {
                                 const x = acc.find(item => item.id === current.user!.id);
                                 if (!x) {
-                                    return acc.concat([{ ...current.user!, tpDocumentId: String(current.documentId || current.id || ""), is_paused: current.is_paused || false, match_offset: current.match_offset || 0 }]);
+                                    return acc.concat([{ ...current.user!, tpDocumentId: String(current.documentId || current.id || ""), is_paused: current.is_paused || false, match_offset: current.match_offset || 0, skill_level: current.skill_level }]);
                                 }
                             } else if (current.guest_name) {
                                 const fauxId = -(Number(current.id) || Math.floor(Math.random() * 10000));
-                                return acc.concat([{ id: fauxId, username: current.guest_name, email: "", tpDocumentId: String(current.documentId || current.id || ""), is_paused: current.is_paused || false, match_offset: current.match_offset || 0, is_guest: true, guest_name: current.guest_name }]);
+                                return acc.concat([{ id: fauxId, username: current.guest_name, email: "", tpDocumentId: String(current.documentId || current.id || ""), is_paused: current.is_paused || false, match_offset: current.match_offset || 0, is_guest: true, guest_name: current.guest_name, skill_level: current.skill_level }]);
                             }
                             return acc;
                         }, [] as RegisteredPlayer[]),

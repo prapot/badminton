@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
 import { TournamentInfo, ApiMatch, User } from "@/features/tournaments/types";
+import { promptSkillLevel } from "@/features/tournaments/utils/skillPrompt";
 
 const STRAPI_BASE_URL = process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
 
@@ -56,9 +57,13 @@ export function useTournamentActions({
             }
         }
 
+        // Prompt for skill level
+        const skillLevel = await promptSkillLevel();
+        if (!skillLevel) return;
+
         setJoining(true);
         try {
-            const body: Record<string, unknown> = { tournament_id: id, user: user.id, seed: null };
+            const body: Record<string, unknown> = { tournament_id: id, user: user.id, seed: null, skill_level: skillLevel };
             if (matchOffset > 0) body.match_offset = matchOffset;
 
             const res = await fetch(`${STRAPI_BASE_URL}/api/tournament-players`, {

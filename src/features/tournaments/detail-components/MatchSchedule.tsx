@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { TournamentInfo, User, ApiMatch } from '../types';
 import { getRankInfoFromPoints } from '../utils/TournamentUtils';
 import RankBadge from '../components/RankBadge';
+import SkillBadge from '../components/SkillBadge';
 import { cn } from '@/shared/utils/utils';
 import { cva } from 'class-variance-authority';
 import { ClipboardList, RefreshCw, XCircle, CheckCircle, Activity, Trophy, Play } from 'lucide-react';
@@ -193,7 +194,8 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                     <div className={cn("flex-1 min-w-0 transition-colors", winnerA ? "text-accent-green" : (isCompleted && !winnerA ? "text-slate-500" : "text-white"))}>
                                                         <div className="flex flex-col gap-3 justify-center h-full">
                                                             {match.team_a_id?.team_players.map((tp, idx) => {
-                                                                const u = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
+                                                                const uFromTp = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
+                                                                const u = uFromTp ? (tournamentInfo.players?.find(p => (tp.user_id && p.id === tp.user_id.id) || (tp.guest_name && p.is_guest && p.guest_name === tp.guest_name)) || uFromTp) : null;
                                                                 if (!u) return null;
                                                                 const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
                                                                 const rp_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.rp_change;
@@ -203,8 +205,11 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                             <div className="flex items-center justify-end gap-1.5 sm:gap-2 mb-1">
                                                                                 {winnerA && idx === 0 && <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-wider text-accent-green bg-accent-green/10 px-1 py-0.5 rounded-md">Win</span>}
                                                                                 <div className="flex flex-col items-end">
-                                                                                    <p className="font-bold text-xs sm:text-sm truncate text-white text-right">{u.username}</p>
-                                                                                    {u.nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{u.nickname}</span>}
+                                                                                    <div className="flex items-center justify-end gap-1.5 flex-wrap flex-row-reverse">
+                                                                                        <p className="font-bold text-xs sm:text-sm truncate text-white text-right">{u.username}</p>
+                                                                                        {(u as any).skill_level && <SkillBadge skillLevel={(u as any).skill_level} showLabel={false} />}
+                                                                                    </div>
+                                                                                    {(u as any).nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{(u as any).nickname}</span>}
                                                                                 </div>
                                                                             </div>
                                                                             {/* Stats - ranking mode only */}
@@ -290,7 +295,8 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                             {match.team_b_id ? (
                                                                 <>
                                                                     {match.team_b_id.team_players.map((tp, idx) => {
-                                                                        const u = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
+                                                                        const uFromTp = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
+                                                                        const u = uFromTp ? (tournamentInfo.players?.find(p => (tp.user_id && p.id === tp.user_id.id) || (tp.guest_name && p.is_guest && p.guest_name === tp.guest_name)) || uFromTp) : null;
                                                                         if (!u) return null;
                                                                         const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
                                                                         const rp_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.rp_change;
@@ -326,9 +332,12 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                 </div>
                                                                                 <div className="flex flex-col items-start justify-center min-w-0 shrink">
                                                                                     <div className="flex items-center justify-start gap-1.5 sm:gap-2 mb-1">
-                                                                                        <div className="flex flex-col">
-                                                                                            <p className="font-bold text-xs sm:text-sm truncate text-white">{u.username}</p>
-                                                                                            {u.nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{u.nickname}</span>}
+                                                                                        <div className="flex flex-col items-start">
+                                                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                                                <p className="font-bold text-xs sm:text-sm truncate text-white text-left">{u.username}</p>
+                                                                                                {(u as any).skill_level && <SkillBadge skillLevel={(u as any).skill_level} showLabel={false} />}
+                                                                                            </div>
+                                                                                            {(u as any).nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{(u as any).nickname}</span>}
                                                                                         </div>
                                                                                         {winnerB && idx === 0 && <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-wider text-accent-green bg-accent-green/10 px-1 py-0.5 rounded-md">Win</span>}
                                                                                     </div>

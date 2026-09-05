@@ -43,6 +43,7 @@ export interface RegisteredPlayer {
     match_offset?: number;
     guest_name?: string | null;
     is_guest?: boolean;
+    skill_level?: string;
 }
 
 export interface TournamentInfo {

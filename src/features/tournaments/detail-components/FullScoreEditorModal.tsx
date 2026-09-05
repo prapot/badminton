@@ -1,6 +1,7 @@
 import { ApiMatch, TournamentInfo } from "../types";
 import Swal from "sweetalert2";
 import Image from 'next/image';
+import SkillBadge from "../components/SkillBadge";
 
 interface FullScoreEditorModalProps {
     match: ApiMatch;
@@ -81,7 +82,8 @@ export default function FullScoreEditorModal({
                     <div className="flex-1 flex flex-col gap-6 items-center">
                         <div className="flex flex-col gap-3 w-full">
                             {(match.team_a_id?.team_players || []).map((tp, idx) => {
-                                const u = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
+                                const uFromTp = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
+                                const u = uFromTp ? (tournamentInfo?.players?.find(p => (tp.user_id && p.id === tp.user_id.id) || (tp.guest_name && p.is_guest && p.guest_name === tp.guest_name)) || uFromTp) : null;
                                 if (!u) return null;
                                 const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
                                 return (
@@ -90,8 +92,11 @@ export default function FullScoreEditorModal({
                                             {pUrl ? <Image src={pUrl} alt={u.username} width={32} height={32} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                         </div>
                                         <div className="min-w-0 flex flex-col justify-center">
-                                            <p className="font-bold text-sm text-white truncate">{u.username}</p>
-                                            {u.nickname && <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{u.nickname}</p>}
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <p className="font-bold text-sm text-white truncate">{u.username}</p>
+                                                {(u as any).skill_level && <SkillBadge skillLevel={(u as any).skill_level} showLabel={false} />}
+                                            </div>
+                                            {(u as any).nickname && <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{(u as any).nickname}</p>}
                                             <p className="text-[10px] text-slate-500 font-medium mt-1">TEAM {match.team_a_id?.team_no}</p>
                                         </div>
                                     </div>
@@ -137,7 +142,8 @@ export default function FullScoreEditorModal({
                     <div className="flex-1 flex flex-col gap-6 items-center">
                         <div className="flex flex-col gap-3 w-full">
                             {(match.team_b_id?.team_players || []).map((tp, idx) => {
-                                const u = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
+                                const uFromTp = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
+                                const u = uFromTp ? (tournamentInfo?.players?.find(p => (tp.user_id && p.id === tp.user_id.id) || (tp.guest_name && p.is_guest && p.guest_name === tp.guest_name)) || uFromTp) : null;
                                 if (!u) return null;
                                 const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
                                 return (
@@ -146,8 +152,11 @@ export default function FullScoreEditorModal({
                                             {pUrl ? <Image src={pUrl} alt={u.username} width={32} height={32} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                         </div>
                                         <div className="min-w-0 flex flex-col justify-center">
-                                            <p className="font-bold text-sm text-white truncate">{u.username}</p>
-                                            {u.nickname && <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{u.nickname}</p>}
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <p className="font-bold text-sm text-white truncate">{u.username}</p>
+                                                {(u as any).skill_level && <SkillBadge skillLevel={(u as any).skill_level} showLabel={false} />}
+                                            </div>
+                                            {(u as any).nickname && <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{(u as any).nickname}</p>}
                                             <p className="text-[10px] text-slate-500 font-medium mt-1">TEAM {match.team_b_id?.team_no}</p>
                                         </div>
                                     </div>

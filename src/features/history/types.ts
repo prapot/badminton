@@ -19,6 +19,7 @@ export interface MatchHistory {
             name: string;
             mode: string;
             documentId: string;
+            tournament_players?: Array<{ skill_level?: string; user?: { id: number; username: string } }>;
         } | null;
         team_a_id?: {
             name: string;

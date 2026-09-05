@@ -1,7 +1,9 @@
 import { useState } from "react";
 import useSWR from "swr";
+import Swal from "sweetalert2";
 import { useAuth } from "@/features/auth/useAuth";
 import { ListTournament, TournamentStatus, PaginationMeta } from "@/features/tournaments/types";
+import { promptSkillLevel } from "@/features/tournaments/utils/skillPrompt";
 
 const STRAPI_BASE_URL = process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
 
@@ -70,6 +72,10 @@ export function useTournamentList() {
             showToast("คุณเข้าร่วมรายการนี้แล้ว", "error");
             return;
         }
+        // Prompt for skill level
+        const skillLevel = await promptSkillLevel();
+        if (!skillLevel) return;
+
         setJoiningId(tournamentId);
         try {
             const res = await fetch(`${STRAPI_BASE_URL}/api/tournament-players`, {
@@ -83,6 +89,7 @@ export function useTournamentList() {
                         tournament_id: tournamentId,
                         user: user.id,
                         seed: null,
+                        skill_level: skillLevel,
                     },
                 }),
             });

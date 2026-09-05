@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import Swal from "sweetalert2";
 import RankBadge from "../components/RankBadge";
+import SkillBadge from "../components/SkillBadge";
 
 interface ApiPlayer {
     id: number;
@@ -13,6 +14,8 @@ interface ApiPlayer {
     match_offset?: number;
     is_guest?: boolean | null;
     guest_name?: string | null;
+    skill_level?: string;
+    nickname?: string;
 }
 
 interface ApiMatch {
@@ -784,7 +787,11 @@ export default function EndlessModeManager({
                                                     >
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center justify-between gap-2">
-                                                                <span className="text-sm font-bold text-white truncate">{p.username}</span>
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                    <span className="text-sm font-bold text-white truncate">{p.username}</span>
+                                                                    {p.skill_level && <SkillBadge skillLevel={p.skill_level} showLabel={false} />}
+                                                                </div>
+                                                                {p.nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{p.nickname}</span>}
                                                                 <span className="text-[10px] text-slate-500 font-bold shrink-0">{actualPlayerCounts.get(p.id) || 0} แมตซ์</span>
                                                             </div>
                                                             <div className="mt-1 flex items-center gap-2">
@@ -837,7 +844,11 @@ export default function EndlessModeManager({
                                                     >
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center justify-between gap-2">
-                                                                <span className="text-sm font-bold text-white truncate">{p.username}</span>
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                    <span className="text-sm font-bold text-white truncate">{p.username}</span>
+                                                                    {p.skill_level && <SkillBadge skillLevel={p.skill_level} showLabel={false} />}
+                                                                </div>
+                                                                {p.nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{p.nickname}</span>}
                                                                 <span className="text-[10px] text-slate-500 font-bold shrink-0">{actualPlayerCounts.get(p.id) || 0} แมตซ์</span>
                                                             </div>
                                                             <div className="mt-1 flex items-center gap-2">
@@ -911,7 +922,13 @@ export default function EndlessModeManager({
                                                             }`} />
                                                         <span className={`flex-1 text-xs font-medium truncate ${isBusy || isPaused ? "text-slate-500" : "text-slate-200"
                                                             }`}>
-                                                            {p.username}
+                                                            <div className="flex flex-col">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span>{p.username}</span>
+                                                                    {p.skill_level && <SkillBadge skillLevel={p.skill_level} showLabel={false} />}
+                                                                </div>
+                                                                {p.nickname && <span className="text-[9px] text-slate-400 font-medium truncate mt-0.5 leading-tight">{p.nickname}</span>}
+                                                            </div>
                                                         </span>
                                                         {tournamentMode === 'ranking' && <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} size="sm" showName={false} />}
                                                         {isBusy && <span className="text-[9px] text-orange-400 font-bold shrink-0">แข่งอยู่</span>}
@@ -968,7 +985,11 @@ export default function EndlessModeManager({
                                             {manualTeamA.length === 0 ? <div className="text-xs text-slate-500 italic py-1">เลือกผู้เล่น...</div> : null}
                                             {manualTeamA.map(p => (
                                                 <div key={p.id} className="flex justify-between items-center bg-black/20 rounded-lg px-2 py-1.5" onClick={(e) => { e.stopPropagation(); setManualTeamA(manualTeamA.filter(x => x.id !== p.id)); }}>
-                                                    <span className="text-xs font-bold text-white truncate">{p.username}</span>
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span className="text-xs font-bold text-white truncate">{p.username}</span>
+                                                        {p.skill_level && <SkillBadge skillLevel={p.skill_level} showLabel={false} />}
+                                                    </div>
+                                                    {p.nickname && <span className="text-[9px] text-slate-400 font-medium truncate mt-0.5">{p.nickname}</span>}
                                                     <span className="text-slate-400 text-xs">✕</span>
                                                 </div>
                                             ))}
@@ -987,7 +1008,11 @@ export default function EndlessModeManager({
                                             {manualTeamB.length === 0 ? <div className="text-xs text-slate-500 italic py-1">เลือกผู้เล่น...</div> : null}
                                             {manualTeamB.map(p => (
                                                 <div key={p.id} className="flex justify-between items-center bg-black/20 rounded-lg px-2 py-1.5" onClick={(e) => { e.stopPropagation(); setManualTeamB(manualTeamB.filter(x => x.id !== p.id)); }}>
-                                                    <span className="text-xs font-bold text-white truncate">{p.username}</span>
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span className="text-xs font-bold text-white truncate">{p.username}</span>
+                                                        {p.skill_level && <SkillBadge skillLevel={p.skill_level} showLabel={false} />}
+                                                    </div>
+                                                    {p.nickname && <span className="text-[9px] text-slate-400 font-medium truncate mt-0.5">{p.nickname}</span>}
                                                     <span className="text-slate-400 text-xs">✕</span>
                                                 </div>
                                             ))}
@@ -1029,7 +1054,11 @@ export default function EndlessModeManager({
                                                         className={`w-full flex justify-between items-center p-2 rounded-xl border text-left transition-all ${isSelected ? "opacity-30 bg-black/10 border-transparent" : "bg-white/[0.04] border-white/10 hover:bg-white/[0.08] active:scale-[0.98]"}`}
                                                     >
                                                         <div>
-                                                            <div className="text-xs font-bold text-slate-200">{p.username}</div>
+                                                            <div className="flex items-center justify-center gap-1.5">
+                                                                <div className="text-xs font-bold text-slate-200">{p.username}</div>
+                                                                {p.skill_level && <SkillBadge skillLevel={p.skill_level} showLabel={false} />}
+                                                            </div>
+                                                            {p.nickname && <div className="text-[9px] text-slate-400 font-medium mt-0.5">{p.nickname}</div>}
                                                             <div className="text-[9px] text-slate-500 mt-0.5">{actualPlayerCounts.get(p.id) || 0} แมตซ์</div>
                                                         </div>
                                                         <div className="flex items-center gap-1">
@@ -1090,7 +1119,11 @@ export default function EndlessModeManager({
                                                             {team.players.map(p => (
                                                                 <div key={p.id} className="flex items-center gap-2">
                                                                     {tournamentMode === 'ranking' && <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} size="sm" showName={true} />}
-                                                                    <span className="text-[11px] font-bold text-white truncate">{p.username}</span>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span className="text-[11px] font-bold text-white truncate">{p.username}</span>
+                                                                        {p.skill_level && <SkillBadge skillLevel={p.skill_level} showLabel={false} />}
+                                                                    </div>
+                                                                    {p.nickname && <span className="text-[9px] text-slate-400 font-medium truncate mt-0.5">{p.nickname}</span>}
                                                                 </div>
                                                             ))}
                                                         </div>

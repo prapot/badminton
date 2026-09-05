@@ -94,3 +94,4 @@ export function getRankInfoFromPoints(points: number) {
     }
     return { tier: 'Bronze', rankStr: 'Bronze III', weight: 1000 };
 }
+

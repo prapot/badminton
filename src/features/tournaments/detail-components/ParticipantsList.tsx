@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { TournamentInfo, User } from '../types';
 import Swal from 'sweetalert2';
 import RankBadge from '../components/RankBadge';
+import SkillBadge from '../components/SkillBadge';
 
 interface ParticipantsListProps {
     tournamentId: string;
@@ -297,7 +298,12 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                                 >
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                         <div className="flex flex-col">
-                                            <p className="text-sm font-bold text-white truncate">{player.username}</p>
+                                            <div className="flex items-center">
+                                                <p className="text-sm font-bold text-white truncate">{player.username}</p>
+                                                {player.skill_level && (
+                                                    <SkillBadge skillLevel={player.skill_level} className="ml-2" />
+                                                )}
+                                            </div>
                                             {player.nickname && <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{player.nickname}</p>}
                                         </div>
                                         {isPaused && (

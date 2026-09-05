@@ -1206,9 +1206,10 @@ export default function EndlessModeManager({
                                                 {isAssigned && <span className="text-[8px] text-slate-500 leading-none">🔒</span>}
                                             </span>
 
-                                            <span className="flex-1 font-medium text-left truncate">
-                                                {p.username}
-                                                {isBusy && <span className="ml-1.5 text-[9px] text-orange-400 font-bold">แข่งอยู่</span>}
+                                            <span className="flex-1 flex items-center gap-1.5 font-medium text-left min-w-0">
+                                                <span className="truncate">{p.username}</span>
+                                                {p.skill_level && <SkillBadge skillLevel={p.skill_level} showLabel={false} />}
+                                                {isBusy && <span className="text-[9px] text-orange-400 font-bold shrink-0">แข่งอยู่</span>}
                                             </span>
 
                                             <span

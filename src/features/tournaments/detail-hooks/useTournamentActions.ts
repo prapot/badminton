@@ -21,7 +21,7 @@ interface ActionsProps {
 }
 
 export function useTournamentActions({
-    id, jwt, user, tournamentInfo, setTournamentInfo, apiMatches, 
+    id, jwt, user, tournamentInfo, setTournamentInfo, apiMatches,
     pausedPlayerIds, playerMatchCounts, refreshInfo, fetchMatches, showToast
 }: ActionsProps) {
     const router = useRouter();
@@ -39,9 +39,9 @@ export function useTournamentActions({
         const isEndless = tournamentInfo?.format === "endless_mode";
         const isOngoing = tournamentInfo?.tournament_status === "ongoing";
         const canJoin = tournamentInfo?.tournament_status === "upcoming" || (isEndless && isOngoing);
-        
+
         if (!jwt || !user || joining || !canJoin) return;
-        
+
         if (tournamentInfo.players.some(p => p.id === user.id)) {
             showToast("คุณเข้าร่วมการแข่งขันนี้แล้ว", "error");
             return;
@@ -88,7 +88,7 @@ export function useTournamentActions({
         const isEndless = tournamentInfo?.format === "endless_mode";
         const canLeave = tournamentInfo?.tournament_status === "upcoming" || (isEndless && tournamentInfo?.tournament_status === "ongoing");
         if (!jwt || !myEntry || leaving || !canLeave) return;
-        
+
         setLeaving(true);
         try {
             const res = await fetch(`${STRAPI_BASE_URL}/api/tournament-players/${myEntry.tpDocumentId}`, {

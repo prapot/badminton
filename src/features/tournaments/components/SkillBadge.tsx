@@ -15,7 +15,8 @@ export default function SkillBadge({ skillLevel, showLabel = true, className }: 
 
     return (
         <span className={cn(
-            "flex items-center gap-1.5 text-[10px] pr-2 pl-1 py-0.5 rounded-full font-extrabold whitespace-nowrap shadow-sm border border-black/5",
+            "flex items-center text-[10px] rounded-full font-extrabold whitespace-nowrap shadow-sm border border-black/5 justify-center",
+            showLabel ? "gap-1.5 pr-2 pl-1 py-0.5" : "p-0.5 aspect-square",
             config.bgClass,
             config.textClass,
             className

@@ -4,6 +4,7 @@ import { TournamentInfo, User } from '../types';
 import Swal from 'sweetalert2';
 import RankBadge from '../components/RankBadge';
 import SkillBadge from '../components/SkillBadge';
+import { promptSkillLevel } from '../utils/skillPrompt';
 
 interface ParticipantsListProps {
     tournamentId: string;
@@ -52,12 +53,17 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
     const handleAddGuest = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!guestName.trim()) return;
+
+        // Force selecting skill level before adding guest
+        const skillLevel = await promptSkillLevel();
+        if (!skillLevel) return;
+
         setAddingGuest(true);
         try {
             const res = await fetch(`${STRAPI_BASE_URL}/api/tournament-players`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
-                body: JSON.stringify({ data: { tournament_id: tournamentId, guest_name: guestName.trim() } })
+                body: JSON.stringify({ data: { tournament_id: tournamentId, guest_name: guestName.trim(), skill_level: skillLevel } })
             });
             if (!res.ok) throw new Error("ไม่สามารถเพิ่มชื่อได้");
             setGuestName("");
@@ -141,6 +147,27 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
             showToast(`อัปเดตสถานะไม่สำเร็จ: ${e.message}`, "error");
             const reverted = new Set(pausedPlayerIds);
             setPausedPlayerIds(reverted);
+        }
+    };
+
+    const handleChangeSkill = async (player: any) => {
+        if (!player.tpDocumentId) return;
+        
+        const newSkill = await promptSkillLevel();
+        if (!newSkill || newSkill === player.skill_level) return;
+
+        try {
+            const res = await fetch(`${STRAPI_BASE_URL}/api/tournament-players/${player.tpDocumentId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+                body: JSON.stringify({ data: { skill_level: newSkill } })
+            });
+            if (!res.ok) throw new Error("เปลี่ยนระดับฝีมือไม่สำเร็จ");
+            
+            refreshInfo();
+            showToast(`เปลี่ยนระดับมือของ ${player.username} แล้ว`, "success");
+        } catch (e: any) {
+            showToast(e.message, "error");
         }
     };
 
@@ -300,9 +327,22 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                                         <div className="flex flex-col">
                                             <div className="flex items-center">
                                                 <p className="text-sm font-bold text-white truncate">{player.username}</p>
-                                                {player.skill_level && (
-                                                    <SkillBadge skillLevel={player.skill_level} className="ml-2" />
-                                                )}
+                                                {player.skill_level ? (
+                                                    <div 
+                                                        onClick={(e) => { e.stopPropagation(); if (canManagePlayer) handleChangeSkill(player); }}
+                                                        className={canManagePlayer ? "cursor-pointer hover:opacity-80 transition-opacity ml-2" : "ml-2"}
+                                                        title={canManagePlayer ? "คลิกเพื่อเปลี่ยนระดับมือ" : ""}
+                                                    >
+                                                        <SkillBadge skillLevel={player.skill_level} />
+                                                    </div>
+                                                ) : canManagePlayer ? (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleChangeSkill(player); }}
+                                                        className="ml-2 px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[9px] font-bold hover:bg-blue-500/20 transition-colors"
+                                                    >
+                                                        + ระดับมือ
+                                                    </button>
+                                                ) : null}
                                             </div>
                                             {player.nickname && <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{player.nickname}</p>}
                                         </div>

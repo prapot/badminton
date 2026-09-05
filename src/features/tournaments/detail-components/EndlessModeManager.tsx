@@ -335,26 +335,15 @@ export default function EndlessModeManager({
     // Converts rank+stars into a linear numeric score:
     // Bronze(0-3) → Silver(4-7) → Gold(8-12) → Platinum(13-18) → Diamond(19-24) → Master(25+)
     const getSkillScore = (p: ApiPlayer): number => {
-        const r = p.rankings?.[0];
-        if (!r?.rank) return 1000;
-
-        const tierWeights: Record<string, number> = {
-            bronze: 1000, silver: 2000, gold: 3000, platinum: 4000, diamond: 5000, master: 6000
-        };
-        const divisions: Record<string, number> = { 'V': 0, 'IV': 1, 'III': 2, 'II': 3, 'I': 4 };
-
-        const rankParts = r.rank.split(' ');
-        const tier = rankParts[0].toLowerCase();
-        const div = rankParts[1] || '';
-        const stars = r.stars || 0;
-
-        if (tier === 'master') return 6000 + (stars * 10);
-
-        const base = tierWeights[tier] || 1000;
-        const divBonus = (divisions[div] || 0) * 200;
-        const starBonus = stars * 50;
-
-        return base + divBonus + starBonus;
+        const skill = p.skill_level || '';
+        switch (skill) {
+            case 'หน้าบ้าน': return 1;
+            case 'BG': return 2;
+            case 'N': return 3;
+            case 'S': return 4;
+            case 'P': return 5;
+            default: return 1; // Default to lowest if not specified
+        }
     };
 
     // ── FRONTEND MATCHMAKING (Maximum Fairness Engine) ──────────────────────
@@ -507,18 +496,18 @@ export default function EndlessModeManager({
                     const individualOpponentCount = getIndividualOpponentHistory(teamA.map(p => p.id), teamB.map(p => p.id));
                     penaltyScore += individualOpponentCount * 100;
 
-                    // Skill Balance (× 50)
+                    // Skill Balance (× 50,000) - Most important now
                     const avgSkillA = teamA.reduce((s, p) => s + getSkillScore(p), 0) / teamA.length;
                     const avgSkillB = teamB.reduce((s, p) => s + getSkillScore(p), 0) / teamB.length;
                     const skillDiff = Math.abs(avgSkillA - avgSkillB);
-                    penaltyScore += skillDiff * 50;
+                    penaltyScore += skillDiff * 50000;
                 } else {
                     // Single match (1v1)
                     const opponentCount = getFaceoffCount([teamA[0].id], [teamB[0].id]);
                     penaltyScore += opponentCount * 1000;
                     
                     const skillDiff = Math.abs(getSkillScore(teamA[0]) - getSkillScore(teamB[0]));
-                    penaltyScore += skillDiff * 50;
+                    penaltyScore += skillDiff * 50000;
                 }
 
                 evaluatedMatchups.push({ teamA, teamB, penaltyScore });

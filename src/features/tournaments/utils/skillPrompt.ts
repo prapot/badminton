@@ -6,19 +6,19 @@ export const promptSkillLevel = async (): Promise<string | null> => {
     const skillOptionsHtml = SKILL_LEVELS.map(skill => `
     <label class="relative cursor-pointer group w-full">
         <input type="radio" name="skillLevel" value="${skill.id}" class="peer sr-only">
-        <div class="p-3 sm:p-4 rounded-xl border-2 ${skill.bgClass.includes('slate') ? 'border-slate-700 bg-slate-800/50 peer-checked:bg-slate-700/80 peer-checked:border-slate-400' : `${skill.borderClass} ${skill.bgClass.replace('bg-', 'bg-opacity-5 ')} peer-checked:${skill.bgClass.replace('bg-', 'bg-opacity-10 ')} peer-checked:${skill.borderClass.split('/')[0]}`} hover:border-opacity-50 transition-all flex items-center gap-3 sm:gap-4">
+        <div class="p-3 sm:p-4 rounded-xl border-2 ${skill.promptClasses ? skill.promptClasses.bg + ' ' + skill.promptClasses.border + ' ' + skill.promptClasses.wrapper : 'border-white/10 bg-white/5 peer-checked:bg-white/10 peer-checked:border-white peer-checked:[&_.check-dot]:border-white peer-checked:[&_.check-dot]:bg-white'} peer-checked:[&_.check-svg]:block hover:border-opacity-50 transition-all flex items-center gap-3 sm:gap-4">
             
             <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full ${skill.bgClass.includes('slate') ? 'bg-slate-700' : skill.bgClass} flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform shrink-0">
                 <span class="${skill.textClass} font-bold text-lg sm:text-xl">${skill.icon}</span>
             </div>
             
             <div class="flex flex-col flex-1 min-w-0">
-                <span class="${skill.bgClass.includes('slate') ? 'text-white' : skill.borderClass.split('-')[1].split('/')[0] ? `text-[#${skill.borderClass.split('-')[1].split('/')[0].replace(']','')}]` : skill.textClass} font-bold text-sm sm:text-base truncate">${skill.label}</span>
-                <span class="text-slate-400 sm:${skill.textClass} sm:opacity-60 text-[10px] sm:text-xs truncate mt-0.5">${skill.description}</span>
+                <span class="${skill.promptClasses ? skill.promptClasses.text : 'text-white'} font-bold text-sm sm:text-base truncate">${skill.label}</span>
+                <span class="text-slate-400 sm:${skill.promptClasses ? skill.promptClasses.text : 'text-white'} sm:opacity-60 text-[10px] sm:text-xs truncate mt-0.5">${skill.description}</span>
             </div>
             
-            <div class="w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 ${skill.bgClass.includes('slate') ? 'border-slate-600 peer-checked:border-white peer-checked:bg-white' : `${skill.borderClass} peer-checked:${skill.borderClass.split('/')[0]} peer-checked:${skill.dotClass}`} flex items-center justify-center shrink-0">
-                <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 ${skill.bgClass.includes('slate') ? 'text-slate-800' : 'text-white'} hidden peer-checked:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"></path></svg>
+            <div class="check-dot w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 ${skill.promptClasses ? skill.promptClasses.dot : 'border-white/30'} flex items-center justify-center shrink-0 transition-colors">
+                <svg class="check-svg w-3 h-3 sm:w-3.5 sm:h-3.5 ${skill.promptClasses ? skill.promptClasses.check : 'text-slate-800'} hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"></path></svg>
             </div>
             
         </div>

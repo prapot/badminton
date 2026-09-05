@@ -8,6 +8,14 @@ export interface SkillLevelConfig {
     textClass: string;
     dotClass: string;
     borderClass: string;
+    promptClasses?: {
+        bg: string;
+        border: string;
+        dot: string;
+        text: string;
+        check: string;
+        wrapper: string;
+    };
 }
 
 export const SKILL_LEVELS: SkillLevelConfig[] = [
@@ -21,6 +29,14 @@ export const SKILL_LEVELS: SkillLevelConfig[] = [
         textClass: 'text-white',
         dotClass: 'bg-slate-400',
         borderClass: 'border-slate-600',
+        promptClasses: {
+            bg: 'bg-slate-800/50 peer-checked:bg-slate-700/80',
+            border: 'border-slate-700 peer-checked:border-slate-400',
+            dot: 'border-slate-600',
+            text: 'text-white',
+            check: 'text-slate-800',
+            wrapper: 'peer-checked:[&_.check-dot]:border-white peer-checked:[&_.check-dot]:bg-white'
+        }
     },
     {
         id: 'BG',
@@ -32,6 +48,14 @@ export const SKILL_LEVELS: SkillLevelConfig[] = [
         textClass: 'text-[#166534]',
         dotClass: 'bg-[#22C55E]',
         borderClass: 'border-[#22C55E]/30',
+        promptClasses: {
+            bg: 'bg-[#DCFCE7]/5 peer-checked:bg-[#DCFCE7]/10',
+            border: 'border-[#22C55E]/30 peer-checked:border-[#22C55E]',
+            dot: 'border-[#22C55E]/30',
+            text: 'text-[#22C55E]',
+            check: 'text-white',
+            wrapper: 'peer-checked:[&_.check-dot]:border-[#22C55E] peer-checked:[&_.check-dot]:bg-[#22C55E]'
+        }
     },
     {
         id: 'N',
@@ -43,6 +67,14 @@ export const SKILL_LEVELS: SkillLevelConfig[] = [
         textClass: 'text-[#1E40AF]',
         dotClass: 'bg-[#3B82F6]',
         borderClass: 'border-[#3B82F6]/30',
+        promptClasses: {
+            bg: 'bg-[#DBEAFE]/5 peer-checked:bg-[#DBEAFE]/10',
+            border: 'border-[#3B82F6]/30 peer-checked:border-[#3B82F6]',
+            dot: 'border-[#3B82F6]/30',
+            text: 'text-[#3B82F6]',
+            check: 'text-white',
+            wrapper: 'peer-checked:[&_.check-dot]:border-[#3B82F6] peer-checked:[&_.check-dot]:bg-[#3B82F6]'
+        }
     },
     {
         id: 'S',
@@ -54,6 +86,14 @@ export const SKILL_LEVELS: SkillLevelConfig[] = [
         textClass: 'text-[#92400E]',
         dotClass: 'bg-[#F59E0B]',
         borderClass: 'border-[#F59E0B]/30',
+        promptClasses: {
+            bg: 'bg-[#FEF3C7]/5 peer-checked:bg-[#FEF3C7]/10',
+            border: 'border-[#F59E0B]/30 peer-checked:border-[#F59E0B]',
+            dot: 'border-[#F59E0B]/30',
+            text: 'text-[#F59E0B]',
+            check: 'text-white',
+            wrapper: 'peer-checked:[&_.check-dot]:border-[#F59E0B] peer-checked:[&_.check-dot]:bg-[#F59E0B]'
+        }
     },
     {
         id: 'P',
@@ -65,6 +105,14 @@ export const SKILL_LEVELS: SkillLevelConfig[] = [
         textClass: 'text-[#9A3412]',
         dotClass: 'bg-[#F97316]',
         borderClass: 'border-[#F97316]/30',
+        promptClasses: {
+            bg: 'bg-[#FFEDD5]/5 peer-checked:bg-[#FFEDD5]/10',
+            border: 'border-[#F97316]/30 peer-checked:border-[#F97316]',
+            dot: 'border-[#F97316]/30',
+            text: 'text-[#F97316]',
+            check: 'text-white',
+            wrapper: 'peer-checked:[&_.check-dot]:border-[#F97316] peer-checked:[&_.check-dot]:bg-[#F97316]'
+        }
     }
 ];
 

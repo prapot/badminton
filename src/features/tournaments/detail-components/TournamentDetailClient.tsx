@@ -134,7 +134,7 @@ export function TournamentDetailClient({ id }: { id: string }) {
                     ? "bg-accent-green/10 border-accent-green/30 text-accent-green shadow-[0_4px_30px_rgba(46,204,113,0.15)]"
                     : "bg-red-500/10 border-red-500/30 text-red-400 shadow-[0_4px_30px_rgba(239,68,68,0.15)]"
                     }`}>
-                    <span className="text-base">{toast.type === "success" ? "✨" : "⚠️"}</span> 
+                    <span className="text-base">{toast.type === "success" ? "✨" : "⚠️"}</span>
                     <span>{toast.msg}</span>
                 </div>
             )}
@@ -206,135 +206,135 @@ export function TournamentDetailClient({ id }: { id: string }) {
                             cancelled={cancelled}
                         />
 
-                {tournamentInfo && (
-                    <>
-                        <ParticipantsList
-                            tournamentId={id as string}
-                            tournamentInfo={tournamentInfo}
-                            user={user}
-                            jwt={jwt!}
-                            isJoined={isJoined}
-                            joining={joining}
-                            leaving={leaving}
-                            handleJoin={handleJoin}
-                            handleLeave={handleLeave}
-                            drawnPairs={drawnPairs}
-                            playerMatchCounts={playerMatchCounts}
-                            apiMatches={apiMatches}
-                            STRAPI_BASE_URL={STRAPI_BASE_URL}
-                            refreshInfo={refreshInfo}
-                            showToast={showToast}
-                            router={router}
-                            pausedPlayerIds={pausedPlayerIds}
-                            setPausedPlayerIds={setPausedPlayerIds}
-                        />
+                        {tournamentInfo && (
+                            <>
+                                <ParticipantsList
+                                    tournamentId={id as string}
+                                    tournamentInfo={tournamentInfo}
+                                    user={user}
+                                    jwt={jwt!}
+                                    isJoined={isJoined}
+                                    joining={joining}
+                                    leaving={leaving}
+                                    handleJoin={handleJoin}
+                                    handleLeave={handleLeave}
+                                    drawnPairs={drawnPairs}
+                                    playerMatchCounts={playerMatchCounts}
+                                    apiMatches={apiMatches}
+                                    STRAPI_BASE_URL={STRAPI_BASE_URL}
+                                    refreshInfo={refreshInfo}
+                                    showToast={showToast}
+                                    router={router}
+                                    pausedPlayerIds={pausedPlayerIds}
+                                    setPausedPlayerIds={setPausedPlayerIds}
+                                />
 
-                        {tournamentInfo.format !== "knockout" && (
-                            <DrawSection
-                                tournamentInfo={tournamentInfo}
-                                user={user}
-                                drawnPairs={drawnPairs}
-                                drawMode={drawMode}
-                                setDrawMode={setDrawMode}
-                                setDrawnPairs={setDrawnPairs}
-                                roundsPerPlayer={roundsPerPlayer}
-                                setRoundsPerPlayer={setRoundsPerPlayer}
-                                numCourts={numCourts}
-                                setNumCourts={setNumCourts}
-                                handleDrawFair={handleDrawFair}
-                                totalRepeatsCount={totalRepeatsCount}
-                                apiMatches={apiMatches}
-                                STRAPI_BASE_URL={STRAPI_BASE_URL}
-                                starting={starting}
-                                startStep={startStep || ""}
-                                handleStartTournament={handleStartTournament}
-                            />
-                        )}
-                    </>
-                )}
-
-                {tournamentInfo?.tournament_status === "ongoing" &&
-                    tournamentInfo?.format === "endless_mode" && (
-                        <div className="mb-4">
-                            <button
-                                onClick={() => setShowEndlessStats(!showEndlessStats)}
-                                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 text-purple-400 font-bold transition-all active:scale-[0.98]"
-                            >
-                                <span>🏆</span>
-                                <span>{showEndlessStats ? "ซ่อนสถิติประจำวัน" : "เปิดดูสถิติประจำวัน"}</span>
-                                <span className="text-xs opacity-70">
-                                    {showEndlessStats ? "▲" : "▼"}
-                                </span>
-                            </button>
-                            
-                            {showEndlessStats && (
-                                <div className="mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <EndlessStatsBoard
-                                        players={tournamentInfo.players}
+                                {tournamentInfo.format !== "knockout" && (
+                                    <DrawSection
+                                        tournamentInfo={tournamentInfo}
+                                        user={user}
+                                        drawnPairs={drawnPairs}
+                                        drawMode={drawMode}
+                                        setDrawMode={setDrawMode}
+                                        setDrawnPairs={setDrawnPairs}
+                                        roundsPerPlayer={roundsPerPlayer}
+                                        setRoundsPerPlayer={setRoundsPerPlayer}
+                                        numCourts={numCourts}
+                                        setNumCourts={setNumCourts}
+                                        handleDrawFair={handleDrawFair}
+                                        totalRepeatsCount={totalRepeatsCount}
                                         apiMatches={apiMatches}
-                                        tournamentMode={tournamentInfo.mode}
+                                        STRAPI_BASE_URL={STRAPI_BASE_URL}
+                                        starting={starting}
+                                        startStep={startStep || ""}
+                                        handleStartTournament={handleStartTournament}
                                     />
+                                )}
+                            </>
+                        )}
+
+                        {tournamentInfo?.tournament_status !== "upcoming" &&
+                            tournamentInfo?.format === "endless_mode" && (
+                                <div className="mb-4">
+                                    <button
+                                        onClick={() => setShowEndlessStats(!showEndlessStats)}
+                                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 text-purple-400 font-bold transition-all active:scale-[0.98]"
+                                    >
+                                        <span>🏆</span>
+                                        <span>{showEndlessStats ? "ซ่อนสถิติประจำวัน" : "เปิดดูสถิติประจำวัน"}</span>
+                                        <span className="text-xs opacity-70">
+                                            {showEndlessStats ? "▲" : "▼"}
+                                        </span>
+                                    </button>
+
+                                    {showEndlessStats && (
+                                        <div className="mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                            <EndlessStatsBoard
+                                                players={tournamentInfo.players}
+                                                apiMatches={apiMatches}
+                                                tournamentMode={tournamentInfo.mode}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             )}
+
+                        {tournamentInfo?.tournament_status === "ongoing" &&
+                            tournamentInfo?.format === "endless_mode" && (
+                                <EndlessModeManager
+                                    tournamentId={id as string}
+                                    tournamentType={tournamentInfo.type as "single" | "double"}
+                                    players={tournamentInfo.players}
+                                    permanentTeamsData={tournamentInfo.permanent_teams || []}
+                                    apiMatches={apiMatches}
+                                    jwt={jwt!}
+                                    STRAPI_BASE_URL={STRAPI_BASE_URL}
+                                    refreshInfo={refreshInfo}
+                                    showToast={showToast}
+                                    pausedPlayerIds={pausedPlayerIds}
+                                    setPausedPlayerIds={setPausedPlayerIds}
+                                    tournamentStatus={tournamentInfo.tournament_status}
+                                    userId={user?.id}
+                                    ownerId={tournamentInfo.user_created?.id}
+                                    tournamentMode={tournamentInfo.mode}
+                                />
+                            )}
+
+                        {tournamentInfo?.format === "knockout" && (
+                            <KnockoutManager
+                                tournamentId={id as string}
+                                tournamentInfo={tournamentInfo}
+                                apiMatches={apiMatches}
+                                jwt={jwt!}
+                                STRAPI_BASE_URL={STRAPI_BASE_URL}
+                                refreshInfo={refreshInfo}
+                                showToast={showToast}
+                                userId={user?.id}
+                                setScoreEditing={setScoreEditing}
+                                setScoreA={setScoreA}
+                                setScoreB={setScoreB}
+                            />
+                        )}
+
+                        {tournamentInfo && tournamentInfo.format !== "knockout" && (
+                            <MatchSchedule
+                                tournamentInfo={tournamentInfo}
+                                user={user}
+                                apiMatches={apiMatches}
+                                fetchMatches={fetchMatches}
+                                handleFinishTournament={handleFinishTournament}
+                                starting={starting}
+                                setScoreEditing={setScoreEditing}
+                                setScoreA={setScoreA}
+                                setScoreB={setScoreB}
+                                STRAPI_BASE_URL={STRAPI_BASE_URL}
+                                isOwner={isOwner}
+                            />
+                        )}
+
+                        <div className="text-center text-xs text-slate-600 pb-4">
+                            🏸 Badminton Club Management System · {new Date().getFullYear()}
                         </div>
-                    )}
-
-                {tournamentInfo?.tournament_status === "ongoing" &&
-                    tournamentInfo?.format === "endless_mode" && (
-                        <EndlessModeManager
-                            tournamentId={id as string}
-                            tournamentType={tournamentInfo.type as "single" | "double"}
-                            players={tournamentInfo.players}
-                            permanentTeamsData={tournamentInfo.permanent_teams || []}
-                            apiMatches={apiMatches}
-                            jwt={jwt!}
-                            STRAPI_BASE_URL={STRAPI_BASE_URL}
-                            refreshInfo={refreshInfo}
-                            showToast={showToast}
-                            pausedPlayerIds={pausedPlayerIds}
-                            setPausedPlayerIds={setPausedPlayerIds}
-                            tournamentStatus={tournamentInfo.tournament_status}
-                            userId={user?.id}
-                            ownerId={tournamentInfo.user_created?.id}
-                            tournamentMode={tournamentInfo.mode}
-                        />
-                    )}
-
-                {tournamentInfo?.format === "knockout" && (
-                    <KnockoutManager
-                        tournamentId={id as string}
-                        tournamentInfo={tournamentInfo}
-                        apiMatches={apiMatches}
-                        jwt={jwt!}
-                        STRAPI_BASE_URL={STRAPI_BASE_URL}
-                        refreshInfo={refreshInfo}
-                        showToast={showToast}
-                        userId={user?.id}
-                        setScoreEditing={setScoreEditing}
-                        setScoreA={setScoreA}
-                        setScoreB={setScoreB}
-                    />
-                )}
-
-                {tournamentInfo && tournamentInfo.format !== "knockout" && (
-                    <MatchSchedule
-                        tournamentInfo={tournamentInfo}
-                        user={user}
-                        apiMatches={apiMatches}
-                        fetchMatches={fetchMatches}
-                        handleFinishTournament={handleFinishTournament}
-                        starting={starting}
-                        setScoreEditing={setScoreEditing}
-                        setScoreA={setScoreA}
-                        setScoreB={setScoreB}
-                        STRAPI_BASE_URL={STRAPI_BASE_URL}
-                        isOwner={isOwner}
-                    />
-                )}
-
-                <div className="text-center text-xs text-slate-600 pb-4">
-                    🏸 Badminton Club Management System · {new Date().getFullYear()}
-                </div>
                     </>
                 )}
             </main>

@@ -153,7 +153,7 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
     const handleChangeSkill = async (player: any) => {
         if (!player.tpDocumentId) return;
         
-        const newSkill = await promptSkillLevel();
+        const newSkill = await promptSkillLevel(player.skill_level);
         if (!newSkill || newSkill === player.skill_level) return;
 
         try {

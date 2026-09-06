@@ -20,6 +20,7 @@ import MatchSchedule from "./MatchSchedule";
 import QRInviteModal from "./QRInviteModal";
 import KnockoutManager from "./KnockoutManager";
 import EndlessModeManager from "./EndlessModeManager";
+import EndlessStatsBoard from "./EndlessStatsBoard";
 
 const STRAPI_BASE_URL = process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
 
@@ -45,6 +46,7 @@ export function TournamentDetailClient({ id }: { id: string }) {
     const router = useRouter();
     const { user, jwt } = useAuth();
     const [showQR, setShowQR] = useState(false);
+    const [showEndlessStats, setShowEndlessStats] = useState(false);
 
     // --- Hooks ---
     const { toast, showToast } = useTournamentToast();
@@ -250,6 +252,32 @@ export function TournamentDetailClient({ id }: { id: string }) {
                         )}
                     </>
                 )}
+
+                {tournamentInfo?.tournament_status === "ongoing" &&
+                    tournamentInfo?.format === "endless_mode" && (
+                        <div className="mb-4">
+                            <button
+                                onClick={() => setShowEndlessStats(!showEndlessStats)}
+                                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 text-purple-400 font-bold transition-all active:scale-[0.98]"
+                            >
+                                <span>🏆</span>
+                                <span>{showEndlessStats ? "ซ่อนสถิติประจำวัน" : "เปิดดูสถิติประจำวัน"}</span>
+                                <span className="text-xs opacity-70">
+                                    {showEndlessStats ? "▲" : "▼"}
+                                </span>
+                            </button>
+                            
+                            {showEndlessStats && (
+                                <div className="mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <EndlessStatsBoard
+                                        players={tournamentInfo.players}
+                                        apiMatches={apiMatches}
+                                        tournamentMode={tournamentInfo.mode}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                 {tournamentInfo?.tournament_status === "ongoing" &&
                     tournamentInfo?.format === "endless_mode" && (

@@ -1,11 +1,11 @@
 import Swal from 'sweetalert2';
 import { SKILL_LEVELS } from '../constants/skillLevels';
 
-export const promptSkillLevel = async (): Promise<string | null> => {
+export const promptSkillLevel = async (defaultSkillLevel?: string | null): Promise<string | null> => {
     // Generate HTML from constants
     const skillOptionsHtml = SKILL_LEVELS.map(skill => `
     <label class="relative cursor-pointer group w-full">
-        <input type="radio" name="skillLevel" value="${skill.id}" class="peer sr-only">
+        <input type="radio" name="skillLevel" value="${skill.id}" class="peer sr-only" ${skill.id === defaultSkillLevel ? 'checked' : ''}>
         <div class="p-3 sm:p-4 rounded-xl border-2 ${skill.promptClasses ? skill.promptClasses.bg + ' ' + skill.promptClasses.border + ' ' + skill.promptClasses.wrapper : 'border-white/10 bg-white/5 peer-checked:bg-white/10 peer-checked:border-white peer-checked:[&_.check-dot]:border-white peer-checked:[&_.check-dot]:bg-white'} peer-checked:[&_.check-svg]:block hover:border-opacity-50 transition-all flex items-center gap-3 sm:gap-4">
             
             <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full ${skill.bgClass.includes('slate') ? 'bg-slate-700' : skill.bgClass} flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform shrink-0">

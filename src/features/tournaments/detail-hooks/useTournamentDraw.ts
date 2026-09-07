@@ -245,27 +245,11 @@ export function useTournamentDraw({
         if (!isEndless && !drawnPairs) return;
 
         let matchesToCreate: DrawnPair[] = drawnPairs || [];
-        if (isEndless && matchesToCreate.length === 0) {
-            const pPerMatch = tournamentInfo?.type === "double" ? 4 : 2;
-            if (tournamentInfo!.players.length < pPerMatch) {
-                showToast("จำนวนผู้เล่นไม่เพียงพอ", "error");
-                return;
-            }
-            const activePlayers = tournamentInfo!.players.filter(p => !pausedPlayerIds.has(p.id));
-            const shuffled = [...activePlayers].sort(() => Math.random() - 0.5);
-            const teamA = tournamentInfo?.type === "double" ? [shuffled[0], shuffled[3]] : [shuffled[0]];
-            const teamB = tournamentInfo?.type === "double" ? [shuffled[1], shuffled[2]] : [shuffled[1]];
-            matchesToCreate = [{
-                teamA,
-                teamB,
-                servingSide: Math.random() > 0.5 ? "A" : "B"
-            }];
-        }
 
         const result = await Swal.fire({
             title: isEndless ? "เริ่มโหมดไร้สิ้นสุด?" : "ยืนยันเริ่มการแข่งขัน?",
             html: isEndless
-                ? `จะเริ่มรายการและสร้าง <b>แมตซ์แรก</b> ให้ทันที<br/><span style="color:#6366f1;font-size:12px">คุณสามารถจัดคู่ถัดไปได้ตลอดเวลา</span>`
+                ? `จะเริ่มรายการและเปลี่ยนสถานะเป็น <b>กำลังแข่ง</b><br/><span style="color:#6366f1;font-size:12px">คุณสามารถเริ่มจัดคู่แข่งขันได้จากเมนูจัดการคิว</span>`
                 : `จะสร้าง <b>${matchesToCreate.length} แมตซ์</b> และเปลี่ยนสถานะเป็น <b>กำลังแข่ง</b><br/><span style="color:#ef4444;font-size:12px">ไม่สามารถย้อนกลับได้</span>`,
             icon: "warning",
             showCancelButton: true,

@@ -53,7 +53,25 @@ export function useTournamentActions({
                 .filter(p => !pausedPlayerIds.has(p.id))
                 .map(p => playerMatchCounts[p.id] ?? 0);
             if (activeCounts.length > 0) {
-                matchOffset = Math.max(...activeCounts);
+                // Determine how many matches they already played in this tournament
+                let pastMatches = 0;
+                apiMatches.forEach(m => {
+                    if (m.match_status === "cancelled") return;
+                    const pids = [
+                        ...(m.team_a_id?.team_players?.map(tp => tp.user_id?.id) || []),
+                        ...(m.team_b_id?.team_players?.map(tp => tp.user_id?.id) || [])
+                    ].filter(Boolean) as number[];
+                    if (pids.includes(user.id)) {
+                        pastMatches++;
+                    }
+                });
+
+                const targetCount = Math.max(...activeCounts);
+                if (pastMatches < targetCount) {
+                    matchOffset = targetCount - pastMatches;
+                } else {
+                    matchOffset = 0;
+                }
             }
         }
 

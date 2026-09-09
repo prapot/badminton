@@ -189,9 +189,9 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                     </div>
                                                 </div>
 
-                                                <div className="flex flex-row items-center justify-between gap-16 sm:gap-4 px-2 py-3 sm:px-5 sm:py-5 relative">
+                                                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-4 px-2 py-3 sm:px-5 sm:py-5 relative">
                                                     {/* Team A */}
-                                                    <div className={cn("flex-1 min-w-0 transition-colors", winnerA ? "text-accent-green" : (isCompleted && !winnerA ? "text-slate-500" : "text-white"))}>
+                                                    <div className={cn("min-w-0 transition-colors", winnerA ? "text-accent-green" : (isCompleted && !winnerA ? "text-slate-500" : "text-white"))}>
                                                         <div className="flex flex-col gap-3 justify-center h-full">
                                                             {match.team_a_id?.team_players.map((tp, idx) => {
                                                                 const uFromTp = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
@@ -201,24 +201,19 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                 const rp_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.rp_change;
                                                                 return (
                                                                     <div key={idx} className="flex items-center justify-end gap-2 sm:gap-3 relative">
-                                                                        <div className="flex flex-col items-end justify-center min-w-0 shrink">
-                                                                            <div className="flex items-center justify-end gap-1.5 sm:gap-2 mb-1">
-                                                                                {winnerA && idx === 0 && <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-wider text-accent-green bg-accent-green/10 px-1 py-0.5 rounded-md">Win</span>}
-                                                                                <div className="flex flex-col items-end">
-                                                                                    <div className="flex items-center justify-end gap-1.5 flex-wrap flex-row-reverse">
-                                                                                        <p className="font-bold text-xs sm:text-sm truncate text-white text-right">{u.username}</p>
-                                                                                        {(u as any).skill_level && <SkillBadge skillLevel={(u as any).skill_level} showLabel={false} />}
-                                                                                    </div>
-                                                                                    {(u as any).nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{(u as any).nickname}</span>}
-                                                                                </div>
+                                                                        <div className="flex flex-col items-end justify-center min-w-0 flex-1">
+                                                                            <div className="flex items-center justify-end gap-1.5 sm:gap-2 mb-0.5 w-full">
+                                                                                {winnerA && idx === 0 && <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-wider text-accent-green bg-accent-green/10 px-1 py-0.5 rounded-md shrink-0">Win</span>}
+                                                                                {(u as any).skill_level && <div className="shrink-0"><SkillBadge skillLevel={(u as any).skill_level} showLabel={false} /></div>}
+                                                                                <p className="font-bold text-xs sm:text-sm truncate text-white text-right">{u.username}</p>
                                                                             </div>
+                                                                            {(u as any).nickname && <p className="text-[9px] sm:text-[10px] text-slate-400 font-medium truncate w-full text-right">{(u as any).nickname}</p>}
                                                                             {/* Stats - ranking mode only */}
                                                                             {tournamentInfo.mode === "ranking" && (
-                                                                                <div className="flex flex-wrap items-center justify-end gap-1.5 mt-0.5">
-                                                                                    <RankBadge rank={u.rankings?.[0]?.rank} stars={u.rankings?.[0]?.stars} size="sm" showName={true} />
+                                                                                <div className="flex flex-wrap items-center justify-end gap-1.5 mt-1 w-full">
                                                                                     {rp_change !== undefined && (
                                                                                         <span className={cn(
-                                                                                            "text-[10px] font-bold px-1.5 py-0.5 rounded border",
+                                                                                            "text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0",
                                                                                             rp_change > 0 ? "bg-accent-green/10 border-accent-green/30 text-accent-green" 
                                                                                             : rp_change < 0 ? "bg-red-500/10 border-red-500/30 text-red-400" 
                                                                                             : "bg-slate-500/10 border-slate-500/30 text-slate-400"
@@ -226,6 +221,9 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                             {rp_change > 0 ? "+" : rp_change < 0 ? "-" : "+"}{Math.abs(Math.floor(rp_change / 100))}
                                                                                         </span>
                                                                                     )}
+                                                                                    <div className="shrink-0 scale-90 sm:scale-100 origin-right">
+                                                                                        <RankBadge rank={u.rankings?.[0]?.rank} stars={u.rankings?.[0]?.stars} size="sm" showName={true} />
+                                                                                    </div>
                                                                                 </div>
                                                                             )}
                                                                         </div>
@@ -267,7 +265,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                     </div>
 
                                                     {/* Score / VS */}
-                                                    <div className="absolute sm:relative left-1/2 sm:left-auto top-1/2 sm:top-auto -translate-x-1/2 sm:translate-x-0 -translate-y-1/2 sm:translate-y-0 z-10 shrink-0 flex flex-col items-center justify-center">
+                                                    <div className="z-10 shrink-0 flex flex-col items-center justify-center">
                                                         {isCompleted ? (
                                                             <div className="flex items-center gap-1.5 sm:gap-4 bg-black/40 px-2 py-1 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-2xl border border-white/5 shadow-inner">
                                                                 <span className={cn("text-base sm:text-3xl font-black tabular-nums", winnerA ? "text-accent-green" : "text-white")}>{match.score_a}</span>
@@ -290,7 +288,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                     </div>
 
                                                     {/* Team B */}
-                                                    <div className={cn("flex-1 min-w-0 transition-colors", winnerB ? "text-accent-green" : (isCompleted && !winnerB ? "text-slate-500" : "text-white"))}>
+                                                    <div className={cn("min-w-0 transition-colors", winnerB ? "text-accent-green" : (isCompleted && !winnerB ? "text-slate-500" : "text-white"))}>
                                                         <div className="flex flex-col gap-3 justify-center h-full">
                                                             {match.team_b_id ? (
                                                                 <>
@@ -330,24 +328,22 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                         return null;
                                                                                     })()}
                                                                                 </div>
-                                                                                <div className="flex flex-col items-start justify-center min-w-0 shrink">
-                                                                                    <div className="flex items-center justify-start gap-1.5 sm:gap-2 mb-1">
-                                                                                        <div className="flex flex-col items-start">
-                                                                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                                                                                <p className="font-bold text-xs sm:text-sm truncate text-white text-left">{u.username}</p>
-                                                                                                {(u as any).skill_level && <SkillBadge skillLevel={(u as any).skill_level} showLabel={false} />}
-                                                                                            </div>
-                                                                                            {(u as any).nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{(u as any).nickname}</span>}
-                                                                                        </div>
-                                                                                        {winnerB && idx === 0 && <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-wider text-accent-green bg-accent-green/10 px-1 py-0.5 rounded-md">Win</span>}
+                                                                                <div className="flex flex-col items-start justify-center min-w-0 flex-1">
+                                                                                    <div className="flex items-center justify-start gap-1.5 sm:gap-2 mb-0.5 w-full">
+                                                                                        <p className="font-bold text-xs sm:text-sm truncate text-white text-left">{u.username}</p>
+                                                                                        {(u as any).skill_level && <div className="shrink-0"><SkillBadge skillLevel={(u as any).skill_level} showLabel={false} /></div>}
+                                                                                        {winnerB && idx === 0 && <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-wider text-accent-green bg-accent-green/10 px-1 py-0.5 rounded-md shrink-0">Win</span>}
                                                                                     </div>
+                                                                                    {(u as any).nickname && <p className="text-[9px] sm:text-[10px] text-slate-400 font-medium truncate w-full text-left">{(u as any).nickname}</p>}
                                                                                     {/* Stats - ranking mode only */}
                                                                                     {tournamentInfo.mode === "ranking" && (
-                                                                                        <div className="flex flex-wrap items-center justify-start gap-1.5 mt-0.5">
-                                                                                            <RankBadge rank={u.rankings?.[0]?.rank} stars={u.rankings?.[0]?.stars} size="sm" showName={true} />
+                                                                                        <div className="flex flex-wrap items-center justify-start gap-1.5 mt-1 w-full">
+                                                                                            <div className="shrink-0 scale-90 sm:scale-100 origin-left">
+                                                                                                <RankBadge rank={u.rankings?.[0]?.rank} stars={u.rankings?.[0]?.stars} size="sm" showName={true} />
+                                                                                            </div>
                                                                                             {rp_change !== undefined && (
                                                                                                 <span className={cn(
-                                                                                                    "text-[10px] font-bold px-1.5 py-0.5 rounded border",
+                                                                                                    "text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0",
                                                                                                     rp_change > 0 ? "bg-accent-green/10 border-accent-green/30 text-accent-green" 
                                                                                                     : rp_change < 0 ? "bg-red-500/10 border-red-500/30 text-red-400" 
                                                                                                     : "bg-slate-500/10 border-slate-500/30 text-slate-400"

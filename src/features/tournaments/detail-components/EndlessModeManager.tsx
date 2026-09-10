@@ -479,35 +479,34 @@ export default function EndlessModeManager({
                 penaltyScore += recentPlayPenalty;
 
                 if (tournamentType === "double") {
-                    // Partner Rotation (× 10,000)
+                    // Partner Rotation (× 100,000) - Strongly avoid same partners
                     const isFixedA = permanentTeams.some(t => t.players.some(p => p.id === teamA[0].id) && t.players.some(p => p.id === teamA[1].id));
                     const isFixedB = permanentTeams.some(t => t.players.some(p => p.id === teamB[0].id) && t.players.some(p => p.id === teamB[1].id));
 
                     const partnerHistA = isFixedA ? 0 : getPartnerHistory(teamA[0].id, teamA[1].id);
                     const partnerHistB = isFixedB ? 0 : getPartnerHistory(teamB[0].id, teamB[1].id);
-                    penaltyScore += (partnerHistA + partnerHistB) * 10000;
+                    penaltyScore += (partnerHistA + partnerHistB) * 100000;
 
-                    // Team Matchup Rotation (× 1,000)
-
+                    // Team Matchup Rotation (× 20,000) - Avoid same 2v2 exactly
                     const teamMatchupCount = getFaceoffCount(teamA.map(p => p.id), teamB.map(p => p.id));
-                    penaltyScore += teamMatchupCount * 1000;
+                    penaltyScore += teamMatchupCount * 20000;
 
-                    // Opponent Rotation (× 100)
+                    // Opponent Rotation (× 10,000) - Avoid playing against the same person
                     const individualOpponentCount = getIndividualOpponentHistory(teamA.map(p => p.id), teamB.map(p => p.id));
-                    penaltyScore += individualOpponentCount * 100;
+                    penaltyScore += individualOpponentCount * 10000;
 
-                    // Skill Balance (× 50,000) - Most important now
+                    // Skill Balance (× 500,000) - Most important: must be perfectly balanced
                     const avgSkillA = teamA.reduce((s, p) => s + getSkillScore(p), 0) / teamA.length;
                     const avgSkillB = teamB.reduce((s, p) => s + getSkillScore(p), 0) / teamB.length;
                     const skillDiff = Math.abs(avgSkillA - avgSkillB);
-                    penaltyScore += skillDiff * 50000;
+                    penaltyScore += skillDiff * 500000;
                 } else {
                     // Single match (1v1)
                     const opponentCount = getFaceoffCount([teamA[0].id], [teamB[0].id]);
-                    penaltyScore += opponentCount * 1000;
+                    penaltyScore += opponentCount * 20000;
                     
                     const skillDiff = Math.abs(getSkillScore(teamA[0]) - getSkillScore(teamB[0]));
-                    penaltyScore += skillDiff * 50000;
+                    penaltyScore += skillDiff * 500000;
                 }
 
                 evaluatedMatchups.push({ teamA, teamB, penaltyScore });

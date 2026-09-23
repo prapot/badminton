@@ -244,7 +244,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                     const currentRp = u.rankings?.[0]?.ranking_points || 0;
                                                                                     const currentRank = getRankInfoFromPoints(currentRp);
                                                                                     const potentialRank = getRankInfoFromPoints(currentRp + 100);
-                                                                                    if (potentialRank.weight > currentRank.weight) {
+                                                                                    if (potentialRank.rankStr !== currentRank.rankStr && potentialRank.weight > currentRank.weight) {
                                                                                         return (
                                                                                             <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-accent-yellow to-orange-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xl border border-white/20 whitespace-nowrap">
                                                                                                 RANK UP
@@ -317,7 +317,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                             const currentRp = u.rankings?.[0]?.ranking_points || 0;
                                                                                             const currentRank = getRankInfoFromPoints(currentRp);
                                                                                             const potentialRank = getRankInfoFromPoints(currentRp + 100);
-                                                                                            if (potentialRank.weight > currentRank.weight) {
+                                                                                            if (potentialRank.rankStr !== currentRank.rankStr && potentialRank.weight > currentRank.weight) {
                                                                                                 return (
                                                                                                     <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-accent-yellow to-orange-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xl border border-white/20 whitespace-nowrap">
                                                                                                         RANK UP

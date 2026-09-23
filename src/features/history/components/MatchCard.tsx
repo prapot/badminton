@@ -120,35 +120,60 @@ export function MatchCard({ history: h, userId }: Props) {
                         </div>
                     </div>
 
-                    {isRanking && (
-                        <div className="text-center min-w-[140px]">
-                            <p className="text-[9px] text-slate-500 font-bold uppercase mb-2 tracking-widest">Rank Progression</p>
-                            <div className="flex flex-col items-center gap-1.5">
-                                <div className="flex flex-col items-center gap-2">
+                    {isRanking && (() => {
+                        const oldRank = getRankInfoFromPoints(h.old_rp);
+                        const newRank = getRankInfoFromPoints(h.new_rp);
+                        const isRankUp = (newRank.weight || 0) > (oldRank.weight || 0) && oldRank.rankStr !== newRank.rankStr;
+                        const isDemoted = (newRank.weight || 0) < (oldRank.weight || 0) && oldRank.rankStr !== newRank.rankStr;
+                        const isBraveBonus = h.rp_change >= 200;
+
+                        return (
+                            <div className="text-center min-w-[140px]">
+                                <div className="flex items-center justify-center gap-1.5 mb-1.5">
+                                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Rank Progression</p>
+                                    {isRankUp && (
+                                        <span className="text-[8px] font-black text-amber-300 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-full shadow-[0_0_8px_rgba(245,158,11,0.25)] flex items-center gap-1">
+                                            <span>🏆</span> ครบ 3 ดาว ➔ RANK UP
+                                        </span>
+                                    )}
+                                    {isDemoted && (
+                                        <span className="text-[8px] font-black text-rose-300 bg-rose-500/20 border border-rose-500/30 px-2 py-0.5 rounded-full shadow-[0_0_8px_rgba(244,63,94,0.25)] flex items-center gap-1">
+                                            <span>⚠️</span> ตกชั้น
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex flex-col items-center gap-1.5">
                                     <div className="flex items-center gap-2">
                                         <RankBadge
-                                            rank={getRankInfoFromPoints(h.old_rp).rankStr}
-                                            stars={getRankInfoFromPoints(h.old_rp).stars}
+                                            rank={oldRank.rankStr}
+                                            stars={oldRank.stars}
                                             size="sm"
                                             showName={true}
                                         />
-                                        <span className="text-slate-600 font-bold">➜</span>
+                                        <span className={`font-bold text-xs ${isRankUp ? 'text-amber-400 animate-pulse' : isDemoted ? 'text-rose-400' : 'text-slate-600'}`}>➜</span>
                                         <RankBadge
-                                            rank={getRankInfoFromPoints(h.new_rp).rankStr}
-                                            stars={getRankInfoFromPoints(h.new_rp).stars}
+                                            rank={newRank.rankStr}
+                                            stars={newRank.stars}
                                             size="sm"
                                             showName={true}
                                         />
                                     </div>
+                                    <div className="flex flex-col items-center gap-1">
+                                        <span className={`text-[10px] font-black flex items-center gap-1 px-3 py-0.5 rounded-full bg-black/40 border border-white/5 ${h.rp_change > 0 ? 'text-green-400' : h.rp_change < 0 ? 'text-red-400' : 'text-slate-500'}`}>
+                                            {h.rp_change > 0 ? `+${Math.abs(Math.floor(h.rp_change / 100))} ⭐` : h.rp_change < 0 ? `-${Math.abs(Math.floor(h.rp_change / 100))} ⭐` : 'PROTECTED 🛡️'}
+                                            {h.rp_change > 0 && <span className="animate-bounce">↑</span>}
+                                            {h.rp_change < 0 && <span className="animate-bounce">↓</span>}
+                                        </span>
+                                        {isBraveBonus && (
+                                            <span className="text-[8px] font-bold text-purple-300 bg-purple-500/20 border border-purple-500/30 px-2 py-0.5 rounded-full" title="แต้มผู้กล้าเต็ม 100 BP แปลงเป็นโบนัส +1 ดาว">
+                                                แต้มผู้กล้าเต็ม +1⭐
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
-                                <span className={`text-[10px] font-black flex items-center gap-1 px-3 py-0.5 rounded-full bg-black/40 border border-white/5 ${h.rp_change > 0 ? 'text-green-400' : h.rp_change < 0 ? 'text-red-400' : 'text-slate-500'}`}>
-                                    {h.rp_change > 0 ? `+${Math.abs(Math.floor(h.rp_change / 100))} ⭐` : h.rp_change < 0 ? `-${Math.abs(Math.floor(h.rp_change / 100))} ⭐` : 'PROTECTED 🛡️'}
-                                    {h.rp_change > 0 && <span className="animate-bounce">↑</span>}
-                                    {h.rp_change < 0 && <span className="animate-bounce">↓</span>}
-                                </span>
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
 
                     <Link
                         href={`/tournament/${tournament?.documentId}`}

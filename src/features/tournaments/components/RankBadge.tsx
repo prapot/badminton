@@ -1,4 +1,5 @@
 import React from 'react';
+import { getMaxStarsForRank } from '../utils/TournamentUtils';
 
 interface RankBadgeProps {
     rank?: string;
@@ -78,38 +79,29 @@ const RankBadge: React.FC<RankBadgeProps> = ({ rank: initialRank, stars = 0, sho
         sm: { 
             container: 'px-1.5 py-0.5 min-w-[60px]', 
             text: 'text-[8px]', 
-            star: 'w-1 h-1', 
+            star: 'w-2.5 h-2.5', 
             icon: 'text-[9px]',
             gap: 'gap-0.5'
         },
         md: { 
             container: 'px-3 py-1 min-w-[90px]', 
             text: 'text-[11px]', 
-            star: 'w-2 h-2', 
+            star: 'w-3.5 h-3.5', 
             icon: 'text-xs',
-            gap: 'gap-1.5'
+            gap: 'gap-1'
         },
         lg: { 
             container: 'px-4 py-2 min-w-[120px]', 
             text: 'text-sm', 
-            star: 'w-3 h-3', 
+            star: 'w-4.5 h-4.5', 
             icon: 'text-base',
-            gap: 'gap-2'
+            gap: 'gap-1.5'
         }
     };
 
     const s = sizeClasses[size];
-
-    const getMaxStars = (rankName: string) => {
-        const lower = rankName.toLowerCase();
-        if (lower.includes('bronze') || lower.includes('silver')) return 3;
-        if (lower.includes('gold')) return 4;
-        if (lower.includes('platinum') || lower.includes('diamond')) return 5;
-        return 0; // Master
-    };
-
-    const maxStars = getMaxStars(rank);
-    const isMaster = rank.includes('Master');
+    const maxStars = getMaxStarsForRank(rank);
+    const isMaster = rank.toLowerCase().includes('master');
 
     return (
         <div className={`flex flex-col items-center ${s.gap} perspective-[1000px]`}>
@@ -139,31 +131,36 @@ const RankBadge: React.FC<RankBadgeProps> = ({ rank: initialRank, stars = 0, sho
 
             {/* Stars Section */}
             {rank !== 'Unranked' && rank !== 'None' && (
-                <div className="flex items-center justify-center min-h-[12px]">
+                <div className="flex items-center justify-center min-h-[14px]">
                     {isMaster ? (
-                        <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-red-950/40 border border-red-500/30 backdrop-blur-sm shadow-inner">
-                            <div className={`${s.star} bg-yellow-400 rounded-full animate-pulse shadow-[0_0_12px_rgba(250,204,21,0.8)]`} />
-                            <span className={`${s.text} font-black text-yellow-400 drop-shadow-[0_0_4px_rgba(250,204,21,0.4)]`}>x{stars}</span>
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-950/60 border border-red-500/40 backdrop-blur-sm shadow-[0_0_10px_rgba(239,68,68,0.2)]">
+                            <span className="text-[9px] leading-none drop-shadow-[0_0_6px_rgba(250,204,21,0.8)]">⭐</span>
+                            <span className={`${s.text} font-black text-yellow-300 drop-shadow-[0_0_4px_rgba(250,204,21,0.5)]`}>x{stars}</span>
                         </div>
                     ) : (
                         <div className="flex items-center gap-1">
                             {[...Array(maxStars)].map((_, i) => (
-                                <div key={i} className="relative">
-                                    {/* Star Background */}
-                                    <div className={`
-                                        ${s.star} rounded-full transition-all duration-500
-                                        ${i < stars
-                                            ? 'bg-yellow-400 scale-110 shadow-[0_0_10px_rgba(250,204,21,0.6)]'
-                                            : 'bg-white/10 border border-white/5'}
-                                    `}>
-                                        {i < stars && (
-                                            <>
-                                                {/* Star Core Glow */}
-                                                <div className="absolute inset-0 bg-white/40 rounded-full animate-ping opacity-20" />
-                                                <div className="absolute inset-0 bg-yellow-200/30 rounded-full blur-[2px]" />
-                                            </>
-                                        )}
-                                    </div>
+                                <div key={i} className="relative flex items-center justify-center">
+                                    {i < stars ? (
+                                        <svg
+                                            viewBox="0 0 24 24"
+                                            className={`${s.star} text-yellow-400 drop-shadow-[0_0_5px_rgba(250,204,21,0.8)] transition-all duration-300 transform scale-105`}
+                                            fill="currentColor"
+                                        >
+                                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                                        </svg>
+                                    ) : (
+                                        <svg
+                                            viewBox="0 0 24 24"
+                                            className={`${s.star} text-white/20 transition-all duration-300`}
+                                            fill="rgba(255,255,255,0.06)"
+                                            stroke="rgba(255,255,255,0.3)"
+                                            strokeWidth="1.5"
+                                            strokeLinejoin="round"
+                                        >
+                                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                                        </svg>
+                                    )}
                                 </div>
                             ))}
                         </div>

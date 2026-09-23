@@ -59,39 +59,51 @@ export function getPartnerRepeats(playerIds: number[], currentPairIdx: number, m
     });
     return count;
 }
+export const RANK_TIERS = [
+    { name: 'Bronze', divisions: 3, stepsPerDiv: 4, starsPerDiv: 3 },
+    { name: 'Silver', divisions: 3, stepsPerDiv: 4, starsPerDiv: 3 },
+    { name: 'Gold', divisions: 3, stepsPerDiv: 4, starsPerDiv: 3 },
+    { name: 'Platinum', divisions: 3, stepsPerDiv: 4, starsPerDiv: 3 },
+    { name: 'Diamond', divisions: 3, stepsPerDiv: 4, starsPerDiv: 3 },
+    { name: 'Master', divisions: 1, stepsPerDiv: 99999, starsPerDiv: 99999 }
+];
+
+export function getMaxStarsForRank(rankName?: string): number {
+    if (!rankName) return 3;
+    const lower = rankName.toLowerCase();
+    const tier = RANK_TIERS.find(t => lower.includes(t.name.toLowerCase()));
+    if (!tier || tier.name === 'Master') return 0;
+    return 3;
+}
+
 export function getRankInfoFromPoints(points: number) {
-    const TIERS = [
-        { name: 'Bronze', divisions: 3, starsPerDiv: 3 },
-        { name: 'Silver', divisions: 3, starsPerDiv: 3 },
-        { name: 'Gold', divisions: 3, starsPerDiv: 3 },
-        { name: 'Platinum', divisions: 3, starsPerDiv: 3 },
-        { name: 'Diamond', divisions: 3, starsPerDiv: 3 },
-        { name: 'Master', divisions: 1, starsPerDiv: 99999 }
-    ];
+    const TIERS = RANK_TIERS;
     const DIVS = ['V', 'IV', 'III', 'II', 'I'];
-    let p = points;
-    for (const t of TIERS) {
-        const tierMax = t.divisions * t.starsPerDiv * 100;
+    let p = Math.max(0, points);
+    for (let i = 0; i < TIERS.length; i++) {
+        const t = TIERS[i];
+        const tierMax = t.divisions * t.stepsPerDiv * 100;
         if (p < tierMax || t.name === 'Master') {
             if (t.name === 'Master') {
                 const s = Math.floor(p / 100);
-                return { tier: 'Master', rankStr: 'Master', weight: 6000 + (s * 10) };
+                return { tier: 'Master', division: '', divisionNum: 1, rankStr: 'Master', stars: s, weight: 6000 + (s * 10) };
             }
-            const divIdx = Math.floor(p / (t.starsPerDiv * 100));
-            const divRp = p % (t.starsPerDiv * 100);
-            const stars = Math.floor(divRp / 100);
+            const divIdx = Math.floor(p / (t.stepsPerDiv * 100));
+            const divRp = p % (t.stepsPerDiv * 100);
+            const stars = Math.min(3, Math.floor(divRp / 100));
             const activeDivs = DIVS.slice(5 - t.divisions);
             const divisionStr = activeDivs[divIdx];
             return {
                 tier: t.name,
                 division: divisionStr,
+                divisionNum: t.divisions - divIdx,
                 rankStr: `${t.name} ${divisionStr}`,
                 stars: stars,
-                weight: 1000 + (TIERS.indexOf(t) * 1000) + (divIdx * 200) + (stars * 50)
+                weight: 1000 + (i * 1000) + (divIdx * 250) + (stars * 50)
             };
         }
         p -= tierMax;
     }
-    return { tier: 'Bronze', rankStr: 'Bronze III', weight: 1000 };
+    return { tier: 'Bronze', division: 'III', divisionNum: 3, rankStr: 'Bronze III', stars: 0, weight: 1000 };
 }
 

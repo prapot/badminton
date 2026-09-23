@@ -224,13 +224,11 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                                             ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
                                             : 'bg-white/5 border-white/10 text-slate-300 hover:text-white hover:bg-white/10'
                                     }`}
-                                    title="ตั้งค่าเว้นการจับคู่ (ข้อมูลนี้เห็นเฉพาะคุณ)"
+                                    title="โหมดท้าดวล (ระบบจะจัดให้อยู่คนละทีมเสมอ - ข้อมูลนี้เห็นเฉพาะคุณ)"
                                 >
-                                    <span>{blockedPartner ? '🛡️' : '🤝'}</span>
+                                    <span>⚔️</span>
                                     <span>
-                                        {blockedPartner
-                                            ? `เว้นคู่: ${blockedPartner.blockedPlayer?.nickname || blockedPartner.blockedPlayer?.username || '1 คน'}`
-                                            : 'เว้นจับคู่'}
+                                        {blockedPartner ? 'ท้าดวลแล้ว' : 'ท้าดวล'}
                                     </span>
                                 </button>
                                 {/* Pause self */}

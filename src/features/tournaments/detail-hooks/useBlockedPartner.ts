@@ -82,7 +82,7 @@ export function useBlockedPartner({ tournamentId, jwt, isJoined, onBlockChange }
             await Swal.fire({
                 icon: "success",
                 title: "บันทึกเรียบร้อย",
-                text: "ระบบจะหลีกเลี่ยงการจัดให้คุณคู่กับผู้เล่นท่านนี้ (ข้อมูลนี้เฉพาะคุณเท่านั้นที่เห็น)",
+                text: "ระบบจะจัดให้คุณและผู้เล่นท่านนี้อยู่คนละทีมเสมอ (ข้อมูลนี้เฉพาะคุณเท่านั้นที่เห็น)",
                 timer: 2000,
                 showConfirmButton: false,
                 background: "#1e293b",
@@ -109,8 +109,8 @@ export function useBlockedPartner({ tournamentId, jwt, isJoined, onBlockChange }
         if (!jwt || !tournamentId) return false;
 
         const confirm = await Swal.fire({
-            title: "ยกเลิกการเว้นคู่?",
-            text: "ระบบจะสามารถจัดคู่คุณกับผู้เล่นท่านนี้ได้ตามปกติ",
+            title: "ยกเลิกเป้าหมายท้าดวล?",
+            text: "ระบบจะสามารถจัดทีมได้ตามปกติ",
             icon: "question",
             showCancelButton: true,
             confirmButtonText: "ยืนยันยกเลิก",
@@ -134,14 +134,14 @@ export function useBlockedPartner({ tournamentId, jwt, isJoined, onBlockChange }
 
             if (!res.ok) {
                 const json = await res.json();
-                throw new Error(json?.error?.message || "ไม่สามารถยกเลิกการตั้งค่าได้");
+                throw new Error(json?.error?.message || "ไม่สามารถยกเลิกได้");
             }
 
             setBlockedPartner(null);
             onBlockChange?.();
             await Swal.fire({
                 icon: "success",
-                title: "ยกเลิกการตั้งค่าแล้ว",
+                title: "ยกเลิกเรียบร้อยแล้ว",
                 timer: 1500,
                 showConfirmButton: false,
                 background: "#1e293b",

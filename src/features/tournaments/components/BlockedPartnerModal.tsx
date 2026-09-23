@@ -65,14 +65,12 @@ export const BlockedPartnerModal: React.FC<BlockedPartnerModalProps> = ({
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/50">
                     <div className="flex items-center space-x-2.5">
-                        <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                            </svg>
+                        <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-lg">
+                            ⚔️
                         </div>
                         <div>
-                            <h3 className="text-base font-semibold text-white">ตั้งค่าเว้นการจับคู่</h3>
-                            <p className="text-xs text-slate-400">เฉพาะในทัวร์นาเมนต์นี้</p>
+                            <h3 className="text-base font-semibold text-white">โหมดท้าดวล</h3>
+                            <p className="text-xs text-slate-400">ระบบจะจัดให้คุณและคู่แข่งอยู่คนละทีมเสมอ</p>
                         </div>
                     </div>
                     <button
@@ -91,7 +89,7 @@ export const BlockedPartnerModal: React.FC<BlockedPartnerModalProps> = ({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                     <div className="text-xs text-blue-200/90 leading-relaxed">
-                        <span className="font-semibold text-blue-300">เป็นความลับเฉพาะคุณ:</span> ข้อมูลนี้มีเพียงคุณเท่านั้นที่เห็น คนอื่นและคู่กรณีจะไม่ทราบ โดยระบบจะหลีกเลี่ยงการจัดให้คุณและผู้เล่นท่านนี้อยู่ทีมเดียวกัน เพื่อความสบายใจในการลงเล่น
+                        <span className="font-semibold text-blue-300">เป็นความลับเฉพาะคุณ:</span> ข้อมูลนี้มีเพียงคุณเท่านั้นที่เห็น เพื่อนคู่กรณีจะไม่ทราบ โดยระบบจะจัดให้คุณและผู้เล่นท่านนี้อยู่ <span className="text-amber-300 font-semibold">"คนละทีมเสมอ"</span> เพื่อให้ได้ดวลฝีมือกันข้ามเน็ต!
                     </div>
                 </div>
 
@@ -99,10 +97,10 @@ export const BlockedPartnerModal: React.FC<BlockedPartnerModalProps> = ({
                 <div className="p-6 space-y-5">
                     {/* Current Block Status if exists */}
                     {blockedPartner ? (
-                        <div className="p-4 bg-slate-800/80 border border-amber-500/30 rounded-xl space-y-3">
-                            <div className="text-xs font-medium text-amber-400 flex items-center space-x-1.5">
-                                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-                                <span>กำลังเว้นคู่กับ:</span>
+                        <div className="p-4 bg-slate-800/80 border border-indigo-500/30 rounded-xl space-y-3">
+                            <div className="text-xs font-medium text-indigo-300 flex items-center space-x-1.5">
+                                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+                                <span>🎯 เป้าหมายท้าดวลของคุณ:</span>
                             </div>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-3">
@@ -137,14 +135,14 @@ export const BlockedPartnerModal: React.FC<BlockedPartnerModalProps> = ({
                                     disabled={saving}
                                     className="px-3 py-1.5 text-xs font-medium text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-lg transition-colors disabled:opacity-50"
                                 >
-                                    {saving ? "กำลังยกเลิก..." : "ยกเลิกการเว้นคู่"}
+                                    {saving ? "กำลังยกเลิก..." : "ยกเลิกการท้าดวล"}
                                 </button>
                             </div>
                         </div>
                     ) : (
                         <div className="space-y-2">
                             <label className="block text-xs font-medium text-slate-300">
-                                เลือกผู้เล่นที่ต้องการเว้นการจับคู่ (สูงสุด 1 คน)
+                                เลือกเพื่อนที่อยากดวลฝีมือด้วย (สูงสุด 1 คน)
                             </label>
                             <div className="relative">
                                 <select
@@ -152,7 +150,7 @@ export const BlockedPartnerModal: React.FC<BlockedPartnerModalProps> = ({
                                     onChange={(e) => setSelectedPlayerId(e.target.value ? Number(e.target.value) : "")}
                                     className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 appearance-none transition-colors"
                                 >
-                                    <option value="">-- เลือกผู้เล่นในก๊วน --</option>
+                                    <option value="">-- เลือกเพื่อนร่วมก๊วนที่อยากดวลด้วย --</option>
                                     {eligiblePlayers.map((p) => {
                                         const displayName = p.nickname ? `${p.nickname} (@${p.username})` : p.username;
                                         return (
@@ -172,7 +170,7 @@ export const BlockedPartnerModal: React.FC<BlockedPartnerModalProps> = ({
                     )}
 
                     <div className="text-[11px] text-slate-500 leading-relaxed space-y-1">
-                        <div>• เลือกได้ 1 คนเท่านั้น (หากต้องการเปลี่ยน ให้ยกเลิกคนเดิมก่อน)</div>
+                        <div>• เลือกได้ 1 คนเท่านั้น (ระบบจะจัดให้คุณและเพื่อนท่านนี้อยู่คนละทีมเสมอ)</div>
                         <div>• ระบบมีเพดานจำกัด เพื่อรักษาความสมดุลในการจัดคู่ลงสนามของก๊วน</div>
                         <div>• มีผลเฉพาะแมตช์ประเภทคู่ในทัวร์นาเมนต์นี้เท่านั้น</div>
                     </div>
@@ -200,7 +198,7 @@ export const BlockedPartnerModal: React.FC<BlockedPartnerModalProps> = ({
                                     <span>กำลังบันทึก...</span>
                                 </>
                             ) : (
-                                <span>บันทึกการตั้งค่า</span>
+                                <span>บันทึกเป้าหมายดวล</span>
                             )}
                         </button>
                     )}

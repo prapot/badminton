@@ -14,7 +14,7 @@ export function useTournamentData(id: string, jwt: string | null) {
         const sortOrder = fmt === "endless_mode" ? "desc" : "asc";
         return fetch(
             `${STRAPI_BASE_URL}/api/matches?filters[tournament_id][documentId][$eq]=${id}&populate[team_a_id][populate][team_players][populate][user_id][populate][rankings][filters][season][is_active][$eq]=true&populate[team_a_id][populate][team_players][populate][user_id][populate][picture][fields][0]=url&populate[team_b_id][populate][team_players][populate][user_id][populate][rankings][filters][season][is_active][$eq]=true&populate[team_b_id][populate][team_players][populate][user_id][populate][picture][fields][0]=url&populate[match_histories][populate][users][fields]=*&populate[team_winner][fields][0]=id&populate[team_winner][fields][1]=documentId&sort=match_no:${sortOrder}&pagination[pageSize]=100`,
-            { headers: { Authorization: `Bearer ${token}` } }
+            { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
         )
             .then((r) => r.json())
             .then((json) => setApiMatches(json.data ?? []))
@@ -25,7 +25,7 @@ export function useTournamentData(id: string, jwt: string | null) {
         if (!jwt || !id) return;
         fetch(
             `${STRAPI_BASE_URL}/api/tournaments/${id}?populate[tournament_players][populate][user][populate][picture][fields][0]=url&populate[tournament_players][populate][user][populate][rankings][filters][season][is_active][$eq]=true&populate[user_created][populate][picture][fields][0]=url&populate[user_created][populate][rankings][filters][season][is_active][$eq]=true`,
-            { headers: { Authorization: `Bearer ${jwt}` } }
+            { headers: { Authorization: `Bearer ${jwt}` }, cache: "no-store" }
         )
             .then((r) => r.json())
             .then((json) => {
@@ -53,19 +53,20 @@ export function useTournamentData(id: string, jwt: string | null) {
                             return acc;
                         }, [] as RegisteredPlayer[]),
                     permanent_teams: data.permanent_teams || [],
+                    blocked_partners: data.blocked_partners || [],
                     user_created: data.user_created ? { id: data.user_created.id || data.user_created } : (data.user_id ? { id: data.user_id } : null),
                 });
             })
             .catch(() => { /* silent */ });
     }, [jwt, id]);
 
-    // Auto-fetch matches when tournament is ongoing/completed
+    // Auto-fetch matches and tournament data when tournament is ongoing/completed
     useEffect(() => {
         let interval: NodeJS.Timeout;
         if (tournamentInfo?.tournament_status === 'ongoing' || tournamentInfo?.tournament_status === 'completed') {
             fetchMatches();
             interval = setInterval(() => {
-                fetchMatches();
+                refreshInfo();
             }, 7000);
         }
         return () => {
@@ -78,7 +79,7 @@ export function useTournamentData(id: string, jwt: string | null) {
         if (!jwt || !id) return Promise.resolve();
         return fetch(
             `${STRAPI_BASE_URL}/api/tournaments/${id}?populate[tournament_players][populate][user][populate][picture][fields][0]=url&populate[tournament_players][populate][user][populate][rankings][filters][season][is_active][$eq]=true&populate[user_created][populate][picture][fields][0]=url&populate[user_created][populate][rankings][filters][season][is_active][$eq]=true`,
-            { headers: { Authorization: `Bearer ${jwt}` } }
+            { headers: { Authorization: `Bearer ${jwt}` }, cache: "no-store" }
         )
             .then((r) => r.json())
             .then((json) => {
@@ -103,6 +104,7 @@ export function useTournamentData(id: string, jwt: string | null) {
                             return acc;
                         }, [] as RegisteredPlayer[]),
                     permanent_teams: data.permanent_teams || [],
+                    blocked_partners: data.blocked_partners || [],
                     user_created: data.user_created ? { id: data.user_created.id || data.user_created } : (data.user_id ? { id: data.user_id } : null),
                 } : null);
                 // Also refresh matches correctly

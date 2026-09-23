@@ -56,6 +56,7 @@ export interface TournamentInfo {
     players: RegisteredPlayer[];
     user_created?: { id: number; username?: string; nickname?: string } | null;
     permanent_teams?: any[];
+    blocked_partners?: Array<{ blockerId: number; blockedId: number; createdAt?: string }>;
 }
 
 export interface ApiRanking {
@@ -142,5 +143,19 @@ export interface PaginationMeta {
     pageSize: number;
     pageCount: number;
     total: number;
+}
+
+export interface BlockedPartnerPlayer {
+    id: number;
+    username: string;
+    nickname?: string;
+    picture?: string | null;
+    is_guest?: boolean;
+}
+
+export interface BlockedPartnerData {
+    blockedId: number;
+    blockedPlayer?: BlockedPartnerPlayer | null;
+    createdAt?: string;
 }
 

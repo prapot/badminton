@@ -38,6 +38,7 @@ interface EndlessModeManagerProps {
     tournamentType: "single" | "double";
     players: ApiPlayer[];
     permanentTeamsData?: any[];
+    blockedPartnersData?: Array<{ blockerId: number; blockedId: number }>;
     apiMatches: ApiMatch[];
     jwt: string;
     STRAPI_BASE_URL: string;
@@ -67,6 +68,7 @@ export default function EndlessModeManager({
     tournamentType,
     players,
     permanentTeamsData,
+    blockedPartnersData,
     apiMatches,
     jwt,
     STRAPI_BASE_URL,
@@ -202,6 +204,34 @@ export default function EndlessModeManager({
         });
         return count;
     };
+
+    const blockedPairsSet = useMemo(() => {
+        const set = new Set<string>();
+        (blockedPartnersData || []).forEach(bp => {
+            const p1 = Number(bp.blockerId);
+            const p2 = Number(bp.blockedId);
+            if (!isNaN(p1) && !isNaN(p2)) {
+                set.add(`${Math.min(p1, p2)}:${Math.max(p1, p2)}`);
+            }
+        });
+        return set;
+    }, [blockedPartnersData]);
+
+    const isBlockedTeammates = (p1Id: number, p2Id: number): boolean => {
+        return blockedPairsSet.has(`${Math.min(p1Id, p2Id)}:${Math.max(p1Id, p2Id)}`);
+    };
+
+    // Invalidate stale previewMatch if it contains blocked teammates
+    useEffect(() => {
+        if (previewMatch && tournamentType === "double") {
+            const isBlockedA = isBlockedTeammates(previewMatch.teamA[0]?.id, previewMatch.teamA[1]?.id);
+            const isBlockedB = isBlockedTeammates(previewMatch.teamB[0]?.id, previewMatch.teamB[1]?.id);
+            if (isBlockedA || isBlockedB) {
+                setPreviewMatch(null);
+            }
+        }
+    }, [blockedPairsSet, previewMatch, tournamentType]);
+
 
     const getPartnerHistory = (p1Id: number, p2Id: number) => {
         let count = 0;
@@ -423,17 +453,20 @@ export default function EndlessModeManager({
             return;
         }
 
-        // Hard Constraint Filter: Only keep sets with minimum maxCount and minimum sumCount (players who played least)
-        const minMaxCount = Math.min(...validSets.map(s => s.maxCount));
-        const setsWithMinMax = validSets.filter(s => s.maxCount === minMaxCount);
-        const minSumCount = Math.min(...setsWithMinMax.map(s => s.sumCount));
-        const hardConstraintQualifiedSets = setsWithMinMax.filter(s => s.sumCount === minSumCount);
+        // 3. EXHAUSTIVE COMBINATIONS: Evaluate possible matchups across candidate entity sets
+        // Sort candidate sets by fairness (min maxCount, then min sumCount)
+        const sortedCandidateSets = [...validSets].sort((a, b) => {
+            if (a.maxCount !== b.maxCount) return a.maxCount - b.maxCount;
+            return a.sumCount - b.sumCount;
+        });
 
-        // 3. EXHAUSTIVE COMBINATIONS: Generate all possible matchups from qualified sets and evaluate Weighted Penalty Score
-        type MatchupCandidate = { teamA: ApiPlayer[], teamB: ApiPlayer[], penaltyScore: number };
+        type MatchupCandidate = { teamA: ApiPlayer[], teamB: ApiPlayer[], penaltyScore: number, isBlocked: boolean };
         const evaluatedMatchups: MatchupCandidate[] = [];
 
-        hardConstraintQualifiedSets.forEach(candidate => {
+        // Evaluate top candidates (up to 20 sets) to guarantee diverse unblocked pairings
+        const candidateSetsToEvaluate = sortedCandidateSets.slice(0, Math.min(20, sortedCandidateSets.length));
+
+        candidateSetsToEvaluate.forEach(candidate => {
             const teams = candidate.entities.filter(e => e.type === "team").map(e => e.players);
             const solos = candidate.entities.filter(e => e.type === "solo").map(e => e.players[0]);
 
@@ -463,6 +496,9 @@ export default function EndlessModeManager({
             pairings.forEach(({ teamA, teamB }) => {
                 let penaltyScore = 0;
 
+                // Candidate fairness weight: prioritize players with fewer matches
+                penaltyScore += candidate.maxCount * 2_000_000 + candidate.sumCount * 200_000;
+
                 // Add a penalty for players who played recently to prevent back-to-back games
                 const maxMatchNo = Math.max(...apiMatches.map(m => m.match_no), 0);
                 let recentPlayPenalty = 0;
@@ -478,7 +514,16 @@ export default function EndlessModeManager({
                 });
                 penaltyScore += recentPlayPenalty;
 
+                let isBlocked = false;
                 if (tournamentType === "double") {
+                    // Blocked Partner check (Anti-Teammate constraint)
+                    const isBlockedA = isBlockedTeammates(teamA[0].id, teamA[1].id);
+                    const isBlockedB = isBlockedTeammates(teamB[0].id, teamB[1].id);
+                    isBlocked = isBlockedA || isBlockedB;
+                    if (isBlocked) {
+                        penaltyScore += 100_000_000_000;
+                    }
+
                     // Partner Rotation (× 100,000) - Strongly avoid same partners
                     const isFixedA = permanentTeams.some(t => t.players.some(p => p.id === teamA[0].id) && t.players.some(p => p.id === teamA[1].id));
                     const isFixedB = permanentTeams.some(t => t.players.some(p => p.id === teamB[0].id) && t.players.some(p => p.id === teamB[1].id));
@@ -509,7 +554,7 @@ export default function EndlessModeManager({
                     penaltyScore += skillDiff * 500000;
                 }
 
-                evaluatedMatchups.push({ teamA, teamB, penaltyScore });
+                evaluatedMatchups.push({ teamA, teamB, penaltyScore, isBlocked });
             });
         });
 
@@ -518,9 +563,16 @@ export default function EndlessModeManager({
             return;
         }
 
-        // 4. TIE BREAKING: Select from combinations with lowest Penalty Score (use random ONLY for tied fairest combinations)
-        const minPenalty = Math.min(...evaluatedMatchups.map(m => m.penaltyScore));
-        const bestCandidates = evaluatedMatchups.filter(m => Math.abs(m.penaltyScore - minPenalty) < 1e-4);
+        // 4. HARD FILTER: Discard any pairing with blocked teammates whenever unblocked pairings exist
+        const unblocked = tournamentType === "double"
+            ? evaluatedMatchups.filter(m => !m.isBlocked)
+            : evaluatedMatchups;
+
+        const candidatePool = unblocked.length > 0 ? unblocked : evaluatedMatchups;
+
+        // 5. TIE BREAKING: Select from combinations with lowest Penalty Score (use random ONLY for tied fairest combinations)
+        const minPenalty = Math.min(...candidatePool.map(m => m.penaltyScore));
+        const bestCandidates = candidatePool.filter(m => Math.abs(m.penaltyScore - minPenalty) < 1e-4);
         const bestPairing = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
 
         setPreviewMatch({ teamA: bestPairing.teamA, teamB: bestPairing.teamB });
@@ -762,6 +814,16 @@ export default function EndlessModeManager({
                                                                 const temp = newTeamA[indexA];
                                                                 newTeamA[indexA] = newTeamB[indexB];
                                                                 newTeamB[indexB] = temp;
+
+                                                                // Stealth Block Check: Silent prevention of swapping blocked players together
+                                                                if (tournamentType === "double" && (
+                                                                    isBlockedTeammates(newTeamA[0].id, newTeamA[1].id) ||
+                                                                    isBlockedTeammates(newTeamB[0].id, newTeamB[1].id)
+                                                                )) {
+                                                                    setSelectedSwapPlayer(null);
+                                                                    return;
+                                                                }
+
                                                                 setPreviewMatch({ ...previewMatch, teamA: newTeamA, teamB: newTeamB });
                                                                 setSelectedSwapPlayer(null);
                                                             } else {
@@ -819,6 +881,16 @@ export default function EndlessModeManager({
                                                                 const temp = newTeamB[indexB];
                                                                 newTeamB[indexB] = newTeamA[indexA];
                                                                 newTeamA[indexA] = temp;
+
+                                                                // Stealth Block Check: Silent prevention of swapping blocked players together
+                                                                if (tournamentType === "double" && (
+                                                                    isBlockedTeammates(newTeamA[0].id, newTeamA[1].id) ||
+                                                                    isBlockedTeammates(newTeamB[0].id, newTeamB[1].id)
+                                                                )) {
+                                                                    setSelectedSwapPlayer(null);
+                                                                    return;
+                                                                }
+
                                                                 setPreviewMatch({ ...previewMatch, teamA: newTeamA, teamB: newTeamB });
                                                                 setSelectedSwapPlayer(null);
                                                             } else {

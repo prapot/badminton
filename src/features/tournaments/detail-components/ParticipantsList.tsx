@@ -5,6 +5,8 @@ import Swal from 'sweetalert2';
 import RankBadge from '../components/RankBadge';
 import SkillBadge from '../components/SkillBadge';
 import { promptSkillLevel } from '../utils/skillPrompt';
+import { BlockedPartnerModal } from '../components/BlockedPartnerModal';
+import { useBlockedPartner } from '../detail-hooks/useBlockedPartner';
 
 interface ParticipantsListProps {
     tournamentId: string;
@@ -49,6 +51,19 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
 }) => {
     const [guestName, setGuestName] = React.useState("");
     const [addingGuest, setAddingGuest] = React.useState(false);
+    const [showBlockedModal, setShowBlockedModal] = React.useState(false);
+
+    const {
+        blockedPartner,
+        saving: savingBlocked,
+        saveBlockedPartner,
+        removeBlockedPartner,
+    } = useBlockedPartner({
+        tournamentId,
+        jwt,
+        isJoined,
+        onBlockChange: refreshInfo,
+    });
 
     const handleAddGuest = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -200,7 +215,24 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
 
                     {canJoinLeave && (
                         isJoined ? (
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                {/* Block partner preference (only visible to joined player) */}
+                                <button
+                                    onClick={() => setShowBlockedModal(true)}
+                                    className={`min-h-[36px] flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all active:scale-95 ${
+                                        blockedPartner
+                                            ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                                            : 'bg-white/5 border-white/10 text-slate-300 hover:text-white hover:bg-white/10'
+                                    }`}
+                                    title="ตั้งค่าเว้นการจับคู่ (ข้อมูลนี้เห็นเฉพาะคุณ)"
+                                >
+                                    <span>{blockedPartner ? '🛡️' : '🤝'}</span>
+                                    <span>
+                                        {blockedPartner
+                                            ? `เว้นคู่: ${blockedPartner.blockedPlayer?.nickname || blockedPartner.blockedPlayer?.username || '1 คน'}`
+                                            : 'เว้นจับคู่'}
+                                    </span>
+                                </button>
                                 {/* Pause self */}
                                 <button
                                     onClick={() => myPlayerEntry && handleTogglePause(myPlayerEntry)}
@@ -447,6 +479,17 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                     })}
                 </ul>
             )}
+
+            <BlockedPartnerModal
+                isOpen={showBlockedModal}
+                onClose={() => setShowBlockedModal(false)}
+                players={tournamentInfo.players}
+                currentUserId={user?.id}
+                blockedPartner={blockedPartner}
+                onSave={saveBlockedPartner}
+                onRemove={removeBlockedPartner}
+                saving={savingBlocked}
+            />
         </div>
     );
 };

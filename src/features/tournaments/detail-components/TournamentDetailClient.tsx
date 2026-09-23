@@ -286,6 +286,7 @@ export function TournamentDetailClient({ id }: { id: string }) {
                                     tournamentType={tournamentInfo.type as "single" | "double"}
                                     players={tournamentInfo.players}
                                     permanentTeamsData={tournamentInfo.permanent_teams || []}
+                                    blockedPartnersData={tournamentInfo.blocked_partners || []}
                                     apiMatches={apiMatches}
                                     jwt={jwt!}
                                     STRAPI_BASE_URL={STRAPI_BASE_URL}

@@ -60,12 +60,12 @@ export function getPartnerRepeats(playerIds: number[], currentPairIdx: number, m
     return count;
 }
 export const RANK_TIERS = [
-    { name: 'Bronze', divisions: 3, stepsPerDiv: 4, starsPerDiv: 3 },
-    { name: 'Silver', divisions: 3, stepsPerDiv: 4, starsPerDiv: 3 },
-    { name: 'Gold', divisions: 3, stepsPerDiv: 4, starsPerDiv: 3 },
-    { name: 'Platinum', divisions: 3, stepsPerDiv: 4, starsPerDiv: 3 },
-    { name: 'Diamond', divisions: 3, stepsPerDiv: 4, starsPerDiv: 3 },
-    { name: 'Master', divisions: 1, stepsPerDiv: 99999, starsPerDiv: 99999 }
+    { name: 'Bronze', divisions: 3, starsPerDiv: 3 },
+    { name: 'Silver', divisions: 3, starsPerDiv: 3 },
+    { name: 'Gold', divisions: 3, starsPerDiv: 3 },
+    { name: 'Platinum', divisions: 3, starsPerDiv: 3 },
+    { name: 'Diamond', divisions: 3, starsPerDiv: 3 },
+    { name: 'Master', divisions: 1, starsPerDiv: 99999 }
 ];
 
 export function getMaxStarsForRank(rankName?: string): number {
@@ -76,34 +76,65 @@ export function getMaxStarsForRank(rankName?: string): number {
     return 3;
 }
 
-export function getRankInfoFromPoints(points: number) {
-    const TIERS = RANK_TIERS;
+export function getRankInfoFromPoints(points: number, options?: { isLoss?: boolean }) {
+    const isLoss = options?.isLoss === true;
     const DIVS = ['V', 'IV', 'III', 'II', 'I'];
     let p = Math.max(0, points);
-    for (let i = 0; i < TIERS.length; i++) {
-        const t = TIERS[i];
-        const tierMax = t.divisions * t.stepsPerDiv * 100;
-        if (p < tierMax || t.name === 'Master') {
-            if (t.name === 'Master') {
-                const s = Math.floor(p / 100);
-                return { tier: 'Master', division: '', divisionNum: 1, rankStr: 'Master', stars: s, weight: 6000 + (s * 10) };
-            }
-            const divIdx = Math.floor(p / (t.stepsPerDiv * 100));
-            const divRp = p % (t.stepsPerDiv * 100);
-            const stars = Math.min(3, Math.floor(divRp / 100));
+
+    // Each non-Master division corresponds to 300 points (3 stars)
+    const pointsPerDiv = 300;
+    const standardTiers = RANK_TIERS.filter(t => t.name !== 'Master');
+    const totalDivisions = standardTiers.reduce((acc, t) => acc + t.divisions, 0); // 15
+    const masterThreshold = totalDivisions * pointsPerDiv; // 4500
+
+    if (p >= masterThreshold) {
+        const masterPoints = p - masterThreshold;
+        const stars = Math.floor(masterPoints / 100);
+        return {
+            tier: 'Master',
+            division: '',
+            divisionNum: 1,
+            rankStr: 'Master',
+            stars: stars,
+            weight: 6000 + (stars * 10)
+        };
+    }
+
+    let divIdx = Math.floor(p / pointsPerDiv);
+    let rem = p % pointsPerDiv;
+    let stars = Math.floor(rem / 100);
+
+    // Division boundary handling (e.g. 300, 600, 900 RP):
+    // - On normal/win/rank-up: represents full 3 stars of the previous division
+    // - On loss (or at 0 stars of current division): represents 0 stars of the current division
+    if (rem === 0 && divIdx > 0) {
+        if (!isLoss) {
+            divIdx = divIdx - 1;
+            stars = 3;
+        } else {
+            stars = 0;
+        }
+    }
+
+    let runningDivs = 0;
+    for (let i = 0; i < standardTiers.length; i++) {
+        const t = standardTiers[i];
+        if (divIdx < runningDivs + t.divisions) {
+            const localDivIdx = divIdx - runningDivs;
             const activeDivs = DIVS.slice(5 - t.divisions);
-            const divisionStr = activeDivs[divIdx];
+            const divisionStr = activeDivs[localDivIdx];
             return {
                 tier: t.name,
                 division: divisionStr,
-                divisionNum: t.divisions - divIdx,
+                divisionNum: t.divisions - localDivIdx,
                 rankStr: `${t.name} ${divisionStr}`,
                 stars: stars,
-                weight: 1000 + (i * 1000) + (divIdx * 250) + (stars * 50)
+                weight: 1000 + (i * 1000) + (localDivIdx * 250) + (stars * 50)
             };
         }
-        p -= tierMax;
+        runningDivs += t.divisions;
     }
+
     return { tier: 'Bronze', division: 'III', divisionNum: 3, rankStr: 'Bronze III', stars: 0, weight: 1000 };
 }
 

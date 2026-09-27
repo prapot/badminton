@@ -59,7 +59,8 @@ export function useHistoryData(userId: string) {
 
     const { data: historiesJson, isLoading: historiesLoading, error: historiesError } = useSWR(
         jwt ? [historiesUrl, jwt] : null,
-        fetcher
+        fetcher,
+        { refreshInterval: 4000, revalidateOnFocus: true }
     );
     const histories: MatchHistory[] = historiesJson?.data ?? [];
     const meta: PaginationMeta | null = historiesJson?.meta?.pagination ?? null;
@@ -68,7 +69,8 @@ export function useHistoryData(userId: string) {
     const lifetimeStatsUrl = `${STRAPI_BASE_URL}/api/rankings/lifetime-stats?userId=${userId}`;
     const { data: lifetimeJson, isLoading: lifetimeLoading } = useSWR(
         jwt ? [lifetimeStatsUrl, jwt] : null,
-        fetcher
+        fetcher,
+        { refreshInterval: 4000, revalidateOnFocus: true }
     );
     const lifetimeStats: RankingStats | null = lifetimeJson?.data ?? null;
 
@@ -79,7 +81,8 @@ export function useHistoryData(userId: string) {
 
     const { data: rankingJson, isLoading: rankingLoading } = useSWR(
         jwt && rankingUrl ? [rankingUrl, jwt] : null,
-        fetcher
+        fetcher,
+        { refreshInterval: 4000, revalidateOnFocus: true }
     );
 
     const rankingStats: RankingStats | null = useMemo(() => {
@@ -96,7 +99,8 @@ export function useHistoryData(userId: string) {
 
     const { data: analyticsJson, isLoading: analyticsLoading } = useSWR(
         jwt ? [analyticsUrl, jwt] : null,
-        fetcher
+        fetcher,
+        { refreshInterval: 4000, revalidateOnFocus: true }
     );
     const analyticsData: AnalyticsData | null = analyticsJson?.data ?? null;
 

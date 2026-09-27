@@ -23,7 +23,7 @@ export function MatchCard({ history: h, userId }: Props) {
     const isWin = !isCancelled && h.is_win;
 
     const tournament = match.tournament_id;
-    const isRanking = tournament?.mode === "ranking";
+    const isRanking = tournament?.mode === "ranking" || Boolean(h.ranking) || (h.old_rp !== undefined && h.new_rp !== undefined && h.rp_change !== undefined);
 
     const renderTeamPlayers = (team: any, colorClass: string) => {
         if (!team?.team_players || team.team_players.length === 0) return <span className={`italic text-slate-500`}>รอยืนยัน</span>;
@@ -121,8 +121,9 @@ export function MatchCard({ history: h, userId }: Props) {
                     </div>
 
                     {isRanking && (() => {
-                        const oldRank = getRankInfoFromPoints(h.old_rp);
-                        const newRank = getRankInfoFromPoints(h.new_rp);
+                        const isLoss = h.rp_change < 0;
+                        const oldRank = getRankInfoFromPoints(h.old_rp, { isLoss });
+                        const newRank = getRankInfoFromPoints(h.new_rp, { isLoss });
                         const isRankUp = (newRank.weight || 0) > (oldRank.weight || 0) && oldRank.rankStr !== newRank.rankStr;
                         const isDemoted = (newRank.weight || 0) < (oldRank.weight || 0) && oldRank.rankStr !== newRank.rankStr;
                         const isBraveBonus = h.rp_change >= 200;

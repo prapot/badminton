@@ -42,6 +42,7 @@ export function useCreateTournament() {
                         mode: form.mode,
                         tournament_status: "upcoming",
                         user_created: user.id,
+                        publishedAt: new Date().toISOString(),
                     },
                 }),
             });

@@ -4,7 +4,9 @@ const nextConfig: NextConfig = {
   output: "standalone",
   env: {
     NEXT_PUBLIC_STRAPI_BASE_URL:
-      process.env.STRAPI_BASE_URL || "http://localhost:1337",
+      process.env.NEXT_PUBLIC_STRAPI_BASE_URL ||
+      process.env.STRAPI_BASE_URL ||
+      "http://localhost:1337",
   },
   images: {
     remotePatterns: [

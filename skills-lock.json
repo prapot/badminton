@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "code-refactoring-refactor-clean": {
+      "source": "rmyndharis/antigravity-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-refactoring-refactor-clean/SKILL.md",
+      "computedHash": "312592ae75e98f1d533cd40e9ff3d5a30038ddf35279515f3fb16da21104bf86"
+    }
+  }
+}

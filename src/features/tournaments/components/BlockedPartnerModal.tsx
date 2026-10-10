@@ -1,14 +1,10 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import Image from "next/image";
-import { RegisteredPlayer, BlockedPartnerData, BlockedPartnerPlayer } from "../types";
-import SkillBadge from "./SkillBadge";
-import RankBadge from "./RankBadge";
-
-const STRAPI_BASE_URL = process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
-
-type DisplayPlayer = RegisteredPlayer | BlockedPartnerPlayer;
+import React from "react";
+import { RegisteredPlayer, BlockedPartnerData } from "../types";
+import { useBlockedPartnerModal } from "../hooks/useBlockedPartnerModal";
+import { ActiveRivalryView } from "./BlockedPartner/ActiveRivalryView";
+import { PlayerSelectCard } from "./BlockedPartner/PlayerSelectCard";
 
 interface BlockedPartnerModalProps {
     isOpen: boolean;
@@ -30,39 +26,23 @@ const BlockedPartnerModalContent: React.FC<BlockedPartnerModalProps> = ({
     onRemove,
     saving,
 }) => {
-    const [selectedPlayerId, setSelectedPlayerId] = useState<number | "">(() => blockedPartner?.blockedId ?? "");
-    const [searchQuery, setSearchQuery] = useState<string>("");
-
-    // Filter players excluding current user
-    const eligiblePlayers = useMemo(() => {
-        return players.filter((p) => p.id !== currentUserId);
-    }, [players, currentUserId]);
-
-    // Search filter
-    const filteredPlayers = useMemo(() => {
-        const query = searchQuery.trim().toLowerCase();
-        if (!query) return eligiblePlayers;
-        return eligiblePlayers.filter((p) => {
-            const username = (p.username || "").toLowerCase();
-            const nickname = (p.nickname || "").toLowerCase();
-            const guestName = (p.guest_name || "").toLowerCase();
-            return username.includes(query) || nickname.includes(query) || guestName.includes(query);
-        });
-    }, [eligiblePlayers, searchQuery]);
-
-    const blockedInPlayers = players.find((p) => p.id === blockedPartner?.blockedId);
-    const currentBlockedPlayer: DisplayPlayer | undefined = blockedInPlayers || blockedPartner?.blockedPlayer || undefined;
-    const blockedSkillLevel = blockedInPlayers?.skill_level;
-    const blockedRankings = blockedInPlayers?.rankings;
-
-    const selectedPlayer = players.find((p) => p.id === selectedPlayerId);
+    const {
+        selectedPlayerId,
+        setSelectedPlayerId,
+        searchQuery,
+        setSearchQuery,
+        eligiblePlayers,
+        filteredPlayers,
+        currentBlockedPlayer,
+        blockedSkillLevel,
+        blockedRankings,
+        selectedPlayer,
+    } = useBlockedPartnerModal(players, currentUserId, blockedPartner);
 
     const handleSave = async () => {
         if (!selectedPlayerId || typeof selectedPlayerId !== "number") return;
         const success = await onSave(selectedPlayerId);
-        if (success) {
-            onClose();
-        }
+        if (success) onClose();
     };
 
     const handleRemove = async () => {
@@ -71,38 +51,6 @@ const BlockedPartnerModalContent: React.FC<BlockedPartnerModalProps> = ({
             setSelectedPlayerId("");
             onClose();
         }
-    };
-
-    const getAvatarUrl = (picture?: { url: string } | string | null) => {
-        if (!picture) return null;
-        const url = typeof picture === "string" ? picture : picture.url;
-        if (!url) return null;
-        return url.startsWith("http") ? url : `${STRAPI_BASE_URL}${url}`;
-    };
-
-    const renderAvatar = (player?: DisplayPlayer, size = "w-10 h-10") => {
-        const url = getAvatarUrl(player?.picture);
-        const guestName = "guest_name" in (player || {}) ? (player as RegisteredPlayer).guest_name : undefined;
-        const initial = (player?.nickname || player?.username || guestName || "?")[0]?.toUpperCase();
-
-        if (url) {
-            return (
-                <div className={`relative ${size} rounded-full overflow-hidden shrink-0 border border-slate-600/80 bg-slate-800 shadow-sm`}>
-                    <Image
-                        src={url}
-                        alt={player?.username || "avatar"}
-                        fill
-                        className="object-cover"
-                    />
-                </div>
-            );
-        }
-
-        return (
-            <div className={`relative ${size} rounded-full shrink-0 flex items-center justify-center font-bold text-xs text-white bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-500 border border-white/20 shadow-inner`}>
-                {initial}
-            </div>
-        );
     };
 
     return (
@@ -149,68 +97,15 @@ const BlockedPartnerModalContent: React.FC<BlockedPartnerModalProps> = ({
 
                 {/* Body (Scrollable) */}
                 <div className="p-5 overflow-y-auto space-y-4 flex-1">
-                    {/* Mode 1: Already has a duel target */}
                     {blockedPartner ? (
-                        <div className="space-y-4">
-                            <div className="p-4 bg-gradient-to-br from-slate-800/90 to-slate-850 border border-rose-500/40 rounded-2xl shadow-lg relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl pointer-events-none" />
-
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="text-xs font-semibold text-rose-300 flex items-center space-x-1.5">
-                                        <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping"></span>
-                                        <span>🎯 เป้าหมายท้าดวลปัจจุบัน</span>
-                                    </div>
-                                    <span className="text-[10px] text-slate-400 bg-slate-900/60 px-2 py-0.5 rounded-full border border-slate-700">
-                                        ล็อคอยู่คนละทีม
-                                    </span>
-                                </div>
-
-                                <div className="flex items-center justify-between gap-3">
-                                    <div className="flex items-center space-x-3 min-w-0">
-                                        <div className="relative">
-                                            {renderAvatar(currentBlockedPlayer, "w-12 h-12")}
-                                            <span className="absolute -bottom-1 -right-1 text-xs">⚔️</span>
-                                        </div>
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                                <span className="text-sm font-bold text-white truncate">
-                                                    {currentBlockedPlayer?.nickname || currentBlockedPlayer?.username || "ผู้เล่นในทัวร์"}
-                                                </span>
-                                                {blockedSkillLevel && (
-                                                    <SkillBadge skillLevel={blockedSkillLevel} className="text-[9px] py-0 px-1.5" />
-                                                )}
-                                            </div>
-                                            {currentBlockedPlayer?.nickname && currentBlockedPlayer?.username && (
-                                                <div className="text-xs text-slate-400 truncate">@{currentBlockedPlayer.username}</div>
-                                            )}
-                                            {blockedRankings?.[0]?.rank && (
-                                                <div className="mt-1">
-                                                    <RankBadge
-                                                        rank={blockedRankings[0].rank}
-                                                        stars={blockedRankings[0].stars}
-                                                        size="sm"
-                                                        showName={true}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <button
-                                        onClick={handleRemove}
-                                        disabled={saving}
-                                        className="shrink-0 px-3.5 py-2 text-xs font-semibold text-rose-300 hover:text-rose-100 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 rounded-xl transition-all disabled:opacity-50 active:scale-95 flex items-center space-x-1"
-                                    >
-                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                        <span>{saving ? "กำลังยกเลิก..." : "ยกเลิกท้าดวล"}</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                        <ActiveRivalryView 
+                            currentBlockedPlayer={currentBlockedPlayer}
+                            blockedSkillLevel={blockedSkillLevel}
+                            blockedRankings={blockedRankings}
+                            onRemove={handleRemove}
+                            saving={saving}
+                        />
                     ) : (
-                        /* Mode 2: Select a player to duel */
                         <div className="space-y-3">
                             {/* Search bar & count */}
                             <div className="space-y-1.5">
@@ -268,81 +163,14 @@ const BlockedPartnerModalContent: React.FC<BlockedPartnerModalProps> = ({
                                         )}
                                     </div>
                                 ) : (
-                                    filteredPlayers.map((player) => {
-                                        const isSelected = selectedPlayerId === player.id;
-                                        const displayName = player.nickname || player.username;
-                                        const subName = player.nickname ? `@${player.username}` : null;
-
-                                        return (
-                                            <div
-                                                key={player.id}
-                                                onClick={() => setSelectedPlayerId(isSelected ? "" : player.id)}
-                                                className={`group relative flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all active:scale-[0.99] ${
-                                                    isSelected
-                                                        ? "bg-gradient-to-r from-rose-950/50 via-slate-800 to-indigo-950/40 border-rose-500 shadow-md shadow-rose-950/40 ring-1 ring-rose-500/50"
-                                                        : "bg-slate-800/60 hover:bg-slate-800 border-slate-700/70 hover:border-slate-600"
-                                                }`}
-                                            >
-                                                {/* Left: Avatar + Names */}
-                                                <div className="flex items-center space-x-3 min-w-0 mr-2">
-                                                    <div className="relative">
-                                                        {renderAvatar(player, "w-10 h-10")}
-                                                        {isSelected && (
-                                                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-rose-500 rounded-full flex items-center justify-center text-[9px] text-white shadow">
-                                                                🎯
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="min-w-0">
-                                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                                            <span className={`text-sm font-semibold truncate ${isSelected ? "text-white" : "text-slate-200 group-hover:text-white"}`}>
-                                                                {displayName}
-                                                            </span>
-                                                            {player.is_guest && (
-                                                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                                                                    Guest
-                                                                </span>
-                                                            )}
-                                                            {player.skill_level && (
-                                                                <SkillBadge skillLevel={player.skill_level} className="text-[9px] py-0 px-1.5" />
-                                                            )}
-                                                        </div>
-
-                                                        <div className="flex items-center gap-2 mt-0.5">
-                                                            {subName && (
-                                                                <span className="text-[11px] text-slate-400 truncate">
-                                                                    {subName}
-                                                                </span>
-                                                            )}
-                                                            {player.rankings?.[0]?.rank && (
-                                                                <RankBadge
-                                                                    rank={player.rankings[0].rank}
-                                                                    stars={player.rankings[0].stars}
-                                                                    size="sm"
-                                                                    showName={false}
-                                                                />
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Right: Selection Radio / Indicator */}
-                                                <div className="shrink-0 pl-2">
-                                                    {isSelected ? (
-                                                        <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-semibold">
-                                                            <span>⚔️</span>
-                                                            <span>เป้าหมาย</span>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="w-6 h-6 rounded-full border border-slate-600 group-hover:border-slate-500 flex items-center justify-center text-transparent group-hover:text-slate-500 transition-colors">
-                                                            <div className="w-2 h-2 rounded-full bg-slate-600/40 group-hover:bg-slate-500" />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })
+                                    filteredPlayers.map((player) => (
+                                        <PlayerSelectCard 
+                                            key={player.id}
+                                            player={player}
+                                            isSelected={selectedPlayerId === player.id}
+                                            onSelect={() => setSelectedPlayerId(selectedPlayerId === player.id ? "" : player.id)}
+                                        />
+                                    ))
                                 )}
                             </div>
                         </div>

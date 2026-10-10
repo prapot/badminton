@@ -35,6 +35,7 @@ export default function Navbar() {
     };
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         updateUserData();
         window.addEventListener("storage", updateUserData);
         return () => window.removeEventListener("storage", updateUserData);
@@ -42,6 +43,7 @@ export default function Navbar() {
 
     // Close drawer on route change
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setDrawerOpen(false);
     }, [pathname]);
 

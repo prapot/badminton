@@ -157,10 +157,10 @@ export default function EndlessStatsBoard({
                                             </div>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <div className="flex flex-col items-start gap-1">
-                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                            <div className="flex flex-col items-start gap-1 min-w-0">
+                                                <div className="flex items-center gap-1.5 min-w-0">
                                                     <span className={`font-bold truncate max-w-[120px] sm:max-w-[150px] ${isTop3 ? 'text-white' : 'text-slate-300'}`}>{s.username}</span>
-                                                    {s.skill_level && <SkillBadge skillLevel={s.skill_level} showLabel={false} />}
+                                                    {s.skill_level && <div className="shrink-0"><SkillBadge skillLevel={s.skill_level} showLabel={false} /></div>}
                                                 </div>
                                                 {s.nickname && <span className="text-[10px] text-slate-500 truncate max-w-[150px]">{s.nickname}</span>}
                                                 {tournamentMode === 'ranking' && s.rank && <RankBadge rank={s.rank} stars={s.stars} showName={true} size="sm" />}

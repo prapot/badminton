@@ -77,7 +77,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
             {/* Header: Glassmorphism */}
             <div className="px-4 py-4 sm:px-6 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10 bg-white/5 backdrop-blur-md">
                 <h2 className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 flex items-center gap-2.5 text-base sm:text-lg cursor-default">
-                    <div className="p-2 bg-gradient-to-br from-accent-blue to-accent-blue-dark rounded-xl shadow-lg shadow-blue-900/20 text-white shrink-0">
+                    <div className="p-2 bg-gradient-to-br from-accent-blue to-accent-blue-dark rounded-xl shadow-lg shadow-orange-900/20 text-white shrink-0">
                         <ClipboardList size={18} strokeWidth={2.5} />
                     </div>
                     ตารางแมตซ์
@@ -189,10 +189,10 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                     </div>
                                                 </div>
 
-                                                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-4 px-2 py-3 sm:px-5 sm:py-5 relative">
-                                                    {/* Team A */}
-                                                    <div className={cn("min-w-0 transition-colors", winnerA ? "text-accent-green" : (isCompleted && !winnerA ? "text-slate-500" : "text-white"))}>
-                                                        <div className="flex flex-col gap-3 justify-center h-full">
+                                                <div className="flex flex-col px-3 py-3 sm:px-5 sm:py-4 gap-3 relative">
+                                                    {/* Team A Row */}
+                                                    <div className={cn("flex items-center justify-between", winnerA ? "text-accent-green" : (isCompleted && !winnerA ? "text-slate-500" : "text-white"))}>
+                                                        <div className="flex flex-col gap-3 min-w-0 flex-1">
                                                             {match.team_a_id?.team_players.map((tp, idx) => {
                                                                 const uFromTp = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
                                                                 const u = uFromTp ? (tournamentInfo.players?.find(p => (tp.user_id && p.id === tp.user_id.id) || (tp.guest_name && p.is_guest && p.guest_name === tp.guest_name)) || uFromTp) : null;
@@ -200,43 +200,17 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                 const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
                                                                 const rp_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.rp_change;
                                                                 return (
-                                                                    <div key={idx} className="flex items-center justify-end gap-2 sm:gap-3 relative">
-                                                                        <div className="flex flex-col items-end justify-center min-w-0 flex-1">
-                                                                            <div className="flex items-center justify-end gap-1.5 sm:gap-2 mb-0.5 w-full">
-                                                                                {winnerA && idx === 0 && <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-wider text-accent-green bg-accent-green/10 px-1 py-0.5 rounded-md shrink-0">Win</span>}
-                                                                                {(u as any).skill_level && <div className="shrink-0"><SkillBadge skillLevel={(u as any).skill_level} showLabel={false} /></div>}
-                                                                                <p className="font-bold text-xs sm:text-sm truncate text-white text-right">{u.username}</p>
-                                                                            </div>
-                                                                            {(u as any).nickname && <p className="text-[9px] sm:text-[10px] text-slate-400 font-medium truncate w-full text-right">{(u as any).nickname}</p>}
-                                                                            {/* Stats - ranking mode only */}
-                                                                            {tournamentInfo.mode === "ranking" && (
-                                                                                <div className="flex flex-wrap items-center justify-end gap-1.5 mt-1 w-full">
-                                                                                    {rp_change !== undefined && (
-                                                                                        <span className={cn(
-                                                                                            "text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0",
-                                                                                            rp_change > 0 ? "bg-accent-green/10 border-accent-green/30 text-accent-green" 
-                                                                                            : rp_change < 0 ? "bg-red-500/10 border-red-500/30 text-red-400" 
-                                                                                            : "bg-slate-500/10 border-slate-500/30 text-slate-400"
-                                                                                        )}>
-                                                                                            {rp_change > 0 ? "+" : rp_change < 0 ? "-" : "+"}{Math.abs(Math.floor(rp_change / 100))}
-                                                                                        </span>
-                                                                                    )}
-                                                                                    <div className="shrink-0 scale-90 sm:scale-100 origin-right">
-                                                                                        <RankBadge rank={u.rankings?.[0]?.rank} stars={u.rankings?.[0]?.stars} size="sm" showName={true} />
-                                                                                    </div>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
+                                                                    <div key={idx} className="flex items-center gap-3">
                                                                         <div className="relative flex items-center shrink-0">
                                                                             <div className={cn(
-                                                                                "w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner",
+                                                                                "w-10 h-10 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner",
                                                                                 match.first_serve === "A" && idx === 0 ? "border-accent-green shadow-bounce-green scale-105" : "border-slate-700/50"
                                                                             )}>
-                                                                                {pUrl ? <Image src={pUrl} alt={u.username} width={48} height={48} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                                                                {pUrl ? <Image src={pUrl} alt={u.username} width={40} height={40} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                                                             </div>
                                                                             {match.first_serve === "A" && idx === 0 && (
-                                                                                <div className="absolute -top-1.5 -right-1.5 z-30 w-5 h-5 bg-accent-green rounded-full border-2 border-brand-dark shadow-[0_0_8px_rgba(46,204,113,0.8)] animate-pulse flex items-center justify-center" title="First Serve">
-                                                                                    <span className="text-[10px]">🏸</span>
+                                                                                <div className="absolute -top-1 -right-1 z-30 w-4 h-4 bg-accent-green rounded-full border-2 border-brand-dark shadow-[0_0_8px_rgba(46,204,113,0.8)] animate-pulse flex items-center justify-center" title="First Serve">
+                                                                                    <span className="text-[8px]">🏸</span>
                                                                                 </div>
                                                                             )}
                                                                             {(() => {
@@ -255,114 +229,147 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                                                                 return null;
                                                                             })()}
                                                                         </div>
+                                                                        <div className="flex flex-col min-w-0">
+                                                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                                                <span className="font-bold text-sm sm:text-base truncate">{u.username}</span>
+                                                                                {(u as any).skill_level && <div className="shrink-0"><SkillBadge skillLevel={(u as any).skill_level} showLabel={false} /></div>}
+                                                                                {winnerA && idx === 0 && <span className="text-[9px] font-black uppercase tracking-wider text-accent-green bg-accent-green/10 px-1.5 py-0.5 rounded-md shrink-0">Win</span>}
+                                                                            </div>
+                                                                            {(u as any).nickname && <span className="text-[10px] text-slate-400 font-medium truncate">{(u as any).nickname}</span>}
+                                                                            {tournamentInfo.mode === "ranking" && (
+                                                                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                                                                    <div className="scale-90 origin-left">
+                                                                                        <RankBadge rank={u.rankings?.[0]?.rank} stars={u.rankings?.[0]?.stars} size="sm" showName={true} />
+                                                                                    </div>
+                                                                                    {rp_change !== undefined && (
+                                                                                        <span className={cn(
+                                                                                            "text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0",
+                                                                                            rp_change > 0 ? "bg-accent-green/10 border-accent-green/30 text-accent-green" 
+                                                                                            : rp_change < 0 ? "bg-red-500/10 border-red-500/30 text-red-400" 
+                                                                                            : "bg-slate-500/10 border-slate-500/30 text-slate-400"
+                                                                                        )}>
+                                                                                            {rp_change > 0 ? "+" : rp_change < 0 ? "-" : "+"}{Math.abs(Math.floor(rp_change / 100))}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
                                                                 );
                                                             })}
                                                             {(!match.team_a_id || match.team_a_id.team_players.length === 0) && (
-                                                                <div className="text-right"><p className="font-bold text-sm text-slate-500">ทีม {match.team_a_id?.team_no ?? "?"}</p></div>
+                                                                <div className="font-bold text-sm text-slate-500 px-2 py-1">ทีม {match.team_a_id?.team_no ?? "?"}</div>
+                                                            )}
+                                                        </div>
+                                                        <div className="shrink-0 pl-3 sm:pl-6 flex flex-col justify-center">
+                                                            {isCompleted ? (
+                                                                <span className={cn("text-3xl sm:text-4xl font-black tabular-nums", winnerA ? "text-accent-green drop-shadow-[0_0_8px_rgba(46,204,113,0.4)]" : "text-slate-500")}>{match.score_a}</span>
+                                                            ) : (
+                                                                <span className="text-2xl sm:text-3xl font-black tabular-nums text-slate-700/50">-</span>
                                                             )}
                                                         </div>
                                                     </div>
 
-                                                    {/* Score / VS */}
-                                                    <div className="z-10 shrink-0 flex flex-col items-center justify-center">
-                                                        {isCompleted ? (
-                                                            <div className="flex items-center gap-1.5 sm:gap-4 bg-black/40 px-2 py-1 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-2xl border border-white/5 shadow-inner">
-                                                                <span className={cn("text-base sm:text-3xl font-black tabular-nums", winnerA ? "text-accent-green" : "text-white")}>{match.score_a}</span>
-                                                                <div className="flex flex-col items-center gap-0.5 sm:gap-1 opacity-50">
-                                                                    <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-white/40" />
-                                                                    <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-white/40" />
-                                                                </div>
-                                                                <span className={cn("text-base sm:text-3xl font-black tabular-nums", winnerB ? "text-accent-green" : "text-white")}>{match.score_b}</span>
+                                                    <div className="relative w-full h-px bg-white/5 my-3 sm:my-4 flex items-center justify-center pointer-events-none">
+                                                        {isCompleted || match.match_status === "cancelled" ? (
+                                                            <div className="absolute z-10 flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 bg-black/40 backdrop-blur-md rounded-full border border-white/5">
+                                                                <span className="font-black italic text-slate-600 text-[9px] sm:text-[11px] tracking-tighter transform -skew-x-12">
+                                                                    VS
+                                                                </span>
                                                             </div>
                                                         ) : (
-                                                            <div className="flex flex-col items-center gap-1">
-                                                                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center relative backdrop-blur-md">
-                                                                    <span className="text-[10px] font-black text-slate-400">VS</span>
-                                                                    {tournamentInfo.tournament_status === "ongoing" && (
-                                                                        <div className="absolute inset-0 rounded-full border border-accent-blue/30 animate-ping opacity-30" />
-                                                                    )}
-                                                                </div>
+                                                            <div className="absolute z-10 flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-black/60 backdrop-blur-md rounded-full border border-white/10 shadow-[0_0_15px_rgba(0,0,0,0.8)]">
+                                                                <span className="font-black italic text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 via-orange-500 to-red-600 text-sm sm:text-base tracking-tighter transform -skew-x-12 drop-shadow-[0_2px_2px_rgba(239,68,68,0.3)]">
+                                                                    VS
+                                                                </span>
                                                             </div>
                                                         )}
                                                     </div>
 
-                                                    {/* Team B */}
-                                                    <div className={cn("min-w-0 transition-colors", winnerB ? "text-accent-green" : (isCompleted && !winnerB ? "text-slate-500" : "text-white"))}>
-                                                        <div className="flex flex-col gap-3 justify-center h-full">
+                                                    {/* Team B Row */}
+                                                    <div className={cn("flex items-center justify-between", winnerB ? "text-accent-green" : (isCompleted && !winnerB ? "text-slate-500" : "text-white"))}>
+                                                        <div className="flex flex-col gap-3 min-w-0 flex-1">
                                                             {match.team_b_id ? (
-                                                                <>
-                                                                    {match.team_b_id.team_players.map((tp, idx) => {
-                                                                        const uFromTp = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
-                                                                        const u = uFromTp ? (tournamentInfo.players?.find(p => (tp.user_id && p.id === tp.user_id.id) || (tp.guest_name && p.is_guest && p.guest_name === tp.guest_name)) || uFromTp) : null;
-                                                                        if (!u) return null;
-                                                                        const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
-                                                                        const rp_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.rp_change;
-                                                                        return (
-                                                                            <div key={idx} className="flex items-center justify-start gap-2 sm:gap-3 relative">
-                                                                                <div className="relative flex items-center shrink-0">
-                                                                                    <div className={cn(
-                                                                                        "w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner",
-                                                                                        match.first_serve === "B" && idx === 0 ? "border-accent-green shadow-bounce-green scale-105" : "border-slate-700/50"
-                                                                                    )}>
-                                                                                        {pUrl ? <Image src={pUrl} alt={u.username} width={48} height={48} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                                                match.team_b_id.team_players.map((tp, idx) => {
+                                                                    const uFromTp = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
+                                                                    const u = uFromTp ? (tournamentInfo.players?.find(p => (tp.user_id && p.id === tp.user_id.id) || (tp.guest_name && p.is_guest && p.guest_name === tp.guest_name)) || uFromTp) : null;
+                                                                    if (!u) return null;
+                                                                    const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
+                                                                    const rp_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.rp_change;
+                                                                    return (
+                                                                        <div key={idx} className="flex items-center gap-3">
+                                                                            <div className="relative flex items-center shrink-0">
+                                                                                <div className={cn(
+                                                                                    "w-10 h-10 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner",
+                                                                                    match.first_serve === "B" && idx === 0 ? "border-accent-green shadow-bounce-green scale-105" : "border-slate-700/50"
+                                                                                )}>
+                                                                                    {pUrl ? <Image src={pUrl} alt={u.username} width={40} height={40} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
+                                                                                </div>
+                                                                                {match.first_serve === "B" && idx === 0 && (
+                                                                                    <div className="absolute -top-1 -right-1 z-30 w-4 h-4 bg-accent-green rounded-full border-2 border-brand-dark shadow-[0_0_8px_rgba(46,204,113,0.8)] animate-pulse flex items-center justify-center" title="First Serve">
+                                                                                        <span className="text-[8px]">🏸</span>
                                                                                     </div>
-                                                                                    {match.first_serve === "B" && idx === 0 && (
-                                                                                        <div className="absolute -top-1.5 -right-1.5 z-30 w-5 h-5 bg-accent-green rounded-full border-2 border-brand-dark shadow-[0_0_8px_rgba(46,204,113,0.8)] animate-pulse flex items-center justify-center" title="First Serve">
-                                                                                            <span className="text-[10px]">🏸</span>
-                                                                                        </div>
-                                                                                    )}
-                                                                                    {(() => {
-                                                                                        if (match.match_status !== 'done' && match.match_status !== 'cancelled') {
-                                                                                            const currentRp = u.rankings?.[0]?.ranking_points || 0;
-                                                                                            const currentRank = getRankInfoFromPoints(currentRp);
-                                                                                            const potentialRank = getRankInfoFromPoints(currentRp + 100);
-                                                                                            if (potentialRank.rankStr !== currentRank.rankStr && potentialRank.weight > currentRank.weight) {
-                                                                                                return (
-                                                                                                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-accent-yellow to-orange-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xl border border-white/20 whitespace-nowrap">
-                                                                                                        RANK UP
-                                                                                                    </div>
-                                                                                                );
-                                                                                            }
+                                                                                )}
+                                                                                {(() => {
+                                                                                    if (match.match_status !== 'done' && match.match_status !== 'cancelled') {
+                                                                                        const currentRp = u.rankings?.[0]?.ranking_points || 0;
+                                                                                        const currentRank = getRankInfoFromPoints(currentRp);
+                                                                                        const potentialRank = getRankInfoFromPoints(currentRp + 100);
+                                                                                        if (potentialRank.rankStr !== currentRank.rankStr && potentialRank.weight > currentRank.weight) {
+                                                                                            return (
+                                                                                                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-accent-yellow to-orange-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xl border border-white/20 whitespace-nowrap">
+                                                                                                    RANK UP
+                                                                                                </div>
+                                                                                            );
                                                                                         }
-                                                                                        return null;
-                                                                                    })()}
-                                                                                </div>
-                                                                                <div className="flex flex-col items-start justify-center min-w-0 flex-1">
-                                                                                    <div className="flex items-center justify-start gap-1.5 sm:gap-2 mb-0.5 w-full">
-                                                                                        <p className="font-bold text-xs sm:text-sm truncate text-white text-left">{u.username}</p>
-                                                                                        {(u as any).skill_level && <div className="shrink-0"><SkillBadge skillLevel={(u as any).skill_level} showLabel={false} /></div>}
-                                                                                        {winnerB && idx === 0 && <span className="text-[7px] sm:text-[9px] font-black uppercase tracking-wider text-accent-green bg-accent-green/10 px-1 py-0.5 rounded-md shrink-0">Win</span>}
-                                                                                    </div>
-                                                                                    {(u as any).nickname && <p className="text-[9px] sm:text-[10px] text-slate-400 font-medium truncate w-full text-left">{(u as any).nickname}</p>}
-                                                                                    {/* Stats - ranking mode only */}
-                                                                                    {tournamentInfo.mode === "ranking" && (
-                                                                                        <div className="flex flex-wrap items-center justify-start gap-1.5 mt-1 w-full">
-                                                                                            <div className="shrink-0 scale-90 sm:scale-100 origin-left">
-                                                                                                <RankBadge rank={u.rankings?.[0]?.rank} stars={u.rankings?.[0]?.stars} size="sm" showName={true} />
-                                                                                            </div>
-                                                                                            {rp_change !== undefined && (
-                                                                                                <span className={cn(
-                                                                                                    "text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0",
-                                                                                                    rp_change > 0 ? "bg-accent-green/10 border-accent-green/30 text-accent-green" 
-                                                                                                    : rp_change < 0 ? "bg-red-500/10 border-red-500/30 text-red-400" 
-                                                                                                    : "bg-slate-500/10 border-slate-500/30 text-slate-400"
-                                                                                                )}>
-                                                                                                    {rp_change > 0 ? "+" : rp_change < 0 ? "-" : "+"}{Math.abs(Math.floor(rp_change / 100))}
-                                                                                                </span>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    )}
-                                                                                </div>
+                                                                                    }
+                                                                                    return null;
+                                                                                })()}
                                                                             </div>
-                                                                        );
-                                                                    })}
-                                                                </>
+                                                                            <div className="flex flex-col min-w-0">
+                                                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                                                    <span className="font-bold text-sm sm:text-base truncate">{u.username}</span>
+                                                                                    {(u as any).skill_level && <div className="shrink-0"><SkillBadge skillLevel={(u as any).skill_level} showLabel={false} /></div>}
+                                                                                    {winnerB && idx === 0 && <span className="text-[9px] font-black uppercase tracking-wider text-accent-green bg-accent-green/10 px-1.5 py-0.5 rounded-md shrink-0">Win</span>}
+                                                                                </div>
+                                                                                {(u as any).nickname && <span className="text-[10px] text-slate-400 font-medium truncate">{(u as any).nickname}</span>}
+                                                                                {tournamentInfo.mode === "ranking" && (
+                                                                                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                                                                        <div className="scale-90 origin-left">
+                                                                                            <RankBadge rank={u.rankings?.[0]?.rank} stars={u.rankings?.[0]?.stars} size="sm" showName={true} />
+                                                                                        </div>
+                                                                                        {rp_change !== undefined && (
+                                                                                            <span className={cn(
+                                                                                                "text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0",
+                                                                                                rp_change > 0 ? "bg-accent-green/10 border-accent-green/30 text-accent-green" 
+                                                                                                : rp_change < 0 ? "bg-red-500/10 border-red-500/30 text-red-400" 
+                                                                                                : "bg-slate-500/10 border-slate-500/30 text-slate-400"
+                                                                                            )}>
+                                                                                                {rp_change > 0 ? "+" : rp_change < 0 ? "-" : "+"}{Math.abs(Math.floor(rp_change / 100))}
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })
                                                             ) : (
-                                                                <div className="flex flex-col items-start gap-1 p-3 sm:p-4 bg-white/5 rounded-xl border border-white/5 border-dashed">
-                                                                    <Play className="text-slate-500" size={14} />
-                                                                    <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">รอบบาย / พัก</p>
+                                                                <div className="flex items-center gap-2 p-3 bg-white/5 rounded-xl border border-white/5 border-dashed w-fit">
+                                                                    <Play className="text-slate-500 shrink-0" size={14} />
+                                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest">รอบบาย / พัก</span>
                                                                 </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="shrink-0 pl-3 sm:pl-6 flex flex-col justify-center">
+                                                            {match.team_b_id ? (
+                                                                isCompleted ? (
+                                                                    <span className={cn("text-3xl sm:text-4xl font-black tabular-nums", winnerB ? "text-accent-green drop-shadow-[0_0_8px_rgba(46,204,113,0.4)]" : "text-slate-500")}>{match.score_b}</span>
+                                                                ) : (
+                                                                    <span className="text-2xl sm:text-3xl font-black tabular-nums text-slate-700/50">-</span>
+                                                                )
+                                                            ) : (
+                                                                <span className="text-2xl sm:text-3xl font-black tabular-nums text-slate-700/50">0</span>
                                                             )}
                                                         </div>
                                                     </div>

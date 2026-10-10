@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import RankBadge from "../components/RankBadge";
 import SkillBadge from "../components/SkillBadge";
 import { RegisteredPlayer, ApiMatch } from "../types";
@@ -63,6 +64,14 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
         isBlockedTeammates
     } = useEndlessModeManager(props);
 
+    const [isTeamBuilderOpen, setIsTeamBuilderOpen] = useState(false);
+
+    useEffect(() => {
+        if (editingTeamId) {
+            setIsTeamBuilderOpen(true);
+        }
+    }, [editingTeamId]);
+
     return (
         <div id="endless-manager" className="bg-gradient-to-br from-indigo-950/70 to-slate-900/90 border border-indigo-500/20 rounded-2xl overflow-hidden shadow-xl relative">
             {/* Decorative glow */}
@@ -94,18 +103,24 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                 {/* ══════════════════ MATCHMAKER ══════════════════ */}
                 <div className="px-4 pb-4 pt-4 space-y-2">
                     {/* Tab Switcher */}
-                    <div className="flex bg-white/5 rounded-xl p-1 mb-3">
+                    <div className="flex bg-white/5 rounded-xl p-1 mb-3 gap-1">
                         <button
                             onClick={() => setPairingMode('auto')}
-                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${pairingMode === 'auto' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${pairingMode === 'auto' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
                         >
                             🎲 สุ่มอัตโนมัติ
                         </button>
                         <button
                             onClick={() => { setPairingMode('manual'); setPreviewMatch(null); }}
-                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${pairingMode === 'manual' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${pairingMode === 'manual' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
                         >
                             ✍️ จัดคู่เอง
+                        </button>
+                        <button
+                            onClick={() => { setPairingMode('team'); setPreviewMatch(null); }}
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${pairingMode === 'team' ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+                        >
+                            🛡️ ทีมถาวร
                         </button>
                     </div>
 
@@ -353,53 +368,78 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                     {/* Manual Pairing UI */}
                     {pairingMode === 'manual' && (
                         <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
-                            {/* Team Slots */}
-                            <div className="flex gap-2">
-                                <button
+                            {/* VS Style Team Slots */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 relative mt-2">
+                                {/* Team A */}
+                                <div 
                                     onClick={() => setActiveManualTeam("A")}
-                                    className={`flex-1 p-3 rounded-2xl border transition-all text-left ${activeManualTeam === "A" ? "bg-indigo-500/20 border-indigo-400 ring-2 ring-indigo-400/50 shadow-lg shadow-indigo-500/20" : "bg-white/[0.03] border-white/10 hover:bg-white/[0.08]"}`}
+                                    className={`p-3 sm:p-4 rounded-2xl border-2 transition-all cursor-pointer ${activeManualTeam === "A" ? "bg-indigo-500/10 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.2)]" : "bg-black/20 border-white/5 hover:border-white/10 hover:bg-white/[0.02]"}`}
                                 >
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">ทีม A</span>
-                                        <span className="text-[10px] text-slate-400">{manualTeamA.length}/{playersPerTeam}</span>
+                                    <div className="flex justify-between items-center mb-3">
+                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${activeManualTeam === "A" ? "bg-indigo-500/20 text-indigo-400" : "bg-white/5 text-slate-500"}`}>ทีม A</span>
+                                        <span className={`text-[10px] font-bold ${manualTeamA.length === playersPerTeam ? "text-indigo-400" : "text-slate-500"}`}>{manualTeamA.length}/{playersPerTeam}</span>
                                     </div>
-                                    <div className="space-y-1">
-                                        {manualTeamA.length === 0 ? <div className="text-xs text-slate-500 italic py-1">เลือกผู้เล่น...</div> : null}
-                                        {manualTeamA.map(p => (
-                                            <div key={p.id} className="flex justify-between items-center bg-black/20 rounded-lg px-2 py-1.5" onClick={(e) => { e.stopPropagation(); setManualTeamA(manualTeamA.filter(x => x.id !== p.id)); }}>
-                                                <div className="flex items-center gap-1.5 flex-wrap">
-                                                    <span className="text-xs font-bold text-white truncate">{p.username}</span>
-                                                    {p.skill_level && <SkillBadge skillLevel={p.skill_level} showLabel={false} />}
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {Array.from({ length: playersPerTeam }).map((_, i) => {
+                                            const p = manualTeamA[i];
+                                            return (
+                                                <div key={i} className={`h-12 rounded-xl flex items-center justify-between px-3 border transition-all ${p ? "bg-indigo-500/20 border-indigo-500/40" : "bg-black/40 border-dashed border-white/10"}`}>
+                                                    {p ? (
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <div className="hidden sm:flex w-6 h-6 rounded-full bg-slate-800 border border-indigo-500/30 items-center justify-center shrink-0">
+                                                                <span className="text-[9px] font-bold text-indigo-400">{p.username.charAt(0).toUpperCase()}</span>
+                                                            </div>
+                                                            <div className="flex flex-col min-w-0">
+                                                                <span className="font-bold text-indigo-300 text-xs sm:text-sm truncate block">{p.username}</span>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[9px] uppercase tracking-wider text-slate-500">เลือกคนที่ {i+1}</span>
+                                                    )}
+                                                    {p && <button onClick={(e) => { e.stopPropagation(); setManualTeamA(manualTeamA.filter(x => x.id !== p.id)); }} className="w-6 h-6 rounded-full hover:bg-red-500/20 text-red-400/50 hover:text-red-400 flex items-center justify-center text-xs transition-colors shrink-0">✕</button>}
                                                 </div>
-                                                {p.nickname && <span className="text-[9px] text-slate-400 font-medium truncate mt-0.5">{p.nickname}</span>}
-                                                <span className="text-slate-400 text-xs">✕</span>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
-                                </button>
+                                </div>
 
-                                <button
+                                {/* VS Divider for Desktop (Hidden on mobile) */}
+                                <div className="hidden sm:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900 border border-white/10 items-center justify-center z-10 shadow-lg shadow-black/50">
+                                    <span className="text-[9px] font-black text-slate-500 italic">VS</span>
+                                </div>
+
+                                {/* Team B */}
+                                <div 
                                     onClick={() => setActiveManualTeam("B")}
-                                    className={`flex-1 p-3 rounded-2xl border transition-all text-left ${activeManualTeam === "B" ? "bg-rose-500/20 border-rose-400 ring-2 ring-rose-400/50 shadow-lg shadow-rose-500/20" : "bg-white/[0.03] border-white/10 hover:bg-white/[0.08]"}`}
+                                    className={`p-3 sm:p-4 rounded-2xl border-2 transition-all cursor-pointer ${activeManualTeam === "B" ? "bg-rose-500/10 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]" : "bg-black/20 border-white/5 hover:border-white/10 hover:bg-white/[0.02]"}`}
                                 >
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-rose-400">ทีม B</span>
-                                        <span className="text-[10px] text-slate-400">{manualTeamB.length}/{playersPerTeam}</span>
+                                    <div className="flex justify-between items-center mb-3">
+                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${activeManualTeam === "B" ? "bg-rose-500/20 text-rose-400" : "bg-white/5 text-slate-500"}`}>ทีม B</span>
+                                        <span className={`text-[10px] font-bold ${manualTeamB.length === playersPerTeam ? "text-rose-400" : "text-slate-500"}`}>{manualTeamB.length}/{playersPerTeam}</span>
                                     </div>
-                                    <div className="space-y-1">
-                                        {manualTeamB.length === 0 ? <div className="text-xs text-slate-500 italic py-1">เลือกผู้เล่น...</div> : null}
-                                        {manualTeamB.map(p => (
-                                            <div key={p.id} className="flex justify-between items-center bg-black/20 rounded-lg px-2 py-1.5" onClick={(e) => { e.stopPropagation(); setManualTeamB(manualTeamB.filter(x => x.id !== p.id)); }}>
-                                                <div className="flex items-center gap-1.5 flex-wrap">
-                                                    <span className="text-xs font-bold text-white truncate">{p.username}</span>
-                                                    {p.skill_level && <SkillBadge skillLevel={p.skill_level} showLabel={false} />}
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {Array.from({ length: playersPerTeam }).map((_, i) => {
+                                            const p = manualTeamB[i];
+                                            return (
+                                                <div key={i} className={`h-12 rounded-xl flex items-center justify-between px-3 border transition-all ${p ? "bg-rose-500/20 border-rose-500/40" : "bg-black/40 border-dashed border-white/10"}`}>
+                                                    {p ? (
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <div className="hidden sm:flex w-6 h-6 rounded-full bg-slate-800 border border-rose-500/30 items-center justify-center shrink-0">
+                                                                <span className="text-[9px] font-bold text-rose-400">{p.username.charAt(0).toUpperCase()}</span>
+                                                            </div>
+                                                            <div className="flex flex-col min-w-0">
+                                                                <span className="font-bold text-rose-300 text-xs sm:text-sm truncate block">{p.username}</span>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[9px] uppercase tracking-wider text-slate-500">เลือกคนที่ {i+1}</span>
+                                                    )}
+                                                    {p && <button onClick={(e) => { e.stopPropagation(); setManualTeamB(manualTeamB.filter(x => x.id !== p.id)); }} className="w-6 h-6 rounded-full hover:bg-red-500/20 text-red-400/50 hover:text-red-400 flex items-center justify-center text-xs transition-colors shrink-0">✕</button>}
                                                 </div>
-                                                {p.nickname && <span className="text-[9px] text-slate-400 font-medium truncate mt-0.5">{p.nickname}</span>}
-                                                <span className="text-slate-400 text-xs">✕</span>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
-                                </button>
+                                </div>
                             </div>
 
                             {/* Confirm Button */}
@@ -407,16 +447,22 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                 <button
                                     onClick={handleConfirmManualMatch}
                                     disabled={drawing}
-                                    className="w-full min-h-[48px] rounded-xl bg-green-500 hover:bg-green-400 active:scale-[0.97] text-white font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20"
+                                    className="w-full min-h-[52px] rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 active:scale-[0.98] text-white font-black text-sm transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2"
                                 >
-                                    {drawing ? spinnerSvg : "✅ ยืนยันสร้างแมตซ์"}
+                                    {drawing ? spinnerSvg : "⚔️ ตกลงและเริ่มแข่ง"}
                                 </button>
                             )}
 
                             {/* Available Players List for Manual Mode */}
-                            <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-3">
-                                <div className="text-[10px] text-slate-400 mb-2">เลือกผู้เล่นเข้า {activeManualTeam === "A" ? "ทีม A" : "ทีม B"} ({availablePlayers.length} ว่าง)</div>
-                                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                            <div className="bg-black/20 border border-white/5 rounded-2xl p-4 mt-2">
+                                <div className="text-xs font-bold text-white mb-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-lg">👥</span>
+                                        <span>เลือกผู้เล่นเข้า {activeManualTeam === "A" ? <span className="text-indigo-400 bg-indigo-500/20 px-1.5 py-0.5 rounded">ทีม A</span> : <span className="text-rose-400 bg-rose-500/20 px-1.5 py-0.5 rounded">ทีม B</span>}</span>
+                                    </div>
+                                    <span className="text-slate-500 text-[10px] font-normal px-2 py-1 bg-white/5 rounded-lg">{availablePlayers.length} ว่าง</span>
+                                </div>
+                                <div className="space-y-2 sm:space-y-0 sm:grid sm:grid-cols-2 gap-2 max-h-[250px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                                     {[...availablePlayers]
                                         .sort((a, b) => (actualPlayerCounts.get(a.id) || 0) - (actualPlayerCounts.get(b.id) || 0))
                                         .map(p => {
@@ -433,32 +479,38 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                                         if (activeManualTeam === "A") setManualTeamA([...manualTeamA, p]);
                                                         else setManualTeamB([...manualTeamB, p]);
                                                     }}
-                                                    className={`w-full flex justify-between items-center p-2 rounded-xl border text-left transition-all ${isSelected ? "opacity-30 bg-black/10 border-transparent" : "bg-white/[0.04] border-white/10 hover:bg-white/[0.08] active:scale-[0.98]"}`}
+                                                    className={`w-full flex justify-between items-center p-3 rounded-xl border text-left transition-all group ${isSelected ? "opacity-40 bg-black/40 border-transparent cursor-not-allowed" : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 active:scale-[0.98]"}`}
                                                 >
-                                                    <div>
-                                                        <div className="flex items-center justify-center gap-1.5">
-                                                            <div className="text-xs font-bold text-slate-200">{p.username}</div>
-                                                            {p.skill_level && <SkillBadge skillLevel={p.skill_level} showLabel={false} />}
+                                                    <div className="flex flex-col min-w-0 flex-1">
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                            <div className="text-xs sm:text-sm font-bold text-slate-200 truncate">{p.username}</div>
+                                                            {p.skill_level && <div className="shrink-0"><SkillBadge skillLevel={p.skill_level} showLabel={false} /></div>}
                                                         </div>
-                                                        {p.nickname && <div className="text-[9px] text-slate-400 font-medium mt-0.5">{p.nickname}</div>}
-                                                        <div className="text-[9px] text-slate-500 mt-0.5">{actualPlayerCounts.get(p.id) || 0} แมตซ์</div>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <div className="text-[10px] text-slate-500 bg-white/5 px-1.5 py-0.5 rounded flex items-center gap-1"><span className="text-[8px]">⚔️</span> {actualPlayerCounts.get(p.id) || 0}</div>
+                                                            {p.nickname && <div className="text-[9px] text-slate-400 font-medium truncate">{p.nickname}</div>}
+                                                        </div>
                                                     </div>
-                                                    <div className="flex items-center gap-1">
+                                                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
                                                         {tournamentMode === 'ranking' && <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} size="sm" showName={false} />}
-                                                        {isSelected && <span className="text-[9px] font-bold text-slate-500 bg-white/10 px-1.5 py-0.5 rounded">{isInTeamA ? "A" : "B"}</span>}
+                                                        {isSelected && <span className={`text-[9px] font-black px-2 py-1 rounded-lg ${isInTeamA ? "text-indigo-300 bg-indigo-500/20" : "text-rose-300 bg-rose-500/20"}`}>{isInTeamA ? "ทีม A" : "ทีม B"}</span>}
+                                                        {!isSelected && <div className="w-5 h-5 rounded-full border border-white/10 flex items-center justify-center text-slate-500 group-hover:text-white group-hover:border-white/30 transition-colors">
+                                                            <span className="text-[10px]">➕</span>
+                                                        </div>}
                                                     </div>
                                                 </button>
                                             );
                                         })}
-                                    {availablePlayers.length === 0 && <div className="text-xs text-center text-slate-500 py-4">ไม่มีผู้เล่นว่าง</div>}
+                                    {availablePlayers.length === 0 && <div className="col-span-full text-xs text-center text-slate-500 py-6 border border-dashed border-white/10 rounded-xl bg-white/5">ไม่มีผู้เล่นว่างในระบบ</div>}
                                 </div>
                             </div>
                         </div>
                     )}
                 </div>
 
-                {/* ══════════════════ FIXED PAIRS ══════════════════ */}
-                <div className="pb-4">
+                {/* ══════════════════ FIXED PAIRS (TEAM BUILDER) ══════════════════ */}
+                {pairingMode === 'team' && (
+                    <div className="pb-4 animate-in fade-in slide-in-from-top-4 duration-300">
                     {/* ── Existing permanent teams ── */}
                     {permanentTeams.length > 0 && (
                         <div className="px-4 pt-2 pb-3">
@@ -538,40 +590,81 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                     <div className="mx-4 border-t border-white/5" />
 
                     {/* ── Add / Edit team section ── */}
-                    <div className="px-4 pt-3 pb-3">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    <div className="mx-4 mb-4 mt-2">
+                        <button
+                            onClick={() => setIsTeamBuilderOpen(!isTeamBuilderOpen)}
+                            className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${isTeamBuilderOpen ? "bg-black/20 border-white/5 rounded-b-none border-b-transparent" : "bg-black/20 border-white/5 hover:bg-white/[0.02]"}`}
+                        >
+                            <h3 className="text-sm font-black text-white flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs shadow-inner shadow-amber-500/10">
+                                    {editingTeamId ? "✏️" : "➕"}
+                                </span>
                                 {editingTeamId
                                     ? `แก้ไข ${permanentTeams.find(t => t.id === editingTeamId)?.label ?? ""}`
-                                    : `เพิ่มทีม ${permanentTeams.length + 1}`}
-                            </span>
-                            <span className={`text-[10px] font-bold tabular-nums ${selectedForNew.length === playersPerTeam ? "text-amber-400" : "text-slate-600"}`}>
-                                {selectedForNew.length}/{playersPerTeam} คน
-                            </span>
+                                    : `บันทึกทีม ${permanentTeams.length + 1}`}
+                            </h3>
+                            <div className="flex items-center gap-3">
+                                {isTeamBuilderOpen && (
+                                    <span className={`text-xs font-black px-2 py-1 rounded-lg border ${selectedForNew.length === playersPerTeam ? "bg-amber-500/20 text-amber-400 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.2)]" : "bg-white/5 text-slate-400 border-white/10"}`}>
+                                        {selectedForNew.length}/{playersPerTeam}
+                                    </span>
+                                )}
+                                <span className={`transition-transform duration-200 text-slate-400 ${isTeamBuilderOpen ? "rotate-180" : ""}`}>▾</span>
+                            </div>
+                        </button>
+
+                        {isTeamBuilderOpen && (
+                            <div className="p-4 sm:p-5 bg-black/20 rounded-b-2xl border border-t-0 border-white/5 animate-in fade-in slide-in-from-top-2">
+                                {/* Visual Slots */}
+                        <div className="grid grid-cols-2 gap-3 mb-4">
+                            {Array.from({ length: playersPerTeam }).map((_, i) => {
+                                const p = selectedForNew[i];
+                                return (
+                                    <div key={i} className={`h-12 sm:h-14 rounded-xl border-2 flex items-center justify-between px-3 transition-all ${
+                                        p 
+                                        ? "bg-amber-500/10 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]" 
+                                        : "bg-black/40 border-dashed border-white/10 text-slate-500"
+                                    }`}>
+                                        {p ? (
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <div className="hidden sm:flex w-7 h-7 rounded-full bg-slate-800 border border-amber-500/30 items-center justify-center shrink-0">
+                                                    <span className="text-[10px] font-bold text-amber-400">{p.username.charAt(0).toUpperCase()}</span>
+                                                </div>
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className="font-bold text-amber-300 text-xs sm:text-sm truncate block">{p.username}</span>
+                                                    {p.skill_level && <span className="text-[9px] text-amber-500/80">{p.skill_level}</span>}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <div className="hidden sm:flex w-7 h-7 rounded-full bg-white/5 border border-dashed border-white/10 items-center justify-center">
+                                                    <span className="text-[10px] text-slate-600">?</span>
+                                                </div>
+                                                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500">เลือกคนที่ {i+1}</span>
+                                            </div>
+                                        )}
+                                        {p && (
+                                            <button onClick={() => toggleSelectPlayer(p)} className="w-6 h-6 rounded-full hover:bg-red-500/20 text-red-400/50 hover:text-red-400 flex items-center justify-center text-xs transition-colors shrink-0">✕</button>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
 
-                        {/* Selection preview chip */}
-                        {selectedForNew.length > 0 && (
-                            <div className="mb-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25">
-                                <span className="text-[10px] text-amber-400 font-bold shrink-0">เลือก:</span>
-                                <span className="text-xs font-bold text-amber-200 flex-1 truncate">
-                                    {selectedForNew.map(p => p.username).join(" + ")}
-                                </span>
-                                <button onClick={() => setSelectedForNew([])} className="text-slate-500 hover:text-red-400 text-sm transition-all shrink-0 active:scale-90">✕</button>
-                            </div>
-                        )}
-
-                        {/* Player picker */}
-                        <div className="max-h-44 overflow-y-auto space-y-1 mb-3 -mx-1 px-1">
+                        {/* Player picker (Grid for Desktop, List for Mobile) */}
+                        <div className="max-h-[250px] overflow-y-auto pr-1 space-y-2 sm:space-y-0 sm:grid sm:grid-cols-2 gap-2 mb-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                             {players.length === 0 && (
-                                <p className="text-xs text-slate-600 text-center py-6">ไม่มีผู้เล่น</p>
+                                <div className="col-span-full py-8 flex flex-col items-center justify-center border border-dashed border-white/10 rounded-xl bg-white/5">
+                                    <span className="text-2xl mb-2">👤</span>
+                                    <p className="text-xs text-slate-400 font-medium">ไม่มีผู้เล่นว่างในระบบ</p>
+                                </div>
                             )}
                             {players.map(p => {
                                 const isSelected = selectedForNew.some(s => s.id === p.id);
                                 const isAssigned = assignedPlayerIds.has(p.id);
                                 const isMaxed = selectedForNew.length >= playersPerTeam && !isSelected;
                                 const isBusy = busyPlayerIds.has(p.id);
-                                const canManage = !!userId; // any logged-in user can pause/resume
+                                const canManage = !!userId;
                                 const disabled = isAssigned || isMaxed;
 
                                 return (
@@ -579,33 +672,34 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                         key={p.id}
                                         onClick={() => !disabled && toggleSelectPlayer(p)}
                                         disabled={disabled}
-                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-xs transition-all active:scale-[0.98] ${isSelected
-                                            ? "bg-amber-500/15 border-amber-500/35 text-amber-100"
+                                        className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl border transition-all group ${isSelected
+                                            ? "bg-amber-500/15 border-amber-500/35 shadow-[0_0_10px_rgba(245,158,11,0.1)]"
                                             : isAssigned
-                                                ? "bg-black/10 border-white/5 text-slate-700 cursor-not-allowed"
+                                                ? "bg-black/40 border-white/5 opacity-50 cursor-not-allowed"
                                                 : disabled
-                                                    ? "bg-white/[0.02] border-white/5 text-slate-700 cursor-not-allowed"
-                                                    : "bg-white/[0.04] border-white/[0.07] text-slate-300 active:bg-white/10"
+                                                    ? "bg-white/[0.02] border-white/5 opacity-50 cursor-not-allowed"
+                                                    : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 active:scale-[0.98]"
                                             }`}
                                     >
-                                        {/* Checkbox circle */}
-                                        <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${isSelected
+                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected
                                             ? "border-amber-400 bg-amber-400"
                                             : isAssigned
-                                                ? "border-slate-700 bg-slate-800"
-                                                : "border-slate-600"
+                                                ? "border-slate-600 bg-slate-800"
+                                                : "border-slate-500 group-hover:border-slate-400"
                                             }`}>
-                                            {isSelected && <span className="text-[9px] text-black font-black leading-none">✓</span>}
+                                            {isSelected && <span className="text-[10px] text-black font-black leading-none">✓</span>}
                                             {isAssigned && <span className="text-[8px] text-slate-500 leading-none">🔒</span>}
-                                        </span>
+                                        </div>
 
-                                        <span className="flex-1 flex items-center gap-1.5 font-medium text-left min-w-0">
-                                            <span className="truncate">{p.username}</span>
-                                            {p.skill_level && <SkillBadge skillLevel={p.skill_level} showLabel={false} />}
-                                            {isBusy && <span className="text-[9px] text-orange-400 font-bold shrink-0">แข่งอยู่</span>}
-                                        </span>
+                                        <div className="flex-1 flex flex-col items-start min-w-0">
+                                            <div className="flex items-center gap-1.5 min-w-0 w-full">
+                                                <span className={`text-xs sm:text-sm font-bold truncate ${isSelected ? 'text-amber-300' : 'text-slate-200'}`}>{p.username}</span>
+                                                {p.skill_level && <div className="shrink-0"><SkillBadge skillLevel={p.skill_level} showLabel={false} /></div>}
+                                                {isBusy && <span className="text-[8px] font-black uppercase bg-orange-500/20 text-orange-400 px-1 rounded shrink-0">แข่งอยู่</span>}
+                                            </div>
+                                        </div>
 
-                                        <span
+                                        <div
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 if (canManage) {
@@ -613,36 +707,39 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                                 }
                                             }}
                                             role="button"
-                                            className={`text-[10px] shrink-0 cursor-pointer ${canManage ? "text-indigo-400 hover:text-indigo-300 underline underline-offset-2" : "text-slate-600"}`}
+                                            className={`text-[10px] font-bold px-2 py-1 rounded-lg shrink-0 cursor-pointer flex items-center gap-1 ${canManage ? "bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20" : "bg-white/5 text-slate-500"}`}
                                             title={canManage ? "ปรับจำนวนแมตช์" : undefined}
                                         >
-                                            {actualPlayerCounts.get(p.id) || 0}แมตซ์ {canManage && "✏️"}
-                                        </span>
+                                            {actualPlayerCounts.get(p.id) || 0} ⚔️
+                                        </div>
                                     </button>
                                 );
                             })}
                         </div>
 
                         {/* Save / Cancel */}
-                        <div className="flex gap-2">
+                        <div className="flex gap-3">
                             <button
                                 onClick={addOrUpdateTeam}
                                 disabled={selectedForNew.length !== playersPerTeam}
-                                className="flex-1 min-h-[48px] rounded-xl bg-amber-500/20 hover:bg-amber-500/30 active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed border border-amber-500/30 text-amber-300 font-bold text-xs transition-all"
+                                className="flex-1 min-h-[50px] rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 disabled:shadow-none shadow-[0_0_20px_rgba(245,158,11,0.3)] text-white font-black text-sm transition-all flex items-center justify-center gap-2 active:scale-95"
                             >
-                                {editingTeamId ? "💾 บันทึกการแก้ไข" : "🔒 บันทึกทีมนี้"}
+                                {editingTeamId ? "💾 บันทึกการแก้ไข" : "⚡ บันทึกทีมนี้"}
                             </button>
                             {(selectedForNew.length > 0 || editingTeamId) && (
                                 <button
                                     onClick={cancelEdit}
-                                    className="w-12 min-h-[48px] rounded-xl border border-white/8 text-slate-500 hover:text-red-400 hover:border-red-500/20 active:scale-95 transition-all flex items-center justify-center shrink-0"
+                                    className="w-[50px] rounded-xl border-2 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 hover:border-slate-600 active:scale-95 transition-all flex items-center justify-center shrink-0 font-bold"
                                 >
                                     ✕
                                 </button>
                             )}
                         </div>
+                            </div>
+                        )}
                     </div>
-                </div>
+                    </div>
+                )}
 
             </div>
         </div>

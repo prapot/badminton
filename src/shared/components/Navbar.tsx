@@ -109,12 +109,13 @@ export default function Navbar() {
                     </div>
 
                     {/* Right side */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                         {user && (
-                            <span className="text-sm text-slate-400 hidden sm:block mr-2">
-                                สวัสดี, <span className="text-white font-medium">{user.username}</span>
-                                {user.nickname && <span className="text-[11px] text-slate-500 ml-1">({user.nickname})</span>}
-                            </span>
+                            <div className="text-sm text-slate-400 hidden sm:flex items-center mr-2 min-w-0 max-w-[150px] md:max-w-[250px] lg:max-w-[350px]">
+                                <span className="shrink-0">สวัสดี,&nbsp;</span>
+                                <span className="text-white font-medium truncate">{user.username}</span>
+                                {user.nickname && <span className="text-[11px] text-slate-500 ml-1 shrink-0">({user.nickname})</span>}
+                            </div>
                         )}
                         {/* Profile button */}
                         <Link

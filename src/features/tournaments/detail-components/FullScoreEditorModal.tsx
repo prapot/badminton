@@ -79,7 +79,7 @@ export default function FullScoreEditorModal({
                     <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
                     {/* Team A */}
-                    <div className="flex-1 flex flex-col gap-6 items-center">
+                    <div className="flex-1 flex flex-col gap-6 items-center min-w-0">
                         <div className="flex flex-col gap-3 w-full">
                             {(match.team_a_id?.team_players || []).map((tp, idx) => {
                                 const uFromTp = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
@@ -92,9 +92,9 @@ export default function FullScoreEditorModal({
                                             {pUrl ? <Image src={pUrl} alt={u.username} width={32} height={32} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                         </div>
                                         <div className="min-w-0 flex flex-col justify-center">
-                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                            <div className="flex items-center gap-1.5 min-w-0">
                                                 <p className="font-bold text-sm text-white truncate">{u.username}</p>
-                                                {(u as any).skill_level && <SkillBadge skillLevel={(u as any).skill_level} showLabel={false} />}
+                                                {(u as any).skill_level && <div className="shrink-0"><SkillBadge skillLevel={(u as any).skill_level} showLabel={false} /></div>}
                                             </div>
                                             {(u as any).nickname && <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{(u as any).nickname}</p>}
                                             <p className="text-[10px] text-slate-500 font-medium mt-1">TEAM {match.team_a_id?.team_no}</p>
@@ -139,7 +139,7 @@ export default function FullScoreEditorModal({
                     </div>
 
                     {/* Team B */}
-                    <div className="flex-1 flex flex-col gap-6 items-center">
+                    <div className="flex-1 flex flex-col gap-6 items-center min-w-0">
                         <div className="flex flex-col gap-3 w-full">
                             {(match.team_b_id?.team_players || []).map((tp, idx) => {
                                 const uFromTp = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
@@ -152,9 +152,9 @@ export default function FullScoreEditorModal({
                                             {pUrl ? <Image src={pUrl} alt={u.username} width={32} height={32} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
                                         </div>
                                         <div className="min-w-0 flex flex-col justify-center">
-                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                            <div className="flex items-center gap-1.5 min-w-0">
                                                 <p className="font-bold text-sm text-white truncate">{u.username}</p>
-                                                {(u as any).skill_level && <SkillBadge skillLevel={(u as any).skill_level} showLabel={false} />}
+                                                {(u as any).skill_level && <div className="shrink-0"><SkillBadge skillLevel={(u as any).skill_level} showLabel={false} /></div>}
                                             </div>
                                             {(u as any).nickname && <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{(u as any).nickname}</p>}
                                             <p className="text-[10px] text-slate-500 font-medium mt-1">TEAM {match.team_b_id?.team_no}</p>

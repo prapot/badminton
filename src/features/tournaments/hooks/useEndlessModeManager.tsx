@@ -3,7 +3,7 @@ import Swal from "sweetalert2";
 
 import { RegisteredPlayer, ApiMatch } from "../types";
 
-export type PairingMode = "auto" | "manual";
+export type PairingMode = "auto" | "manual" | "team";
 
 export interface PermanentTeam {
     id: string;

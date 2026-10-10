@@ -70,6 +70,7 @@ export interface ApiRanking {
 }
 
 export interface ApiPlayer {
+    skill_level: any;
     id: number;
     username: string;
     nickname?: string;

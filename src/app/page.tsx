@@ -1,4 +1,4 @@
-import { HomeClient } from "@/shared/components/HomeClient";
+import { HomeClient } from "@/features/home/components/HomeClient";
 
 export default function HomePage() {
     return <HomeClient />;

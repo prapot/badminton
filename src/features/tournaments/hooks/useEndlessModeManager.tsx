@@ -58,6 +58,7 @@ export function useEndlessModeManager({
     const [previewMatch, setPreviewMatch] = useState<{ teamA: RegisteredPlayer[], teamB: RegisteredPlayer[] } | null>(null);
     const [selectedSwapPlayer, setSelectedSwapPlayer] = useState<number | null>(null);
     const [showPlayerList, setShowPlayerList] = useState(false);
+    const [optimisticBusy, setOptimisticBusy] = useState<Set<number>>(new Set());
 
     // ── Permanent teams (persist across draws) ───────────────────────────
     const [permanentTeams, setPermanentTeams] = useState<PermanentTeam[]>(permanentTeamsData || []);
@@ -126,9 +127,23 @@ export function useEndlessModeManager({
     }, [players, apiMatches]);
 
     const availablePlayers = useMemo(
-        () => players.filter(p => !busyPlayerIds.has(p.id) && !pausedPlayerIds.has(p.id)),
-        [players, busyPlayerIds, pausedPlayerIds]
+        () => players.filter(p => !busyPlayerIds.has(p.id) && !pausedPlayerIds.has(p.id) && !optimisticBusy.has(p.id)),
+        [players, busyPlayerIds, pausedPlayerIds, optimisticBusy]
     );
+
+    // Clear optimistic busy state once the backend confirms they are actually busy
+    useEffect(() => {
+        setOptimisticBusy(prev => {
+            if (prev.size === 0) return prev;
+            const newSet = new Set(prev);
+            for (const id of newSet) {
+                if (busyPlayerIds.has(id)) {
+                    newSet.delete(id);
+                }
+            }
+            return newSet.size === prev.size ? prev : newSet;
+        });
+    }, [busyPlayerIds]);
 
     // Players already assigned to a permanent team
     const assignedPlayerIds = useMemo(
@@ -583,25 +598,29 @@ export function useEndlessModeManager({
             const json = await res.json();
             if (!res.ok) throw new Error(json.error?.message || "Error creating match");
 
-            // Trigger Pusher notification
-            try {
-                await fetch('/api/pusher/trigger', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        playerIds: [...previewMatch.teamA.map(p => p.id), ...previewMatch.teamB.map(p => p.id)],
-                        matchData: {
-                            matchId: json.data?.id || json.id || 0,
-                            teamA: previewMatch.teamA.map(p => ({ id: p.id, name: p.username || p.guest_name })),
-                            teamB: previewMatch.teamB.map(p => ({ id: p.id, name: p.username || p.guest_name }))
-                        }
-                    })
-                });
-            } catch (pusherErr) {
-                console.error("Failed to trigger pusher:", pusherErr);
-            }
+            // Trigger Pusher notification (Fire and forget, do not await)
+            fetch('/api/pusher/trigger', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    playerIds: [...previewMatch.teamA.map(p => p.id), ...previewMatch.teamB.map(p => p.id)],
+                    matchData: {
+                        matchId: json.data?.id || json.id || 0,
+                        teamA: previewMatch.teamA.map(p => ({ id: p.id, name: p.username || p.guest_name })),
+                        teamB: previewMatch.teamB.map(p => ({ id: p.id, name: p.username || p.guest_name }))
+                    }
+                })
+            }).catch(console.error);
 
-            showToast("สร้างแมตซ์เรียบร้อยแล้ว", "success");
+            // Optimistically mark players as busy to prevent duplicate draws
+            setOptimisticBusy(prev => {
+                const newSet = new Set(prev);
+                previewMatch.teamA.forEach(p => newSet.add(p.id));
+                previewMatch.teamB.forEach(p => newSet.add(p.id));
+                return newSet;
+            });
+
+            showToast("สร้างแมตช์เรียบร้อยแล้ว", "success");
             setPreviewMatch(null);
             await refreshInfo();
             setTimeout(() => {
@@ -638,24 +657,29 @@ export function useEndlessModeManager({
             const json = await res.json();
             if (!res.ok) throw new Error(json.error?.message || "Error creating match");
 
-            try {
-                await fetch('/api/pusher/trigger', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        playerIds: [...manualTeamA.map(p => p.id), ...manualTeamB.map(p => p.id)],
-                        matchData: {
-                            matchId: json.data?.id || json.id || 0,
-                            teamA: manualTeamA.map(p => ({ id: p.id, name: p.username || p.guest_name })),
-                            teamB: manualTeamB.map(p => ({ id: p.id, name: p.username || p.guest_name }))
-                        }
-                    })
-                });
-            } catch (pusherErr) {
-                console.error("Failed to trigger pusher:", pusherErr);
-            }
+            // Trigger Pusher notification (Fire and forget)
+            fetch('/api/pusher/trigger', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    playerIds: [...manualTeamA.map(p => p.id), ...manualTeamB.map(p => p.id)],
+                    matchData: {
+                        matchId: json.data?.id || json.id || 0,
+                        teamA: manualTeamA.map(p => ({ id: p.id, name: p.username || p.guest_name })),
+                        teamB: manualTeamB.map(p => ({ id: p.id, name: p.username || p.guest_name }))
+                    }
+                })
+            }).catch(console.error);
 
-            showToast("สร้างแมตซ์เรียบร้อยแล้ว", "success");
+            // Optimistically mark players as busy
+            setOptimisticBusy(prev => {
+                const newSet = new Set(prev);
+                manualTeamA.forEach(p => newSet.add(p.id));
+                manualTeamB.forEach(p => newSet.add(p.id));
+                return newSet;
+            });
+
+            showToast("สร้างแมตช์เรียบร้อยแล้ว", "success");
             setManualTeamA([]);
             setManualTeamB([]);
             await refreshInfo();

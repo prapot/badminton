@@ -5,7 +5,6 @@ import { getRankInfoFromPoints } from '../utils/TournamentUtils';
 import RankBadge from '../components/RankBadge';
 import SkillBadge from '../components/SkillBadge';
 import { cn } from '@/shared/utils/utils';
-import { cva } from 'class-variance-authority';
 import { ClipboardList, RefreshCw, XCircle, CheckCircle, Activity, Trophy, Play } from 'lucide-react';
 
 interface MatchScheduleProps {
@@ -22,36 +21,128 @@ interface MatchScheduleProps {
     isOwner?: boolean;
 }
 
-const matchCardVariants = cva(
-    "group relative overflow-hidden border rounded-2xl transition-all duration-300",
-    {
-        variants: {
-            state: {
-                default: "bg-black/20 border-white/5 hover:bg-black/40 hover:-translate-y-0.5 hover:shadow-xl hover:border-white/10 cursor-pointer active:scale-[0.99]",
-                userInMatch: "bg-accent-yellow/5 border-accent-yellow ring-1 ring-accent-yellow/50 shadow-match-active hover:-translate-y-0.5 cursor-pointer active:scale-[0.99]",
-                cancelled: "bg-black/20 border-white/5 opacity-60 grayscale cursor-not-allowed",
-            }
-        },
-        defaultVariants: {
-            state: "default",
-        }
-    }
-);
+// ── helpers ──────────────────────────────────────────────────────────
+function PlayerRow({
+    tp,
+    tournamentInfo,
+    STRAPI_BASE_URL,
+    match,
+    isWinner,
+    isCompleted,
+    firstServeKey,
+    firstServeIdx,
+}: {
+    tp: any;
+    tournamentInfo: TournamentInfo;
+    STRAPI_BASE_URL: string;
+    match: ApiMatch;
+    isWinner: boolean;
+    isCompleted: boolean;
+    firstServeKey: 'A' | 'B';
+    firstServeIdx: number;
+}) {
+    const uFromTp = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
+    const u = uFromTp
+        ? (tournamentInfo.players?.find(
+              p => (tp.user_id && p.id === tp.user_id.id) || (tp.guest_name && p.is_guest && p.guest_name === tp.guest_name)
+          ) || uFromTp)
+        : null;
+    if (!u) return null;
 
-const statusBadgeVariants = cva(
-    "text-[10px] px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border",
-    {
-        variants: {
-            status: {
-                cancelled: "bg-red-500/10 text-red-400 border-red-500/20",
-                done: "bg-accent-green/20 text-accent-green border-accent-green/30 shadow-badge-green",
-                ongoing: "bg-accent-blue/20 text-accent-blue border-accent-blue/30 animate-pulse",
-                upcoming: "bg-white/5 text-slate-400 border-white/10"
-            }
-        }
-    }
-);
+    const pUrl = u.picture?.url
+        ? u.picture.url.startsWith('http') ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`
+        : null;
 
+    const rp_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.rp_change;
+    const isFirstServe = match.first_serve === firstServeKey && firstServeIdx === 0;
+
+    // Rank-up warning (for upcoming matches)
+    const showRankUpWarning = (() => {
+        if (match.match_status !== 'done' && match.match_status !== 'cancelled') {
+            const currentRp = u.rankings?.[0]?.ranking_points || 0;
+            const currentRank = getRankInfoFromPoints(currentRp);
+            const potentialRank = getRankInfoFromPoints(currentRp + 100);
+            return potentialRank.rankStr !== currentRank.rankStr && potentialRank.weight > currentRank.weight;
+        }
+        return false;
+    })();
+
+    const nameColor = isWinner
+        ? 'text-emerald-400'
+        : isCompleted
+        ? 'text-slate-500'
+        : 'text-white';
+
+    return (
+        <div className="flex items-center gap-2.5">
+            {/* Avatar */}
+            <div className="relative shrink-0">
+                <div className={cn(
+                    'w-9 h-9 rounded-full bg-slate-800 overflow-hidden border-2 flex items-center justify-center shadow-inner transition-all',
+                    isFirstServe ? 'border-emerald-500/80 scale-105 shadow-[0_0_10px_rgba(52,211,153,0.3)]' : 'border-slate-700/50'
+                )}>
+                    {pUrl
+                        ? <Image src={pUrl} alt={u.username} width={36} height={36} className="w-full h-full object-cover" />
+                        : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>
+                    }
+                </div>
+                {isFirstServe && (
+                    <div className="absolute -top-1 -right-1 z-30 w-4 h-4 bg-emerald-500 rounded-full border-2 border-[#0d1117] shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse flex items-center justify-center" title="First Serve">
+                        <span className="text-[8px]">🏸</span>
+                    </div>
+                )}
+                {showRankUpWarning && (
+                    <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[7px] font-black px-1.5 py-0.5 rounded-full shadow-xl whitespace-nowrap">
+                        RANK UP
+                    </div>
+                )}
+            </div>
+
+            {/* Name + badges */}
+            <div className="flex flex-col min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                    <span className={cn('font-bold text-sm leading-tight truncate', nameColor)}>
+                        {u.username}
+                    </span>
+                    {(u as any).skill_level && (
+                        <div className="shrink-0"><SkillBadge skillLevel={(u as any).skill_level} showLabel={false} /></div>
+                    )}
+                    {isWinner && (
+                        <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md shrink-0 border border-emerald-500/20">
+                            WIN
+                        </span>
+                    )}
+                </div>
+
+                {/* Nickname */}
+                {(u as any).nickname && (
+                    <span className="text-[10px] text-slate-500 font-medium truncate leading-tight">{(u as any).nickname}</span>
+                )}
+
+                {/* Rank badge + RP change (ranking mode) */}
+                {tournamentInfo.mode === 'ranking' && (
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <div className="scale-90 origin-left">
+                            <RankBadge rank={u.rankings?.[0]?.rank} stars={u.rankings?.[0]?.stars} size="sm" showName={true} />
+                        </div>
+                        {rp_change !== undefined && (
+                            <span className={cn(
+                                'text-[10px] font-bold px-1.5 py-0.5 rounded-full border shrink-0',
+                                rp_change > 0 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                    : rp_change < 0 ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                                    : 'bg-slate-500/10 border-slate-500/30 text-slate-400'
+                            )}>
+                                {rp_change > 0 ? '+' : rp_change < 0 ? '-' : '+'}{Math.abs(Math.floor(rp_change / 100))} ⭐
+                            </span>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// ── Main Component ────────────────────────────────────────────────────
 const MatchSchedule: React.FC<MatchScheduleProps> = ({
     tournamentInfo,
     user,
@@ -65,311 +156,260 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
     STRAPI_BASE_URL,
     isOwner,
 }) => {
-    const isOwnerOrAdmin = isOwner !== undefined ? isOwner : (!!user?.id && Number(tournamentInfo.user_created?.id) === Number(user?.id));
+    const isOwnerOrAdmin = isOwner !== undefined
+        ? isOwner
+        : (!!user?.id && Number(tournamentInfo.user_created?.id) === Number(user?.id));
 
-    if (tournamentInfo.tournament_status !== "ongoing" && tournamentInfo.tournament_status !== "completed") return null;
+    if (tournamentInfo.tournament_status !== 'ongoing' && tournamentInfo.tournament_status !== 'completed') return null;
+
+    const rounds = Array.from(new Set(apiMatches.map(m => m.round)));
 
     return (
         <div id="match-schedule" className="bg-gradient-to-br from-brand-dark to-brand-darker border border-white/10 rounded-3xl overflow-hidden shadow-2xl relative">
-            {/* Background Decoration */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-accent-blue/5 rounded-full blur-[80px] pointer-events-none" />
+            {/* Background decoration */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-[80px] pointer-events-none" />
 
-            {/* Header: Glassmorphism */}
-            <div className="px-4 py-4 sm:px-6 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10 bg-white/5 backdrop-blur-md">
-                <h2 className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 flex items-center gap-2.5 text-base sm:text-lg cursor-default">
-                    <div className="p-2 bg-gradient-to-br from-accent-blue to-accent-blue-dark rounded-xl shadow-lg shadow-orange-900/20 text-white shrink-0">
+            {/* ── Header ── */}
+            <div className="px-4 py-4 sm:px-6 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10 bg-white/5 backdrop-blur-md">
+                <h2 className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 flex items-center gap-2.5 text-base sm:text-lg">
+                    <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl shadow-lg text-white shrink-0">
                         <ClipboardList size={18} strokeWidth={2.5} />
                     </div>
                     ตารางแมตซ์
                 </h2>
+
                 <div className="flex items-center gap-2 self-end sm:self-auto">
-                    <button onClick={() => fetchMatches()}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-slate-300 text-xs font-semibold transition-all">
-                        <RefreshCw size={14} />
+                    <button
+                        onClick={() => fetchMatches()}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-slate-300 text-xs font-semibold transition-all"
+                    >
+                        <RefreshCw size={13} />
                         <span>รีเฟรช</span>
                     </button>
-                    {tournamentInfo.tournament_status === "ongoing" && isOwner && (
+                    {tournamentInfo.tournament_status === 'ongoing' && isOwner && (
                         <button
                             onClick={handleFinishTournament}
                             disabled={starting}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 active:scale-95 border border-orange-500/30 text-orange-400 text-xs font-bold transition-all disabled:opacity-50"
                         >
-                            <Trophy size={14} />
+                            <Trophy size={13} />
                             <span>จบการแข่งขัน</span>
                         </button>
                     )}
                 </div>
             </div>
 
+            {/* ── Body ── */}
             {apiMatches.length === 0 ? (
                 <div className="py-20 text-center text-slate-500 relative z-10 flex flex-col items-center gap-4">
                     <div className="p-4 bg-white/5 rounded-full">
-                        <ClipboardList size={48} className="opacity-50" />
+                        <ClipboardList size={40} className="opacity-40" />
                     </div>
                     <p className="text-sm font-medium">ยังไม่มีข้อมูลแมตซ์การแข่งขัน</p>
                 </div>
             ) : (
-                <div className="p-3 sm:p-6 space-y-8 relative z-10">
-                    {/* Group by round */}
-                    {Array.from(new Set(apiMatches.map(m => m.round))).map(round => (
-                        <div key={round} className="space-y-4">
-                            <div className="flex items-center gap-4">
-                                <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent flex-1" />
-                                <span className="px-4 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-slate-400 uppercase tracking-widest text-center shadow-inner">
-                                    แมตซ์ #{round}
-                                </span>
-                                <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent flex-1" />
-                            </div>
+                <div className="p-3 sm:p-5 space-y-8 relative z-10">
+                    {rounds.map(round => {
+                        const roundMatches = apiMatches
+                            .filter(m => m.round === round)
+                            .sort((a, b) => {
+                                const order = (s: string) => s === 'upcoming' ? 0 : s === 'done' ? 1 : s === 'cancelled' ? 2 : 3;
+                                const diff = order(a.match_status) - order(b.match_status);
+                                return diff !== 0 ? diff : (b.match_no ?? 0) - (a.match_no ?? 0);
+                            });
 
-                            <div className="grid gap-4">
-                                {apiMatches
-                                    .filter(m => m.round === round)
-                                    .sort((a, b) => {
-                                        const getStatusScore = (s: string) => {
-                                            if (s === "upcoming") return 1;
-                                            if (s === "done") return 2;
-                                            if (s === "cancelled") return 3;
-                                            return 4;
-                                        };
-                                        const scoreA = getStatusScore(a.match_status);
-                                        const scoreB = getStatusScore(b.match_status);
-                                        if (scoreA !== scoreB) return scoreA - scoreB;
-                                        return (b.match_no ?? 0) - (a.match_no ?? 0);
-                                    })
-                                    .map((match, idx) => {
-                                        const isCompleted = match.match_status === "done";
-                                        const winnerA = isCompleted && match.score_a > match.score_b;
-                                        const winnerB = isCompleted && match.score_b > match.score_a;
+                        return (
+                            <div key={round} className="space-y-3">
+                                {/* Round header */}
+                                <div className="flex items-center gap-3">
+                                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                                    <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">
+                                        แมตซ์ #{round}
+                                    </span>
+                                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                                </div>
+
+                                {/* Match cards */}
+                                <div className="grid gap-3">
+                                    {roundMatches.map((match, idx) => {
+                                        const isCompleted = match.match_status === 'done';
+                                        const isCancelled = match.match_status === 'cancelled';
+                                        const winnerA = isCompleted && (match.score_a ?? 0) > (match.score_b ?? 0);
+                                        const winnerB = isCompleted && (match.score_b ?? 0) > (match.score_a ?? 0);
 
                                         const isUserInMatch = user?.id && (
                                             match.team_a_id?.team_players.some(tp => tp.user_id?.id === user.id) ||
                                             match.team_b_id?.team_players.some(tp => tp.user_id?.id === user.id)
                                         );
 
-                                        const matchState = match.match_status === "cancelled" ? "cancelled" : (isUserInMatch ? "userInMatch" : "default");
+                                        const handleClick = () => {
+                                            if (tournamentInfo.tournament_status === 'completed') return;
+                                            if ((isCancelled || isCompleted) && !isOwnerOrAdmin) return;
+                                            setScoreEditing(match);
+                                            setScoreA(match.score_a ?? 0);
+                                            setScoreB(match.score_b ?? 0);
+                                        };
 
                                         return (
-                                            <div key={match.id}
-                                                className={cn(matchCardVariants({ state: matchState }), "animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both")}
-                                                style={{ animationDelay: `${idx * 100}ms` }}
-                                                onClick={() => {
-                                                    if (tournamentInfo.tournament_status === "completed") return;
-                                                    if ((match.match_status === "cancelled" || match.match_status === "done") && !isOwnerOrAdmin) return;
-                                                    setScoreEditing(match);
-                                                    setScoreA(match.score_a ?? 0);
-                                                    setScoreB(match.score_b ?? 0);
-                                                }}>
+                                            <div
+                                                key={match.id}
+                                                onClick={handleClick}
+                                                className={cn(
+                                                    'group relative overflow-hidden rounded-2xl border transition-all duration-300 animate-in fade-in slide-in-from-bottom-3 duration-500 fill-mode-both',
+                                                    isCancelled
+                                                        ? 'bg-black/20 border-white/5 opacity-60 grayscale cursor-not-allowed'
+                                                        : isUserInMatch
+                                                        ? 'bg-amber-500/[0.07] border-amber-400/50 ring-2 ring-amber-400/25 cursor-pointer hover:-translate-y-0.5 active:scale-[0.99]'
+                                                        : 'bg-black/20 border-white/5 cursor-pointer hover:bg-black/40 hover:-translate-y-0.5 hover:shadow-xl hover:border-white/10 active:scale-[0.99]'
+                                                )}
+                                                style={{
+                                                    animationDelay: `${idx * 80}ms`,
+                                                    ...(isUserInMatch && !isCancelled ? {
+                                                        boxShadow: '0 0 0 1px rgba(251,191,36,0.15), 0 0 20px rgba(251,191,36,0.12), 0 4px 24px rgba(0,0,0,0.4)'
+                                                    } : {})
+                                                }}
+                                            >
+                                                {/* Top accent strip */}
+                                                <div className={cn(
+                                                    'h-0.5 w-full',
+                                                    isCancelled ? 'bg-slate-700/50'
+                                                        : isCompleted ? 'bg-gradient-to-r from-emerald-500 via-green-400 to-teal-500'
+                                                        : isUserInMatch ? 'bg-gradient-to-r from-amber-400 to-orange-500'
+                                                        : 'bg-gradient-to-r from-blue-500/50 via-violet-500/30 to-transparent'
+                                                )} />
 
-                                                {/* Top info row: match no + status badge */}
-                                                <div className="flex items-center justify-between px-3 pt-3 pb-2 sm:px-5 sm:pt-4 border-b border-white/5 bg-black/10">
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                        MATCH #{match.match_no}
-                                                    </span>
-                                                    <div>
-                                                        {match.match_status === "cancelled" ? (
-                                                            <div className={statusBadgeVariants({ status: "cancelled" })}>
-                                                                <XCircle size={12} strokeWidth={2.5} />
+                                                {/* ── Card content ── */}
+                                                <div className="px-3 py-3 sm:px-4 sm:py-3.5">
+                                                    {/* Top row: match no + status */}
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                                                # {match.match_no}
+                                                            </span>
+                                                            {isUserInMatch && !isCancelled && (
+                                                                <span className="inline-flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full border bg-amber-500/20 text-amber-300 border-amber-400/40 uppercase tracking-wide animate-pulse">
+                                                                    🏸 แมตซ์ของคุณ
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {/* Status badge */}
+                                                        {isCancelled ? (
+                                                            <div className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold border bg-rose-500/10 text-rose-400 border-rose-500/20">
+                                                                <XCircle size={11} strokeWidth={2.5} />
                                                                 ยกเลิกแล้ว
                                                             </div>
                                                         ) : isCompleted ? (
-                                                            <div className={statusBadgeVariants({ status: "done" })}>
-                                                                <CheckCircle size={12} strokeWidth={3} />
+                                                            <div className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold border bg-emerald-500/15 text-emerald-400 border-emerald-500/25">
+                                                                <CheckCircle size={11} strokeWidth={2.5} />
                                                                 จบแล้ว
                                                             </div>
-                                                        ) : tournamentInfo.tournament_status === "ongoing" ? (
-                                                            <div className={statusBadgeVariants({ status: "ongoing" })}>
-                                                                <Activity size={12} />
+                                                        ) : tournamentInfo.tournament_status === 'ongoing' ? (
+                                                            <div className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold border bg-blue-500/10 text-blue-400 border-blue-500/20 animate-pulse">
+                                                                <Activity size={11} />
                                                                 กำลังแข่ง
                                                             </div>
                                                         ) : (
-                                                            <div className={statusBadgeVariants({ status: "upcoming" })}>
+                                                            <div className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold border bg-white/5 text-slate-400 border-white/10">
                                                                 รอแข่ง
                                                             </div>
                                                         )}
                                                     </div>
-                                                </div>
 
-                                                <div className="flex flex-col px-3 py-3 sm:px-5 sm:py-4 gap-3 relative">
-                                                    {/* Team A Row */}
-                                                    <div className={cn("flex items-center justify-between", winnerA ? "text-accent-green" : (isCompleted && !winnerA ? "text-slate-500" : "text-white"))}>
-                                                        <div className="flex flex-col gap-3 min-w-0 flex-1">
-                                                            {match.team_a_id?.team_players.map((tp, idx) => {
-                                                                const uFromTp = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
-                                                                const u = uFromTp ? (tournamentInfo.players?.find(p => (tp.user_id && p.id === tp.user_id.id) || (tp.guest_name && p.is_guest && p.guest_name === tp.guest_name)) || uFromTp) : null;
-                                                                if (!u) return null;
-                                                                const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
-                                                                const rp_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.rp_change;
-                                                                return (
-                                                                    <div key={idx} className="flex items-center gap-3">
-                                                                        <div className="relative flex items-center shrink-0">
-                                                                            <div className={cn(
-                                                                                "w-10 h-10 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner",
-                                                                                match.first_serve === "A" && idx === 0 ? "border-accent-green shadow-bounce-green scale-105" : "border-slate-700/50"
-                                                                            )}>
-                                                                                {pUrl ? <Image src={pUrl} alt={u.username} width={40} height={40} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
-                                                                            </div>
-                                                                            {match.first_serve === "A" && idx === 0 && (
-                                                                                <div className="absolute -top-1 -right-1 z-30 w-4 h-4 bg-accent-green rounded-full border-2 border-brand-dark shadow-[0_0_8px_rgba(46,204,113,0.8)] animate-pulse flex items-center justify-center" title="First Serve">
-                                                                                    <span className="text-[8px]">🏸</span>
-                                                                                </div>
-                                                                            )}
-                                                                            {(() => {
-                                                                                if (match.match_status !== 'done' && match.match_status !== 'cancelled') {
-                                                                                    const currentRp = u.rankings?.[0]?.ranking_points || 0;
-                                                                                    const currentRank = getRankInfoFromPoints(currentRp);
-                                                                                    const potentialRank = getRankInfoFromPoints(currentRp + 100);
-                                                                                    if (potentialRank.rankStr !== currentRank.rankStr && potentialRank.weight > currentRank.weight) {
-                                                                                        return (
-                                                                                            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-accent-yellow to-orange-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xl border border-white/20 whitespace-nowrap">
-                                                                                                RANK UP
-                                                                                            </div>
-                                                                                        );
-                                                                                    }
-                                                                                }
-                                                                                return null;
-                                                                            })()}
-                                                                        </div>
-                                                                        <div className="flex flex-col min-w-0">
-                                                                            <div className="flex items-center gap-1.5 min-w-0">
-                                                                                <span className="font-bold text-sm sm:text-base truncate">{u.username}</span>
-                                                                                {(u as any).skill_level && <div className="shrink-0"><SkillBadge skillLevel={(u as any).skill_level} showLabel={false} /></div>}
-                                                                                {winnerA && idx === 0 && <span className="text-[9px] font-black uppercase tracking-wider text-accent-green bg-accent-green/10 px-1.5 py-0.5 rounded-md shrink-0">Win</span>}
-                                                                            </div>
-                                                                            {(u as any).nickname && <span className="text-[10px] text-slate-400 font-medium truncate">{(u as any).nickname}</span>}
-                                                                            {tournamentInfo.mode === "ranking" && (
-                                                                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                                                                    <div className="scale-90 origin-left">
-                                                                                        <RankBadge rank={u.rankings?.[0]?.rank} stars={u.rankings?.[0]?.stars} size="sm" showName={true} />
-                                                                                    </div>
-                                                                                    {rp_change !== undefined && (
-                                                                                        <span className={cn(
-                                                                                            "text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0",
-                                                                                            rp_change > 0 ? "bg-accent-green/10 border-accent-green/30 text-accent-green" 
-                                                                                            : rp_change < 0 ? "bg-red-500/10 border-red-500/30 text-red-400" 
-                                                                                            : "bg-slate-500/10 border-slate-500/30 text-slate-400"
-                                                                                        )}>
-                                                                                            {rp_change > 0 ? "+" : rp_change < 0 ? "-" : "+"}{Math.abs(Math.floor(rp_change / 100))}
-                                                                                        </span>
-                                                                                    )}
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                            {(!match.team_a_id || match.team_a_id.team_players.length === 0) && (
-                                                                <div className="font-bold text-sm text-slate-500 px-2 py-1">ทีม {match.team_a_id?.team_no ?? "?"}</div>
-                                                            )}
-                                                        </div>
-                                                        <div className="shrink-0 pl-3 sm:pl-6 flex flex-col justify-center">
-                                                            {isCompleted ? (
-                                                                <span className={cn("text-3xl sm:text-4xl font-black tabular-nums", winnerA ? "text-accent-green drop-shadow-[0_0_8px_rgba(46,204,113,0.4)]" : "text-slate-500")}>{match.score_a}</span>
-                                                            ) : (
-                                                                <span className="text-2xl sm:text-3xl font-black tabular-nums text-slate-700/50">-</span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="relative w-full h-px bg-white/5 my-3 sm:my-4 flex items-center justify-center pointer-events-none">
-                                                        {isCompleted || match.match_status === "cancelled" ? (
-                                                            <div className="absolute z-10 flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 bg-black/40 backdrop-blur-md rounded-full border border-white/5">
-                                                                <span className="font-black italic text-slate-600 text-[9px] sm:text-[11px] tracking-tighter transform -skew-x-12">
-                                                                    VS
-                                                                </span>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="absolute z-10 flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-black/60 backdrop-blur-md rounded-full border border-white/10 shadow-[0_0_15px_rgba(0,0,0,0.8)]">
-                                                                <span className="font-black italic text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 via-orange-500 to-red-600 text-sm sm:text-base tracking-tighter transform -skew-x-12 drop-shadow-[0_2px_2px_rgba(239,68,68,0.3)]">
-                                                                    VS
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Team B Row */}
-                                                    <div className={cn("flex items-center justify-between", winnerB ? "text-accent-green" : (isCompleted && !winnerB ? "text-slate-500" : "text-white"))}>
-                                                        <div className="flex flex-col gap-3 min-w-0 flex-1">
-                                                            {match.team_b_id ? (
-                                                                match.team_b_id.team_players.map((tp, idx) => {
-                                                                    const uFromTp = tp.user_id || (tp.guest_name ? { id: 0, username: tp.guest_name, picture: null, rankings: [] } : null);
-                                                                    const u = uFromTp ? (tournamentInfo.players?.find(p => (tp.user_id && p.id === tp.user_id.id) || (tp.guest_name && p.is_guest && p.guest_name === tp.guest_name)) || uFromTp) : null;
-                                                                    if (!u) return null;
-                                                                    const pUrl = u.picture?.url ? (u.picture.url.startsWith("http") ? u.picture.url : `${STRAPI_BASE_URL}${u.picture.url}`) : null;
-                                                                    const rp_change = match.match_histories?.find(mh => mh.users?.some(us => us.id === u.id))?.rp_change;
-                                                                    return (
-                                                                        <div key={idx} className="flex items-center gap-3">
-                                                                            <div className="relative flex items-center shrink-0">
-                                                                                <div className={cn(
-                                                                                    "w-10 h-10 rounded-full bg-slate-800 shrink-0 overflow-hidden border-2 transition-all duration-500 flex items-center justify-center shadow-inner",
-                                                                                    match.first_serve === "B" && idx === 0 ? "border-accent-green shadow-bounce-green scale-105" : "border-slate-700/50"
-                                                                                )}>
-                                                                                    {pUrl ? <Image src={pUrl} alt={u.username} width={40} height={40} className="w-full h-full object-cover" /> : <span className="text-sm font-bold text-slate-400">{u.username.charAt(0).toUpperCase()}</span>}
-                                                                                </div>
-                                                                                {match.first_serve === "B" && idx === 0 && (
-                                                                                    <div className="absolute -top-1 -right-1 z-30 w-4 h-4 bg-accent-green rounded-full border-2 border-brand-dark shadow-[0_0_8px_rgba(46,204,113,0.8)] animate-pulse flex items-center justify-center" title="First Serve">
-                                                                                        <span className="text-[8px]">🏸</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {(() => {
-                                                                                    if (match.match_status !== 'done' && match.match_status !== 'cancelled') {
-                                                                                        const currentRp = u.rankings?.[0]?.ranking_points || 0;
-                                                                                        const currentRank = getRankInfoFromPoints(currentRp);
-                                                                                        const potentialRank = getRankInfoFromPoints(currentRp + 100);
-                                                                                        if (potentialRank.rankStr !== currentRank.rankStr && potentialRank.weight > currentRank.weight) {
-                                                                                            return (
-                                                                                                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 z-30 bg-gradient-to-r from-accent-yellow to-orange-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-xl border border-white/20 whitespace-nowrap">
-                                                                                                    RANK UP
-                                                                                                </div>
-                                                                                            );
-                                                                                        }
-                                                                                    }
-                                                                                    return null;
-                                                                                })()}
-                                                                            </div>
-                                                                            <div className="flex flex-col min-w-0">
-                                                                                <div className="flex items-center gap-1.5 min-w-0">
-                                                                                    <span className="font-bold text-sm sm:text-base truncate">{u.username}</span>
-                                                                                    {(u as any).skill_level && <div className="shrink-0"><SkillBadge skillLevel={(u as any).skill_level} showLabel={false} /></div>}
-                                                                                    {winnerB && idx === 0 && <span className="text-[9px] font-black uppercase tracking-wider text-accent-green bg-accent-green/10 px-1.5 py-0.5 rounded-md shrink-0">Win</span>}
-                                                                                </div>
-                                                                                {(u as any).nickname && <span className="text-[10px] text-slate-400 font-medium truncate">{(u as any).nickname}</span>}
-                                                                                {tournamentInfo.mode === "ranking" && (
-                                                                                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                                                                        <div className="scale-90 origin-left">
-                                                                                            <RankBadge rank={u.rankings?.[0]?.rank} stars={u.rankings?.[0]?.stars} size="sm" showName={true} />
-                                                                                        </div>
-                                                                                        {rp_change !== undefined && (
-                                                                                            <span className={cn(
-                                                                                                "text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0",
-                                                                                                rp_change > 0 ? "bg-accent-green/10 border-accent-green/30 text-accent-green" 
-                                                                                                : rp_change < 0 ? "bg-red-500/10 border-red-500/30 text-red-400" 
-                                                                                                : "bg-slate-500/10 border-slate-500/30 text-slate-400"
-                                                                                            )}>
-                                                                                                {rp_change > 0 ? "+" : rp_change < 0 ? "-" : "+"}{Math.abs(Math.floor(rp_change / 100))}
-                                                                                            </span>
-                                                                                        )}
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                })
-                                                            ) : (
-                                                                <div className="flex items-center gap-2 p-3 bg-white/5 rounded-xl border border-white/5 border-dashed w-fit">
-                                                                    <Play className="text-slate-500 shrink-0" size={14} />
-                                                                    <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest">รอบบาย / พัก</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div className="shrink-0 pl-3 sm:pl-6 flex flex-col justify-center">
-                                                            {match.team_b_id ? (
-                                                                isCompleted ? (
-                                                                    <span className={cn("text-3xl sm:text-4xl font-black tabular-nums", winnerB ? "text-accent-green drop-shadow-[0_0_8px_rgba(46,204,113,0.4)]" : "text-slate-500")}>{match.score_b}</span>
+                                                    {/* ── Teams + Score ── */}
+                                                    <div className="flex items-center gap-2">
+                                                        {/* Teams column */}
+                                                        <div className="flex-1 min-w-0 space-y-2.5">
+                                                            {/* Team A players */}
+                                                            <div className="space-y-2">
+                                                                {match.team_a_id?.team_players.length ? (
+                                                                    match.team_a_id.team_players.map((tp, i) => (
+                                                                        <PlayerRow
+                                                                            key={i}
+                                                                            tp={tp}
+                                                                            tournamentInfo={tournamentInfo}
+                                                                            STRAPI_BASE_URL={STRAPI_BASE_URL}
+                                                                            match={match}
+                                                                            isWinner={winnerA}
+                                                                            isCompleted={isCompleted}
+                                                                            firstServeKey="A"
+                                                                            firstServeIdx={i}
+                                                                        />
+                                                                    ))
                                                                 ) : (
-                                                                    <span className="text-2xl sm:text-3xl font-black tabular-nums text-slate-700/50">-</span>
-                                                                )
+                                                                    <div className="text-sm font-bold text-slate-600">ทีม {match.team_a_id?.team_no ?? '?'}</div>
+                                                                )}
+                                                            </div>
+
+                                                            {/* VS divider — image */}
+                                                            <div className="flex items-center gap-2 py-1">
+                                                                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-white/5" />
+                                                                <div className={cn(
+                                                                    'shrink-0 transition-all duration-300',
+                                                                    isCompleted || isCancelled ? 'opacity-20 grayscale' : 'opacity-90 drop-shadow-[0_0_8px_rgba(251,191,36,0.4)]'
+                                                                )}>
+                                                                    <Image
+                                                                        src="/vs.png"
+                                                                        alt="VS"
+                                                                        width={40}
+                                                                        height={24}
+                                                                        className="object-contain"
+                                                                    />
+                                                                </div>
+                                                                <div className="h-px flex-1 bg-gradient-to-l from-transparent via-white/10 to-white/5" />
+                                                            </div>
+
+
+                                                            {/* Team B players */}
+                                                            <div className="space-y-2">
+                                                                {match.team_b_id ? (
+                                                                    match.team_b_id.team_players.length ? (
+                                                                        match.team_b_id.team_players.map((tp, i) => (
+                                                                            <PlayerRow
+                                                                                key={i}
+                                                                                tp={tp}
+                                                                                tournamentInfo={tournamentInfo}
+                                                                                STRAPI_BASE_URL={STRAPI_BASE_URL}
+                                                                                match={match}
+                                                                                isWinner={winnerB}
+                                                                                isCompleted={isCompleted}
+                                                                                firstServeKey="B"
+                                                                                firstServeIdx={i}
+                                                                            />
+                                                                        ))
+                                                                    ) : null
+                                                                ) : (
+                                                                    <div className="flex items-center gap-2 py-1.5 px-3 bg-white/5 rounded-xl border border-dashed border-white/5 w-fit">
+                                                                        <Play className="text-slate-600 shrink-0" size={12} />
+                                                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">รอบบาย / พัก</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Score column */}
+                                                        <div className="shrink-0 flex flex-col items-center justify-center gap-0.5 px-2 sm:px-4">
+                                                            {isCompleted ? (
+                                                                <>
+                                                                    <span className={cn(
+                                                                        'text-3xl sm:text-4xl font-black tabular-nums leading-none',
+                                                                        winnerA ? 'text-emerald-400 drop-shadow-[0_0_10px_rgba(52,211,153,0.5)]' : 'text-slate-500'
+                                                                    )}>
+                                                                        {match.score_a}
+                                                                    </span>
+                                                                    <span className="text-[10px] font-black text-slate-700">:</span>
+                                                                    <span className={cn(
+                                                                        'text-3xl sm:text-4xl font-black tabular-nums leading-none',
+                                                                        winnerB ? 'text-emerald-400 drop-shadow-[0_0_10px_rgba(52,211,153,0.5)]' : 'text-slate-500'
+                                                                    )}>
+                                                                        {match.score_b}
+                                                                    </span>
+                                                                </>
                                                             ) : (
-                                                                <span className="text-2xl sm:text-3xl font-black tabular-nums text-slate-700/50">0</span>
+                                                                <div className="flex flex-col items-center gap-0.5">
+                                                                    <span className="text-2xl sm:text-3xl font-black tabular-nums text-slate-700/40 leading-none">-</span>
+                                                                    <span className="text-[10px] font-black text-slate-800">:</span>
+                                                                    <span className="text-2xl sm:text-3xl font-black tabular-nums text-slate-700/40 leading-none">-</span>
+                                                                </div>
                                                             )}
                                                         </div>
                                                     </div>
@@ -377,9 +417,10 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({
                                             </div>
                                         );
                                     })}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>

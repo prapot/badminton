@@ -2,6 +2,7 @@ import React from "react";
 import Image from "next/image";
 import RankBadge from "@/features/tournaments/components/RankBadge";
 import { UserRankingStats } from "../types";
+import { isLinePlaceholderEmail } from "@/features/auth/line";
 
 interface Props {
     user: any;
@@ -58,7 +59,7 @@ export function ProfileAvatarCard({ user, userRanking, previewObjUrl, onFileChan
                     </div>
                 </div>
                 <p className="text-slate-500 text-xs mt-1">
-                    <span className="opacity-50">Email:</span> {user.email} <span className="mx-2 opacity-20">|</span> <span className="opacity-50">UID:</span> {user.id}
+                    <span className="opacity-50">Email:</span> {isLinePlaceholderEmail(user.email) ? "ยังไม่ได้ตั้ง" : user.email} <span className="mx-2 opacity-20">|</span> <span className="opacity-50">UID:</span> {user.id}
                 </p>
             </div>
         </div>

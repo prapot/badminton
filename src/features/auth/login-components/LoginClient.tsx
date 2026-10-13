@@ -4,6 +4,8 @@ import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { loginWithStrapi } from "@/features/auth/auth";
+import { startLineAuth } from "@/features/auth/line";
+import { LineIcon } from "@/features/auth/line-components/LineIcon";
 import Swal from "sweetalert2";
 
 function LoginForm() {
@@ -31,6 +33,14 @@ function LoginForm() {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleLineLogin = () => {
+        try {
+            startLineAuth("login", redirectPath);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
         }
     };
 
@@ -93,6 +103,24 @@ function LoginForm() {
                             {error}
                         </div>
                     )}
+
+                    {/* LINE login — ถ้า LINE ยังไม่ผูกบัญชี หน้า callback จะให้เข้าบัญชีเดิมหรือสมัครใหม่แล้วผูกให้ */}
+                    <button
+                        type="button"
+                        onClick={handleLineLogin}
+                        className="w-full flex items-center bg-[#06C755] hover:bg-[#05b34c] active:bg-[#049a42] text-white text-sm font-semibold rounded-xl overflow-hidden transition-colors"
+                    >
+                        <span className="flex items-center justify-center w-12 py-2.5 border-r border-black/10">
+                            <LineIcon className="w-5 h-5" />
+                        </span>
+                        <span className="flex-1 py-2.5 pr-12">เข้าสู่ระบบด้วย LINE</span>
+                    </button>
+
+                    <div className="flex items-center gap-3 my-6">
+                        <div className="flex-1 h-px bg-white/10" />
+                        <span className="text-xs text-slate-500">หรือเข้าสู่ระบบด้วยอีเมล</span>
+                        <div className="flex-1 h-px bg-white/10" />
+                    </div>
 
                     <form onSubmit={handleSubmit} className="space-y-5">
                         {/* Email */}
@@ -181,7 +209,7 @@ function LoginForm() {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full py-2.5 px-4 bg-gradient-to-r from-[#2ecc71] to-[#27ae60] hover:from-[#3de382] hover:to-[#2ecc71] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl shadow-lg shadow-green-900/30 transition-all duration-200 flex items-center justify-center gap-2 mt-2"
+                            className="w-full py-2.5 px-4 bg-white hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed text-[#0f1923] text-sm font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 mt-2"
                         >
                             {isLoading ? (
                                 <>

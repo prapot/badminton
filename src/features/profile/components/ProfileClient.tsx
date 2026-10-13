@@ -8,6 +8,7 @@ import { ProfileHeader } from "./ProfileHeader";
 import { ProfileAvatarCard } from "./ProfileAvatarCard";
 import { ProfileAccountForm } from "./ProfileAccountForm";
 import { ProfilePasswordForm } from "./ProfilePasswordForm";
+import { ProfileLineCard } from "./ProfileLineCard";
 
 export function ProfileClient() {
     const { user, jwt, userRanking, initialPictureUrl } = useProfileData();
@@ -41,6 +42,8 @@ export function ProfileClient() {
                 <ProfileAccountForm form={form} setForm={setForm} />
 
                 <ProfilePasswordForm form={form} setForm={setForm} />
+
+                <ProfileLineCard jwt={jwt} />
 
                 {/* Alerts */}
                 {error && (

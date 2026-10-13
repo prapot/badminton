@@ -5,13 +5,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { loginWithStrapi } from "@/features/auth/auth";
 import { startLineAuth } from "@/features/auth/line";
+import { safeRedirectPath } from "@/features/auth/safeRedirect";
 import { LineIcon } from "@/features/auth/line-components/LineIcon";
 import Swal from "sweetalert2";
 
 function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const redirectPath = searchParams.get("redirect") || "/";
+    const redirectPath = safeRedirectPath(searchParams.get("redirect"));
 
     const [identifier, setIdentifier] = useState("");
     const [password, setPassword] = useState("");
@@ -36,9 +37,9 @@ function LoginForm() {
         }
     };
 
-    const handleLineLogin = () => {
+    const handleLineLogin = async () => {
         try {
-            startLineAuth("login", redirectPath);
+            await startLineAuth("login", redirectPath);
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
         }

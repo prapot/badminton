@@ -22,9 +22,9 @@ describe("startLineAuth", () => {
     beforeEach(() => sessionStorage.clear());
     afterEach(() => vi.unstubAllGlobals());
 
-    it("redirects to LINE authorize with channel id, callback URL, state and nonce", () => {
+    it("redirects to LINE authorize with channel id, callback URL, state, nonce and PKCE", async () => {
         const location = stubLocation("https://127.0.0.1:3000");
-        startLineAuth("login", "/tournament/abc");
+        await startLineAuth("login", "/tournament/abc");
 
         const url = new URL(location.href);
         expect(url.origin + url.pathname).toBe("https://access.line.me/oauth2/v2.1/authorize");
@@ -38,6 +38,19 @@ describe("startLineAuth", () => {
         expect(url.searchParams.get("nonce")).toBe(pending.nonce);
         expect(pending.state).toMatch(/^[0-9a-f]{32}$/);
         expect(pending.nonce).not.toBe(pending.state);
+
+        // PKCE: challenge sent to LINE = base64url(sha256(verifier kept in sessionStorage))
+        expect(url.searchParams.get("code_challenge_method")).toBe("S256");
+        expect(pending.codeVerifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pending.codeVerifier));
+        const expected = Buffer.from(digest).toString("base64url");
+        expect(url.searchParams.get("code_challenge")).toBe(expected);
+    });
+
+    it("never stores an off-site redirect", async () => {
+        stubLocation();
+        await startLineAuth("login", "https://evil.example/phish");
+        expect(JSON.parse(sessionStorage.getItem(PENDING_KEY)!).redirect).toBe("/");
     });
 
     it("throws when the channel id is not configured", async () => {
@@ -47,7 +60,7 @@ describe("startLineAuth", () => {
         try {
             const fresh = await import("../line");
             stubLocation();
-            expect(() => fresh.startLineAuth("login", "/")).toThrow("NEXT_PUBLIC_LINE_CHANNEL_ID");
+            await expect(fresh.startLineAuth("login", "/")).rejects.toThrow("NEXT_PUBLIC_LINE_CHANNEL_ID");
         } finally {
             process.env.NEXT_PUBLIC_LINE_CHANNEL_ID = saved;
         }
@@ -55,7 +68,7 @@ describe("startLineAuth", () => {
 });
 
 describe("takePendingLineAuth", () => {
-    const pending = { state: "s1", nonce: "n1", mode: "link", redirect: "/profile" };
+    const pending = { state: "s1", nonce: "n1", codeVerifier: "v1", mode: "link", redirect: "/profile" };
     beforeEach(() => sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending)));
 
     it("returns the pending auth when state matches, and can only be used once", () => {
@@ -70,6 +83,18 @@ describe("takePendingLineAuth", () => {
         expect(() => takePendingLineAuth(state)).toThrow("ลิงก์ยืนยันตัวตนไม่ถูกต้อง");
     });
 
+    it("sanitizes a tampered redirect in storage", () => {
+        sessionStorage.setItem(PENDING_KEY, JSON.stringify({ ...pending, redirect: "//evil.example" }));
+        expect(takePendingLineAuth("s1").redirect).toBe("/");
+    });
+
+    it("rejects pending auth without a PKCE verifier (started before an upgrade)", () => {
+        const { codeVerifier: _omit, ...legacy } = pending;
+        void _omit;
+        sessionStorage.setItem(PENDING_KEY, JSON.stringify(legacy));
+        expect(() => takePendingLineAuth("s1")).toThrow("ลิงก์ยืนยันตัวตนไม่ถูกต้อง");
+    });
+
     it("rejects when nothing is pending or the stored value is corrupt", () => {
         sessionStorage.clear();
         expect(() => takePendingLineAuth("s1")).toThrow("ลิงก์ยืนยันตัวตนไม่ถูกต้อง");
@@ -82,20 +107,22 @@ describe("Strapi LINE API calls", () => {
     beforeEach(() => stubLocation());
     afterEach(() => vi.unstubAllGlobals());
 
-    it("loginWithLine sends code, nonce and redirect URI, then loads the user", async () => {
+    it("loginWithLine sends code, nonce, PKCE verifier and redirect URI, then loads the user", async () => {
         const user = { id: 7, username: "kai" };
         const fetchMock = mockFetch({
             "/api/line-auth/login": { body: { jwt: "jwt-7" } },
             "/api/users/me": { body: user },
         });
 
-        await expect(loginWithLine("code-1", "nonce-1")).resolves.toEqual({ jwt: "jwt-7", user });
+        await expect(loginWithLine({ code: "code-1", nonce: "nonce-1", codeVerifier: "verifier-1" }))
+            .resolves.toEqual({ jwt: "jwt-7", user });
 
         const [url, init] = callTo(fetchMock, "/api/line-auth/login")!;
         expect(url).toBe("http://strapi.test/api/line-auth/login");
         expect(JSON.parse(init.body!)).toEqual({
             code: "code-1",
             nonce: "nonce-1",
+            codeVerifier: "verifier-1",
             redirectUri: "http://localhost:3000/auth/line/callback",
         });
         expect(callTo(fetchMock, "/api/users/me")![1].headers).toEqual({ Authorization: "Bearer jwt-7" });
@@ -110,14 +137,14 @@ describe("Strapi LINE API calls", () => {
             }),
         });
 
-        const err = await loginWithLine("c", "n").catch((e) => e);
+        const err = await loginWithLine({ code: "c", nonce: "n", codeVerifier: "v" }).catch((e) => e);
         expect(err).toBeInstanceOf(LineNotLinkedError);
         expect(err).toMatchObject({ linkTicket: "ticket-1", displayName: "Kai", message: "ยังไม่ได้เชื่อมต่อ" });
     });
 
     it("surfaces other Strapi errors as plain errors with the server message", async () => {
         mockFetch({ "/api/line-auth/login": strapiError(400, "ยืนยันตัวตนกับ LINE ไม่สำเร็จ") });
-        const err = await loginWithLine("c", "n").catch((e) => e);
+        const err = await loginWithLine({ code: "c", nonce: "n", codeVerifier: "v" }).catch((e) => e);
         expect(err).not.toBeInstanceOf(LineNotLinkedError);
         expect(err.message).toBe("ยืนยันตัวตนกับ LINE ไม่สำเร็จ");
     });

@@ -43,12 +43,13 @@ export function useLineCallback(): LineCallbackState {
                 const code = searchParams.get("code");
                 if (!code) throw new Error("ไม่ได้รับข้อมูลจาก LINE");
 
+                const grant = { code, nonce: pending.nonce, codeVerifier: pending.codeVerifier };
                 if (pending.mode === "link") {
                     const jwt = localStorage.getItem("jwt");
                     if (!jwt) throw new Error("กรุณาเข้าสู่ระบบก่อนเชื่อมต่อ LINE");
-                    await linkLine(code, pending.nonce, jwt);
+                    await linkLine(grant, jwt);
                 } else {
-                    const data = await loginWithLine(code, pending.nonce);
+                    const data = await loginWithLine(grant);
                     localStorage.setItem("jwt", data.jwt);
                     localStorage.setItem("user", JSON.stringify(data.user));
                 }

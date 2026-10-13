@@ -13,9 +13,9 @@ export function useLineLink(jwt: string | null) {
             .catch((err: Error) => setError(err.message));
     }, [jwt]);
 
-    const link = useCallback(() => {
+    const link = useCallback(async () => {
         try {
-            startLineAuth("link", "/profile");
+            await startLineAuth("link", "/profile");
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
         }

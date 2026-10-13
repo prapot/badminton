@@ -15,7 +15,7 @@ export function useTournamentData(id: string, jwt: string | null) {
         const sortOrder = fmt === "endless_mode" ? "desc" : "asc";
         return fetch(
             `${STRAPI_BASE_URL}/api/matches?filters[tournament_id][documentId][$eq]=${id}&populate[team_a_id][populate][team_players][populate][user_id][populate][rankings][filters][season][is_active][$eq]=true&populate[team_a_id][populate][team_players][populate][user_id][populate][picture][fields][0]=url&populate[team_b_id][populate][team_players][populate][user_id][populate][rankings][filters][season][is_active][$eq]=true&populate[team_b_id][populate][team_players][populate][user_id][populate][picture][fields][0]=url&populate[match_histories][populate][users][fields]=*&populate[team_winner][fields][0]=id&populate[team_winner][fields][1]=documentId&sort=match_no:${sortOrder}&pagination[pageSize]=100`,
-            { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
+            { headers: { Authorization: `Bearer ${token}` } }
         )
             .then((r) => r.json())
             .then((json) => setApiMatches(json.data ?? []))
@@ -26,7 +26,7 @@ export function useTournamentData(id: string, jwt: string | null) {
         if (!jwt || !id) return;
         fetch(
             `${STRAPI_BASE_URL}/api/tournaments/${id}?populate[tournament_players][populate][user][populate][picture][fields][0]=url&populate[tournament_players][populate][user][populate][rankings][filters][season][is_active][$eq]=true&populate[user_created][populate][picture][fields][0]=url&populate[user_created][populate][rankings][filters][season][is_active][$eq]=true`,
-            { headers: { Authorization: `Bearer ${jwt}` }, cache: "no-store" }
+            { headers: { Authorization: `Bearer ${jwt}` } }
         )
             .then((r) => r.json())
             .then((json) => {
@@ -61,31 +61,61 @@ export function useTournamentData(id: string, jwt: string | null) {
             .catch(() => { /* silent */ });
     }, [jwt, id]);
 
-    // Keep the latest refreshInfo for the realtime/polling callbacks below
-    const refreshInfoRef = useRef<() => Promise<void>>(() => Promise.resolve());
+    // Keep the latest fetchers for the realtime/polling callbacks below
+    const fetchersRef = useRef({ refreshInfo: () => Promise.resolve(), fetchMatches: () => Promise.resolve() });
 
     // Realtime: backend pushes `tournament-<id>:changed` on every match/player/tournament change.
+    // `scope: "matches"` → refetch only matches; anything else → tournament + matches.
     // While connected, polling is only a slow safety net; without Pusher it falls back to fast polling.
     const [realtimeConnected, setRealtimeConnected] = useState(false);
     useEffect(() => {
         const pusher = getPusher();
         if (!pusher || !id) return;
 
-        const channelName = `tournament-${id}`;
-        const channel = pusher.subscribe(channelName);
+        type Scope = "matches" | "tournament";
+        const apply = (scope: Scope) =>
+            scope === "matches" ? fetchersRef.current.fetchMatches() : fetchersRef.current.refreshInfo();
+
+        // Hidden tabs don't refetch on events; they catch up once when they become visible
+        let missedWhileHidden: Scope | null = null;
         // Small random delay so every viewer doesn't hit Strapi in the same instant
         let jitterTimer: ReturnType<typeof setTimeout> | undefined;
-        const onChanged = () => {
+        let queuedScope: Scope | null = null;
+
+        const channelName = `tournament-${id}`;
+        const channel = pusher.subscribe(channelName);
+        const onChanged = (data?: { scope?: string }) => {
+            const scope: Scope = data?.scope === "matches" ? "matches" : "tournament";
+            if (document.visibilityState !== "visible") {
+                missedWhileHidden = missedWhileHidden === "tournament" ? "tournament" : scope;
+                return;
+            }
+            queuedScope = queuedScope === "tournament" ? "tournament" : scope;
             clearTimeout(jitterTimer);
-            jitterTimer = setTimeout(() => refreshInfoRef.current(), Math.random() * 800);
+            jitterTimer = setTimeout(() => {
+                const s = queuedScope ?? "tournament";
+                queuedScope = null;
+                apply(s);
+            }, Math.random() * 800);
         };
         channel.bind("changed", onChanged);
+
+        const onVisible = () => {
+            if (document.visibilityState !== "visible" || !missedWhileHidden) return;
+            const s = missedWhileHidden;
+            missedWhileHidden = null;
+            apply(s);
+        };
+        document.addEventListener("visibilitychange", onVisible);
 
         // On reconnect, catch up on anything missed while the socket was down
         let wasConnected = pusher.connection.state === "connected";
         const onStateChange = ({ current }: { current: string }) => {
             const connected = current === "connected";
-            if (connected && !wasConnected) refreshInfoRef.current();
+            if (connected && !wasConnected && document.visibilityState === "visible") {
+                missedWhileHidden = null;
+                fetchersRef.current.refreshInfo();
+            }
             wasConnected = connected;
             setRealtimeConnected(connected);
         };
@@ -96,6 +126,7 @@ export function useTournamentData(id: string, jwt: string | null) {
             clearTimeout(jitterTimer);
             channel.unbind("changed", onChanged);
             pusher.unsubscribe(channelName);
+            document.removeEventListener("visibilitychange", onVisible);
             pusher.connection.unbind("state_change", onStateChange);
         };
     }, [id]);
@@ -114,12 +145,13 @@ export function useTournamentData(id: string, jwt: string | null) {
 
         const pollMs = realtimeConnected ? 60_000 : 7_000;
         const interval = setInterval(() => {
-            if (document.visibilityState === "visible") refreshInfoRef.current();
+            if (document.visibilityState === "visible") fetchersRef.current.refreshInfo();
         }, pollMs);
 
-        // Refresh right away when the user comes back to the tab
+        // Without realtime, refresh right away when the user comes back to the tab
+        // (with realtime, the subscription above replays only what was missed)
         const onVisible = () => {
-            if (document.visibilityState === "visible") refreshInfoRef.current();
+            if (!realtimeConnected && document.visibilityState === "visible") fetchersRef.current.refreshInfo();
         };
         document.addEventListener("visibilitychange", onVisible);
 
@@ -133,7 +165,7 @@ export function useTournamentData(id: string, jwt: string | null) {
         if (!jwt || !id) return Promise.resolve();
         return fetch(
             `${STRAPI_BASE_URL}/api/tournaments/${id}?populate[tournament_players][populate][user][populate][picture][fields][0]=url&populate[tournament_players][populate][user][populate][rankings][filters][season][is_active][$eq]=true&populate[user_created][populate][picture][fields][0]=url&populate[user_created][populate][rankings][filters][season][is_active][$eq]=true`,
-            { headers: { Authorization: `Bearer ${jwt}` }, cache: "no-store" }
+            { headers: { Authorization: `Bearer ${jwt}` } }
         )
             .then((r) => r.json())
             .then((json) => {
@@ -168,7 +200,7 @@ export function useTournamentData(id: string, jwt: string | null) {
     };
 
     useEffect(() => {
-        refreshInfoRef.current = refreshInfo;
+        fetchersRef.current = { refreshInfo, fetchMatches: () => fetchMatches() };
     });
 
     // Sync paused state from DB

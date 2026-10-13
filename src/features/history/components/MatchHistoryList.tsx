@@ -13,6 +13,7 @@ interface Props {
     meta: PaginationMeta | null;
     filterDate: string;
     setFilterDate: (date: string) => void;
+    showSeason?: boolean;
 }
 
 interface TournamentGroup {
@@ -31,7 +32,7 @@ function groupHistoriesByTournamentAndDate(histories: MatchHistory[]): Tournamen
     for (const h of histories) {
         const match = h.matches?.[0];
         const tournamentId = match?.tournament_id?.documentId ?? null;
-        const tournamentName = match?.tournament_id?.name ?? "แมทช์ทั่วไป";
+        const tournamentName = match?.tournament_id?.name ?? "แมตช์ทั่วไป";
         const isRanking = match?.tournament_id?.mode === "ranking" || Boolean(h.ranking);
 
         // Group by date + tournament (so same tournament on different days = separate groups)
@@ -71,6 +72,7 @@ export function MatchHistoryList({
     meta,
     filterDate,
     setFilterDate,
+    showSeason = false,
 }: Props) {
     const groups = useMemo(() => groupHistoriesByTournamentAndDate(histories), [histories]);
 
@@ -103,7 +105,8 @@ export function MatchHistoryList({
                     {filterDate && (
                         <button
                             onClick={() => { setFilterDate(""); setPage(1); }}
-                            className="ml-1 w-5 h-5 flex items-center justify-center rounded-full bg-slate-700 hover:bg-slate-600 text-white text-[10px] transition-colors"
+                            aria-label="ล้างตัวกรองวันที่"
+                            className="ml-auto w-8 h-8 flex items-center justify-center rounded-full bg-slate-700 hover:bg-slate-600 text-white text-sm transition-colors"
                         >
                             ✕
                         </button>
@@ -144,34 +147,28 @@ export function MatchHistoryList({
                 <div className="space-y-8">
                     {groups.map((group, gIdx) => (
                         <div key={gIdx} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            {/* Tournament Group Header */}
-                            <div className="flex items-center gap-3 mb-3">
-                                {/* Date pill */}
-                                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md shrink-0">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                        {group.date}
-                                    </span>
-                                </div>
-
-                                {/* Separator line */}
-                                <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
-
-                                {/* Tournament name + link */}
-                                <div className="flex items-center gap-2 shrink-0">
-                                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg border ${group.isRanking ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-sky-500/10 text-sky-400 border-sky-500/20'}`}>
-                                        {group.isRanking ? '🏆' : '🎮'} {group.tournamentName}
-                                    </span>
-                                    {group.tournamentDocumentId && (
-                                        <Link
-                                            href={`/tournament/${group.tournamentDocumentId}`}
-                                            className="flex items-center justify-center w-6 h-6 rounded-lg bg-white/5 border border-white/10 text-slate-500 hover:text-white hover:bg-white/10 transition-all text-xs"
-                                            title="ดูทัวร์นาเมนต์นี้"
-                                        >
-                                            ↗
-                                        </Link>
-                                    )}
-                                </div>
-                            </div>
+                            {/* Group header: date + day result, tournament name is the link */}
+                            {(() => {
+                                const wins = group.matches.filter(h => h.matches?.[0]?.match_status !== "cancelled" && h.is_win).length;
+                                const losses = group.matches.filter(h => h.matches?.[0]?.match_status !== "cancelled" && !h.is_win).length;
+                                const chipClass = `inline-flex items-center gap-1 min-h-9 max-w-full text-xs font-black px-3 rounded-xl border truncate ${group.isRanking ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-sky-500/10 text-sky-400 border-sky-500/20'}`;
+                                return (
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-3">
+                                        <span className="text-sm font-black text-slate-300">{group.date}</span>
+                                        <span className="text-xs font-bold text-slate-400">
+                                            <span className="text-emerald-400">ชนะ {wins}</span> · <span className="text-rose-400">แพ้ {losses}</span>
+                                        </span>
+                                        <div className="h-px flex-1 min-w-4 bg-gradient-to-r from-white/10 to-transparent" />
+                                        {group.tournamentDocumentId ? (
+                                            <Link href={`/tournament/${group.tournamentDocumentId}`} className={`${chipClass} hover:brightness-125`}>
+                                                {group.isRanking ? '🏆' : '🎮'} <span className="truncate">{group.tournamentName}</span> <span aria-hidden>›</span>
+                                            </Link>
+                                        ) : (
+                                            <span className={chipClass}>{group.isRanking ? '🏆' : '🎮'} {group.tournamentName}</span>
+                                        )}
+                                    </div>
+                                );
+                            })()}
 
                             {/* Match cards in this group (timeline) */}
                             <div className="pl-1">
@@ -181,6 +178,7 @@ export function MatchHistoryList({
                                         history={h}
                                         userId={userId}
                                         isLast={mIdx === group.matches.length - 1}
+                                        showSeason={showSeason}
                                     />
                                 ))}
                             </div>
@@ -195,7 +193,7 @@ export function MatchHistoryList({
                     <button
                         onClick={() => setPage(Math.max(1, page - 1))}
                         disabled={page === 1}
-                        className="h-10 px-5 rounded-xl bg-white/5 border border-white/10 text-sm font-bold text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
+                        className="h-11 px-4 sm:px-5 rounded-xl bg-white/5 border border-white/10 text-sm font-bold text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
                     >
                         ‹ ย้อนกลับ
                     </button>
@@ -216,7 +214,7 @@ export function MatchHistoryList({
                                     <button
                                         key={p}
                                         onClick={() => setPage(p as number)}
-                                        className={`w-9 h-9 rounded-xl text-sm font-black transition-all border ${page === p
+                                        className={`w-11 h-11 rounded-xl text-sm font-black transition-all border ${page === p
                                             ? 'bg-[#2ecc71]/20 text-[#2ecc71] border-[#2ecc71]/30 shadow-[0_0_12px_rgba(46,204,113,0.2)]'
                                             : 'bg-white/5 text-slate-500 border-white/10 hover:bg-white/10 hover:text-white'
                                         }`}
@@ -230,7 +228,7 @@ export function MatchHistoryList({
                     <button
                         onClick={() => setPage(Math.min(meta.pageCount, page + 1))}
                         disabled={page === meta.pageCount}
-                        className="h-10 px-5 rounded-xl bg-white/5 border border-white/10 text-sm font-bold text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
+                        className="h-11 px-4 sm:px-5 rounded-xl bg-white/5 border border-white/10 text-sm font-bold text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
                     >
                         ถัดไป ›
                     </button>

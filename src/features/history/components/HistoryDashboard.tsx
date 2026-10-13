@@ -47,33 +47,33 @@ export function HistoryDashboard({ userId }: { userId: string }) {
 
     return (
         <>
-            <HistoryHeader 
+            <HistoryHeader
                 targetUser={targetUser}
+                lifetimeStats={lifetimeStats}
+            />
+
+            <StatsSummary
+                loading={loading}
+                rankingStats={rankingStats}
                 seasons={seasons}
                 selectedSeason={selectedSeason}
                 setSelectedSeason={setSelectedSeason}
                 setPage={setPage}
-                lifetimeStats={lifetimeStats}
-            />
-
-            <StatsSummary 
-                loading={loading}
-                rankingStats={rankingStats}
             />
 
             {/* Main Tab Navigation */}
-            <div className="flex gap-4 mb-6 border-b border-white/10">
+            <div className="grid grid-cols-2 mb-6 border-b border-white/10">
                 <button 
                     onClick={() => setActiveTab('history')}
-                    className={`pb-3 px-2 font-semibold text-sm transition-colors border-b-2 ${activeTab === 'history' ? 'border-[#2ecc71] text-[#2ecc71]' : 'border-transparent text-slate-400 hover:text-white'}`}
+                    className={`min-h-11 pb-2 px-2 font-semibold text-sm transition-colors border-b-2 ${activeTab === 'history' ? 'border-[#2ecc71] text-[#2ecc71]' : 'border-transparent text-slate-400 hover:text-white'}`}
                 >
-                    ประวัติแมทช์ (Match History)
+                    📅 ประวัติแมตช์
                 </button>
                 <button 
                     onClick={() => setActiveTab('analytics')}
-                    className={`pb-3 px-2 font-semibold text-sm transition-colors border-b-2 ${activeTab === 'analytics' ? 'border-[#2ecc71] text-[#2ecc71]' : 'border-transparent text-slate-400 hover:text-white'}`}
+                    className={`min-h-11 pb-2 px-2 font-semibold text-sm transition-colors border-b-2 ${activeTab === 'analytics' ? 'border-[#2ecc71] text-[#2ecc71]' : 'border-transparent text-slate-400 hover:text-white'}`}
                 >
-                    วิเคราะห์สถิติ (Analytics)
+                    📊 วิเคราะห์สถิติ
                 </button>
             </div>
 
@@ -88,6 +88,7 @@ export function HistoryDashboard({ userId }: { userId: string }) {
                     meta={meta}
                     filterDate={filterDate}
                     setFilterDate={setFilterDate}
+                    showSeason={selectedSeason === "all"}
                 />
             )}
 
@@ -101,16 +102,16 @@ export function HistoryDashboard({ userId }: { userId: string }) {
                     )}
                     
                     {/* Sub-tab Navigation for Partners / Nemesis */}
-                    <div className="flex gap-4 mt-8 mb-2 border-b border-white/10">
+                    <div className="grid grid-cols-2 mt-8 mb-2 border-b border-white/10">
                         <button 
                             onClick={() => setAnalyticsTab('partners')}
-                            className={`pb-3 px-4 font-semibold text-sm transition-colors border-b-2 flex items-center gap-2 ${analyticsTab === 'partners' ? 'border-green-500 text-green-400' : 'border-transparent text-slate-400 hover:text-white'}`}
+                            className={`min-h-11 pb-2 px-4 font-semibold text-sm transition-colors border-b-2 flex items-center justify-center gap-2 ${analyticsTab === 'partners' ? 'border-green-500 text-green-400' : 'border-transparent text-slate-400 hover:text-white'}`}
                         >
                             <span>🏆</span> คู่หูรู้ใจ
                         </button>
                         <button 
                             onClick={() => setAnalyticsTab('nemesis')}
-                            className={`pb-3 px-4 font-semibold text-sm transition-colors border-b-2 flex items-center gap-2 ${analyticsTab === 'nemesis' ? 'border-red-500 text-red-400' : 'border-transparent text-slate-400 hover:text-white'}`}
+                            className={`min-h-11 pb-2 px-4 font-semibold text-sm transition-colors border-b-2 flex items-center justify-center gap-2 ${analyticsTab === 'nemesis' ? 'border-red-500 text-red-400' : 'border-transparent text-slate-400 hover:text-white'}`}
                         >
                             <span>👿</span> คู่แค้น
                         </button>

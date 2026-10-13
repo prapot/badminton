@@ -9,9 +9,11 @@ interface Props {
     history: MatchHistory;
     userId: string;
     isLast?: boolean;
+    /** Season is already chosen at the top of the page — only repeat it per card when viewing all seasons */
+    showSeason?: boolean;
 }
 
-export function MatchCard({ history: h, userId, isLast = false }: Props) {
+export function MatchCard({ history: h, userId, isLast = false, showSeason = false }: Props) {
     const match = h.matches?.[0];
     if (!match) return null;
 
@@ -49,18 +51,17 @@ export function MatchCard({ history: h, userId, isLast = false }: Props) {
                     const isMe = p.user_id?.id === Number(userId);
 
                     return (
-                        <div key={idx} className="flex items-center gap-1.5">
+                        <div key={idx} className="flex items-center gap-1.5 min-w-0">
                             <span
-                                className={`text-xs font-bold leading-tight ${
-                                    isMe
-                                        ? "text-emerald-400 underline decoration-dotted underline-offset-2"
-                                        : isUserTeam
-                                        ? "text-emerald-300"
-                                        : "text-slate-400"
+                                className={`text-sm font-bold leading-tight truncate ${
+                                    isMe ? "text-amber-300" : isUserTeam ? "text-slate-200" : "text-slate-400"
                                 }`}
                             >
-                                {p.user_id?.username || "Unknown"}
+                                {p.user_id?.username || p.guest_name || "ไม่ทราบชื่อ"}
                             </span>
+                            {isMe && (
+                                <span className="shrink-0 text-[11px] font-black px-1.5 py-px rounded-md bg-amber-400 text-slate-900">คุณ</span>
+                            )}
                             {skillLevel && <SkillBadge skillLevel={skillLevel} showLabel={false} />}
                         </div>
                     );
@@ -87,7 +88,7 @@ export function MatchCard({ history: h, userId, isLast = false }: Props) {
                 <div className="flex items-center gap-1.5">
                     <RankBadge rank={oldRank.rankStr} stars={oldRank.stars} size="sm" showName={true} />
                     <span
-                        className={`text-[10px] font-black ${
+                        className={`text-[11px] font-black ${
                             isRankUp ? "text-amber-400" : isDemoted ? "text-rose-400" : "text-slate-600"
                         }`}
                     >
@@ -98,7 +99,7 @@ export function MatchCard({ history: h, userId, isLast = false }: Props) {
 
                 {/* RP change */}
                 <span
-                    className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                    className={`text-[11px] font-black px-2 py-0.5 rounded-full border ${
                         h.rp_change > 0
                             ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
                             : h.rp_change < 0
@@ -110,23 +111,23 @@ export function MatchCard({ history: h, userId, isLast = false }: Props) {
                         ? `+${Math.abs(Math.floor(h.rp_change / 100))} ⭐`
                         : h.rp_change < 0
                         ? `-${Math.abs(Math.floor(h.rp_change / 100))} ⭐`
-                        : "PROTECTED 🛡️"}
+                        : "🛡️ ดาวไม่ลด"}
                 </span>
 
                 {/* Special badges */}
                 {isRankUp && (
-                    <span className="text-[8px] font-black text-amber-300 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded-full">
+                    <span className="text-[11px] font-black text-amber-300 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded-full">
                         🏆 RANK UP!
                     </span>
                 )}
                 {isDemoted && (
-                    <span className="text-[8px] font-black text-rose-300 bg-rose-500/20 border border-rose-500/30 px-1.5 py-0.5 rounded-full">
+                    <span className="text-[11px] font-black text-rose-300 bg-rose-500/20 border border-rose-500/30 px-1.5 py-0.5 rounded-full">
                         ⚠️ ตกชั้น
                     </span>
                 )}
                 {isBraveBonus && (
-                    <span className="text-[8px] font-bold text-violet-300 bg-violet-500/20 border border-violet-500/30 px-1.5 py-0.5 rounded-full">
-                        ผู้กล้า +1⭐
+                    <span className="text-[11px] font-bold text-violet-300 bg-violet-500/20 border border-violet-500/30 px-1.5 py-0.5 rounded-full">
+                        🔥 โบนัสกล้าหาญ +1⭐
                     </span>
                 )}
             </div>
@@ -177,56 +178,32 @@ export function MatchCard({ history: h, userId, isLast = false }: Props) {
                 <div className={`h-0.5 w-full bg-gradient-to-r ${accentGradient}`} />
 
                 <div className="p-3 sm:p-4 space-y-3">
-                    {/* ── Row 1: Badges + Time ── */}
+                    {/* ── Row 1: result + time (labels that are the same on every card are dropped) ── */}
                     <div className="flex items-center gap-1.5 flex-wrap">
-                        {/* Win/Loss/Cancel */}
-                        {isCancelled ? (
-                            <span className="inline-flex items-center text-[10px] font-black px-2 py-0.5 rounded-full border bg-slate-500/15 text-slate-400 border-slate-500/25 uppercase tracking-wide">
-                                ✕ Cancelled
-                            </span>
-                        ) : (
-                            <span
-                                className={`inline-flex items-center text-[10px] font-black px-2.5 py-0.5 rounded-full border uppercase tracking-wide ${
-                                    isWin
-                                        ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                                        : "bg-rose-500/15 text-rose-400 border-rose-500/30"
-                                }`}
-                            >
-                                {isWin ? "✓ WIN" : "✗ LOSS"}
-                            </span>
-                        )}
-
-                        {/* Ranking/Casual */}
                         <span
-                            className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wide ${
-                                isRanking
-                                    ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                                    : "bg-sky-500/10 text-sky-400 border-sky-500/20"
+                            className={`text-base font-black ${
+                                isCancelled ? "text-slate-400" : isWin ? "text-emerald-400" : "text-rose-400"
                             }`}
                         >
-                            {isRanking ? "🏆 Ranking" : "🎮 Casual"}
+                            {isCancelled ? "ยกเลิก" : isWin ? "ชนะ" : "แพ้"}
                         </span>
-
-                        {/* Round */}
-                        {match.round && (
-                            <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border bg-white/5 text-slate-400 border-white/10 uppercase">
-                                Round {match.round}
+                        {!isRanking && (
+                            <span className="inline-flex items-center text-[11px] font-bold px-2 py-0.5 rounded-full border bg-sky-500/10 text-sky-400 border-sky-500/20">
+                                🎮 ไม่นับแรงค์
                             </span>
                         )}
-
-                        {/* Season */}
-                        {h.ranking?.season?.name && (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] font-black px-2 py-0.5 rounded-full border bg-violet-500/10 text-violet-400 border-violet-500/20">
-                                📅 {h.ranking.season.name}
+                        {match.round != null && match.round > 1 && (
+                            <span className="inline-flex items-center text-[11px] font-bold px-2 py-0.5 rounded-full border bg-white/5 text-slate-400 border-white/10">
+                                รอบ {match.round}
                             </span>
                         )}
-
-                        {/* Time — push to right */}
-                        <span className="ml-auto text-[10px] text-slate-500 font-medium tabular-nums shrink-0">
-                            {new Date(h.createdAt).toLocaleTimeString("th-TH", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                            })}
+                        {showSeason && h.ranking?.season?.name && (
+                            <span className="inline-flex items-center text-[11px] font-bold px-2 py-0.5 rounded-full border bg-violet-500/10 text-violet-400 border-violet-500/20">
+                                {h.ranking.season.name}
+                            </span>
+                        )}
+                        <span className="ml-auto text-xs text-slate-500 font-medium tabular-nums shrink-0">
+                            {new Date(h.createdAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}
                         </span>
                     </div>
 
@@ -243,7 +220,7 @@ export function MatchCard({ history: h, userId, isLast = false }: Props) {
                             {/* VS separator */}
                             <div className="flex items-center gap-2 pl-2.5">
                                 <div className="h-px w-4 bg-white/10" />
-                                <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">
+                                <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">
                                     vs
                                 </span>
                             </div>
@@ -257,37 +234,24 @@ export function MatchCard({ history: h, userId, isLast = false }: Props) {
 
                         {/* Score — fixed width, compact */}
                         <div className="shrink-0 flex flex-col items-center gap-0.5">
-                            <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">
-                                Score
-                            </p>
-                            <div className="flex items-center gap-1 px-2.5 py-1.5 bg-black/40 rounded-xl border border-white/5">
+                            <div className="flex items-center gap-1 px-3 py-2 bg-black/40 rounded-xl border border-white/5" aria-label={`คะแนนเรา ${userScore ?? "-"} ต่อ ${oppScore ?? "-"}`}>
                                 <span
-                                    className={`text-base font-black tabular-nums leading-none ${
-                                        isCancelled
-                                            ? "text-slate-500"
-                                            : isWin
-                                            ? "text-emerald-400"
-                                            : "text-slate-300"
+                                    className={`text-xl font-black tabular-nums leading-none ${
+                                        isCancelled ? "text-slate-500" : isWin ? "text-emerald-400" : "text-rose-400"
                                     }`}
                                 >
                                     {userScore ?? "-"}
                                 </span>
                                 <span className="text-slate-700 font-black text-sm">:</span>
                                 <span
-                                    className={`text-base font-black tabular-nums leading-none ${
-                                        isCancelled
-                                            ? "text-slate-500"
-                                            : !isWin
-                                            ? "text-rose-400"
-                                            : "text-slate-500"
-                                    }`}
+                                    className="text-xl font-black tabular-nums leading-none text-slate-500"
                                 >
                                     {oppScore ?? "-"}
                                 </span>
                             </div>
                         </div>
 
-                        {/* Link — only on sm+ */}
+                        {/* Link — only on sm+ (on phones the group header links to the tournament) */}
                         {tournament?.documentId && (
                             <Link
                                 href={`/tournament/${tournament.documentId}`}

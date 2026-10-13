@@ -65,8 +65,8 @@ export function BestPartners({ userId, selectedSeason }: BestPartnersProps) {
 
     if (loading && partners.length === 0) {
         return (
-            <div className="bg-[#131e2b] rounded-2xl p-6 border border-white/5 shadow-xl mt-6">
-                <h3 className="text-xl font-bold text-white mb-4">🏆 คู่หูรู้ใจ (Best Partners)</h3>
+            <div className="bg-[#131e2b] rounded-2xl p-4 sm:p-6 border border-white/5 shadow-xl mt-6">
+                <h3 className="text-xl font-bold text-white mb-4">🏆 คู่หูรู้ใจ</h3>
                 <div className="animate-pulse flex flex-col gap-3">
                     {[1, 2, 3].map(i => (
                         <div key={i} className="bg-white/5 rounded-xl h-20 w-full"></div>
@@ -82,8 +82,8 @@ export function BestPartners({ userId, selectedSeason }: BestPartnersProps) {
 
     if (partners.length === 0 && page === 1) {
         return (
-            <div className="bg-[#131e2b] rounded-2xl p-6 border border-white/5 shadow-xl mt-6">
-                <h3 className="text-xl font-bold text-white mb-4">🏆 คู่หูรู้ใจ (Best Partners)</h3>
+            <div className="bg-[#131e2b] rounded-2xl p-4 sm:p-6 border border-white/5 shadow-xl mt-6">
+                <h3 className="text-xl font-bold text-white mb-4">🏆 คู่หูรู้ใจ</h3>
                 <p className="text-slate-400 text-center py-6">ยังไม่มีข้อมูลคู่หูในฤดูกาลนี้</p>
             </div>
         );
@@ -93,15 +93,16 @@ export function BestPartners({ userId, selectedSeason }: BestPartnersProps) {
     const pageCount = meta?.pagination?.pageCount || 1;
 
     return (
-        <div className="bg-[#131e2b] rounded-2xl p-6 border border-white/5 shadow-xl mt-6">
-            <div className="flex justify-between items-end mb-6">
+        <div className="bg-[#131e2b] rounded-2xl p-4 sm:p-6 border border-white/5 shadow-xl mt-6">
+            <div className="flex justify-between items-end mb-1 gap-2">
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                    <span>🏆</span> คู่หูรู้ใจ (Best Partners)
+                    <span>🏆</span> คู่หูรู้ใจ
                 </h3>
                 <p className="text-xs text-slate-400 font-medium bg-white/5 px-3 py-1 rounded-full">
                     มีคู่หูทั้งหมด {totalPartners} คน
                 </p>
             </div>
+            <p className="text-xs text-slate-500 mb-5">เรียงจากคู่ที่ชนะด้วยกันสม่ำเสมอ (เล่นด้วยกันบ่อยจะน่าเชื่อถือกว่า)</p>
             
             <div className={`flex flex-col gap-3 transition-opacity duration-200 ${loading ? 'opacity-50' : 'opacity-100'}`}>
                 {partners.map((partner, index) => {
@@ -132,9 +133,9 @@ export function BestPartners({ userId, selectedSeason }: BestPartnersProps) {
                             <div className="flex-1 min-w-0 flex items-center justify-between">
                                 <div className="flex flex-col">
                                     <h4 className="font-semibold text-white truncate text-base">{partner.username}</h4>
-                                    {partner.nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{partner.nickname}</span>}
+                                    {partner.nickname && <span className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{partner.nickname}</span>}
                                     <span className="text-xs text-slate-400 truncate mt-0.5">
-                                        ชนะ {partner.wins}/{partner.matchesPlayed} แมทช์
+                                        ชนะ {partner.wins}/{partner.matchesPlayed} แมตช์
                                     </span>
                                 </div>
                                 <div className="text-sm font-bold px-3 py-1 rounded-lg bg-green-500/10 text-green-400 border border-green-500/20">

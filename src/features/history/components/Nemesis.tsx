@@ -69,7 +69,7 @@ export function Nemesis({ userId, selectedSeason }: NemesisProps) {
             <div className="bg-[#131e2b] rounded-2xl p-6 border border-white/5 shadow-xl mt-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-bl-[100px] blur-3xl pointer-events-none"></div>
                 <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                    <span>👿</span> คู่แค้น (Nemesis)
+                    <span>👿</span> คู่แค้น
                 </h3>
                 <div className="animate-pulse flex flex-col gap-3">
                     {[1, 2, 3].map(i => (
@@ -89,7 +89,7 @@ export function Nemesis({ userId, selectedSeason }: NemesisProps) {
             <div className="bg-[#131e2b] rounded-2xl p-6 border border-white/5 shadow-xl mt-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-bl-[100px] blur-3xl pointer-events-none"></div>
                 <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                    <span>👿</span> คู่แค้น (Nemesis)
+                    <span>👿</span> คู่แค้น
                 </h3>
                 <p className="text-slate-400 text-center py-6">ยังไม่มีข้อมูลคู่แค้นในฤดูกาลนี้ (คุณอาจจะชนะรวด!)</p>
             </div>
@@ -100,16 +100,17 @@ export function Nemesis({ userId, selectedSeason }: NemesisProps) {
     const pageCount = meta?.pagination?.pageCount || 1;
 
     return (
-        <div className="bg-[#131e2b] rounded-2xl p-6 border border-white/5 shadow-xl mt-6 relative overflow-hidden">
+        <div className="bg-[#131e2b] rounded-2xl p-4 sm:p-6 border border-white/5 shadow-xl mt-6 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-bl-[100px] blur-3xl pointer-events-none"></div>
-            <div className="flex justify-between items-end mb-6 relative z-10">
+            <div className="flex justify-between items-end gap-2 mb-1 relative z-10">
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                    <span>👿</span> คู่แค้น (Nemesis)
+                    <span>👿</span> คู่แค้น
                 </h3>
                 <p className="text-xs text-slate-400 font-medium bg-white/5 px-3 py-1 rounded-full">
                     เคยปะทะทั้งหมด {totalOpponents} คน
                 </p>
             </div>
+            <p className="text-xs text-slate-500 mb-5 relative z-10">เรียงจากคนที่เราแพ้บ่อยและสม่ำเสมอ</p>
             
             <div className={`flex flex-col gap-3 transition-opacity duration-200 relative z-10 ${loading ? 'opacity-50' : 'opacity-100'}`}>
                 {opponents.map((opponent, index) => {
@@ -140,9 +141,9 @@ export function Nemesis({ userId, selectedSeason }: NemesisProps) {
                             <div className="flex-1 min-w-0 flex items-center justify-between">
                                 <div className="flex flex-col">
                                     <h4 className="font-semibold text-white truncate text-base">{opponent.username}</h4>
-                                    {opponent.nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{opponent.nickname}</span>}
+                                    {opponent.nickname && <span className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{opponent.nickname}</span>}
                                     <span className="text-xs text-slate-400 truncate mt-0.5">
-                                        แพ้ {opponent.losses}/{opponent.matchesPlayed} แมทช์
+                                        แพ้ {opponent.losses}/{opponent.matchesPlayed} แมตช์
                                     </span>
                                 </div>
                                 <div className={`text-sm font-bold px-3 py-1 rounded-lg border ${isFirst ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-white/5 text-slate-300 border-white/10'}`}>

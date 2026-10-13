@@ -70,19 +70,19 @@ export function HistoryAnalytics({ analyticsData, rankingStats }: Props) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
       {/* RP Progression Line Chart */}
-      <div className="md:col-span-2 bg-white/5 border border-white/10 p-6 rounded-3xl backdrop-blur-md relative">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-4">
+      <div className="md:col-span-2 bg-white/5 border border-white/10 p-4 sm:p-6 rounded-3xl backdrop-blur-md relative">
+        <div className="flex justify-between items-center mb-4 sm:mb-6">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">
-              RP Progression
+              กราฟแต้มแรงค์ (RP)
             </h3>
             {summaryData.length > 0 && (
               <select
                 value={selectedDate || ''}
                 onChange={(e) => setSelectedDate(e.target.value || null)}
-                className="bg-[#1e293b] border border-white/10 text-white text-xs font-bold rounded-lg px-3 py-1.5 outline-none focus:border-[#2ecc71] cursor-pointer"
+                className="min-h-10 bg-[#1e293b] border border-white/10 text-white text-xs font-bold rounded-lg px-3 py-1.5 outline-none focus:border-[#2ecc71] cursor-pointer"
               >
-                <option value="">ภาพรวมทั้งซีซั่น (Overall)</option>
+                <option value="">ภาพรวมทั้งซีซัน</option>
                 {[...summaryData].reverse().map(s => (
                   <option key={s.fullDate} value={s.fullDate}>วันที่ {s.date}</option>
                 ))}
@@ -97,7 +97,7 @@ export function HistoryAnalytics({ analyticsData, rankingStats }: Props) {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={summaryData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }} onClick={handleChartClick}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => val.split('/')[0]} />
+                <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val: string) => val.split('/').slice(0, 2).join('/')} />
                 <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} domain={['auto', 'auto']} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px' }}
@@ -115,7 +115,7 @@ export function HistoryAnalytics({ analyticsData, rankingStats }: Props) {
                 />
               </LineChart>
             </ResponsiveContainer>
-            <p className="text-center text-xs text-slate-500 mt-2">Click on a point to view matches for that day</p>
+            <p className="text-center text-xs text-slate-500 mt-2">แตะที่จุดเพื่อดูแต่ละเกมของวันนั้น</p>
           </div>
         )}
 
@@ -154,20 +154,20 @@ export function HistoryAnalytics({ analyticsData, rankingStats }: Props) {
       </div>
 
       {/* Win Rate Doughnut Chart */}
-      <div className="bg-white/5 border border-white/10 p-6 rounded-3xl backdrop-blur-md flex flex-col items-center">
-        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2 w-full text-left">Win Rate</h3>
+      <div className="bg-white/5 border border-white/10 p-4 sm:p-6 rounded-3xl backdrop-blur-md flex flex-col items-center">
+        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2 w-full text-left">อัตราชนะ</h3>
         
         {pieData.length > 0 ? (
           <>
-            <div className="h-[200px] w-full relative">
+            <div className="h-[150px] sm:h-[200px] w-full relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={pieData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
+                    innerRadius="70%"
+                    outerRadius="92%"
                     paddingAngle={5}
                     dataKey="value"
                     stroke="none"
@@ -188,7 +188,7 @@ export function HistoryAnalytics({ analyticsData, rankingStats }: Props) {
                 <span className="text-2xl font-black text-white">
                   {rankingStats?.match_played ? Math.round(((rankingStats?.win || 0) / rankingStats.match_played) * 100) : 0}%
                 </span>
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Win Rate</span>
+                <span className="text-[11px] font-bold text-slate-400">อัตราชนะ</span>
               </div>
             </div>
             
@@ -196,11 +196,11 @@ export function HistoryAnalytics({ analyticsData, rankingStats }: Props) {
             <div className="flex gap-4 mt-2">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-[#2ecc71]"></div>
-                <span className="text-xs font-bold text-slate-300">Win ({rankingStats?.win || 0})</span>
+                <span className="text-xs font-bold text-slate-300">ชนะ {rankingStats?.win || 0}</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-[#e74c3c]"></div>
-                <span className="text-xs font-bold text-slate-300">Loss ({rankingStats?.lose || 0})</span>
+                <span className="text-xs font-bold text-slate-300">แพ้ {rankingStats?.lose || 0}</span>
               </div>
             </div>
           </>

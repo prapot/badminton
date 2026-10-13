@@ -110,7 +110,6 @@ export function RankingTable({
                                                         </span>
                                                         {p.nickname && <span className="text-[11px] text-slate-400 truncate">{p.nickname}</span>}
                                                     </div>
-                                                    <span className="text-[11px] text-slate-500 truncate">{p.email}</span>
                                                 </div>
                                             </div>
                                         </td>

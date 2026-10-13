@@ -25,7 +25,8 @@ export function LeaderboardView({
     const [page, setPage] = useState(1);
 
     const searchLower = search.toLowerCase();
-    const filteredPlayers = allPlayers.filter(p => p.username.toLowerCase().includes(searchLower) || (p.email && p.email.toLowerCase().includes(searchLower)));
+    // Search by name/nickname only — emails are private and must not be discoverable by typing them
+    const filteredPlayers = allPlayers.filter(p => p.username.toLowerCase().includes(searchLower) || (p.nickname?.toLowerCase().includes(searchLower) ?? false));
     const pageCount = Math.max(1, Math.ceil(filteredPlayers.length / 10));
     const currentPagePlayers = filteredPlayers.slice((page - 1) * 10, page * 10);
 

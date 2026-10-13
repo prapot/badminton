@@ -4,14 +4,24 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
 import { LoginResponse, loginWithStrapi } from "@/features/auth/auth";
-import { linkLineWithTicket, registerWithLine } from "@/features/auth/line";
+import { clearLineHandoff, linkLineWithTicket, publishLineHandoff, registerWithLine } from "@/features/auth/line";
 import { PendingLineLink } from "@/features/auth/useLineCallback";
 
 /** หลัง login ด้วย LINE ที่ยังไม่ผูก: เข้าบัญชีเดิมแล้วผูก LINE ด้วย linkTicket หรือสมัครใหม่จาก LINE */
-export function useLineLinkAccount({ linkTicket, redirect }: PendingLineLink) {
+export function useLineLinkAccount({ linkTicket, redirect, handoffId }: PendingLineLink) {
     const router = useRouter();
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // เก็บ session ในเบราว์เซอร์นี้ และส่งให้แท็บที่เริ่ม login ด้วย (ถ้าหน้านี้เปิดในเบราว์เซอร์อื่น เช่นในแอป LINE)
+    const saveSession = async (data: LoginResponse) => {
+        localStorage.setItem("jwt", data.jwt);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        clearLineHandoff();
+        await publishLineHandoff(handoffId, data.jwt).catch(() => {
+            // ไม่เป็นไร — login ในเบราว์เซอร์นี้แล้ว
+        });
+    };
 
     const loginAndLink = async (identifier: string, password: string) => {
         setSubmitting(true);
@@ -26,8 +36,7 @@ export function useLineLinkAccount({ linkTicket, redirect }: PendingLineLink) {
         }
 
         // login สำเร็จแล้ว — เก็บ session ไว้ก่อน ถึงผูก LINE ไม่สำเร็จก็ยังเข้าใช้งานได้
-        localStorage.setItem("jwt", data.jwt);
-        localStorage.setItem("user", JSON.stringify(data.user));
+        await saveSession(data);
         try {
             await linkLineWithTicket(linkTicket, data.jwt);
         } catch (err: unknown) {
@@ -49,9 +58,7 @@ export function useLineLinkAccount({ linkTicket, redirect }: PendingLineLink) {
         setSubmitting(true);
         setError(null);
         try {
-            const data = await registerWithLine(linkTicket);
-            localStorage.setItem("jwt", data.jwt);
-            localStorage.setItem("user", JSON.stringify(data.user));
+            await saveSession(await registerWithLine(linkTicket));
             router.replace(redirect);
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");

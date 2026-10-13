@@ -15,11 +15,12 @@ export function useLineLink(jwt: string | null) {
 
     const link = useCallback(async () => {
         try {
-            await startLineAuth("link", "/profile");
+            // backend ผูก LINE กับ user จาก JWT นี้ — ใช้ได้แม้ LINE เปิด callback ในเบราว์เซอร์อื่น
+            await startLineAuth("link", "/profile", jwt);
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
         }
-    }, []);
+    }, [jwt]);
 
     const unlink = useCallback(async () => {
         if (!jwt) return;

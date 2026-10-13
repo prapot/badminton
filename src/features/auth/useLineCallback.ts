@@ -2,27 +2,34 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { linkLine, loginWithLine, LineNotLinkedError, takePendingLineAuth } from "@/features/auth/line";
+import { clearLineHandoff, completeLineCallback, sessionFromJwt } from "@/features/auth/line";
+import { safeRedirectPath } from "@/features/auth/safeRedirect";
 
 export interface PendingLineLink {
     linkTicket: string;
     displayName: string;
     redirect: string;
+    /** ส่ง session ที่ได้ในหน้านี้กลับไปให้แท็บที่เริ่ม login (กรณีหน้านี้เปิดในเบราว์เซอร์อื่น) */
+    handoffId: string;
 }
 
 export interface LineCallbackState {
     error: string | null;
-    backHref: string;
-    /** LINE ยังไม่ผูกกับบัญชีไหน → ให้ login/สมัครด้วยอีเมลแล้วผูก */
+    /** LINE ยังไม่ผูกกับบัญชีไหน → ให้สมัครใหม่หรือ login ด้วยอีเมลแล้วผูก */
     pendingLink: PendingLineLink | null;
+    /** ผูก LINE สำเร็จ แต่หน้านี้เปิดในเบราว์เซอร์ที่ไม่ได้ login (เช่นเบราว์เซอร์ในแอป LINE บน iOS) */
+    linkedElsewhere: string | null;
 }
 
-/** จัดการตอน LINE redirect กลับมาพร้อม code: login หรือเชื่อมบัญชี แล้วพากลับหน้าเดิม */
+/**
+ * จัดการตอน LINE redirect กลับมาพร้อม code + state — ไม่พึ่ง storage ของเบราว์เซอร์
+ * (state/nonce/PKCE อยู่ที่ backend) จึงใช้ได้แม้หน้านี้เปิดในเบราว์เซอร์อื่นจากที่เริ่ม
+ */
 export function useLineCallback(): LineCallbackState {
     const router = useRouter();
     const searchParams = useSearchParams();
     const handled = useRef(false);
-    const [state, setState] = useState<LineCallbackState>({ error: null, backHref: "/login", pendingLink: null });
+    const [state, setState] = useState<LineCallbackState>({ error: null, pendingLink: null, linkedElsewhere: null });
 
     useEffect(() => {
         // code ใช้แลกได้ครั้งเดียว — กัน StrictMode เรียก effect ซ้ำ
@@ -30,43 +37,46 @@ export function useLineCallback(): LineCallbackState {
         handled.current = true;
 
         const run = async () => {
-            let backHref = "/login";
-            let redirect = "/";
             try {
-                const pending = takePendingLineAuth(searchParams.get("state"));
-                backHref = pending.mode === "link" ? pending.redirect : "/login";
-                redirect = pending.redirect;
-
                 if (searchParams.get("error")) {
                     throw new Error("ยกเลิกการเข้าสู่ระบบด้วย LINE");
                 }
                 const code = searchParams.get("code");
-                if (!code) throw new Error("ไม่ได้รับข้อมูลจาก LINE");
+                const lineState = searchParams.get("state");
+                if (!code || !lineState) throw new Error("ไม่ได้รับข้อมูลจาก LINE");
 
-                const grant = { code, nonce: pending.nonce, codeVerifier: pending.codeVerifier };
-                if (pending.mode === "link") {
-                    const jwt = localStorage.getItem("jwt");
-                    if (!jwt) throw new Error("กรุณาเข้าสู่ระบบก่อนเชื่อมต่อ LINE");
-                    await linkLine(grant, jwt);
+                const res = await completeLineCallback(code, lineState);
+                const redirect = safeRedirectPath(res.redirect);
+
+                if (res.result === "login") {
+                    const session = await sessionFromJwt(res.jwt);
+                    localStorage.setItem("jwt", session.jwt);
+                    localStorage.setItem("user", JSON.stringify(session.user));
+                    clearLineHandoff(); // เบราว์เซอร์เดียวกับที่เริ่ม — ไม่ต้องรับ session ซ้ำ
+                    router.replace(redirect);
+                } else if (res.result === "linked") {
+                    if (localStorage.getItem("jwt")) {
+                        router.replace(redirect);
+                    } else {
+                        setState({ error: null, pendingLink: null, linkedElsewhere: res.displayName });
+                    }
                 } else {
-                    const data = await loginWithLine(grant);
-                    localStorage.setItem("jwt", data.jwt);
-                    localStorage.setItem("user", JSON.stringify(data.user));
-                }
-                router.replace(pending.redirect);
-            } catch (err: unknown) {
-                if (err instanceof LineNotLinkedError) {
                     setState({
                         error: null,
-                        backHref,
-                        pendingLink: { linkTicket: err.linkTicket, displayName: err.displayName, redirect },
+                        linkedElsewhere: null,
+                        pendingLink: {
+                            linkTicket: res.linkTicket,
+                            displayName: res.displayName,
+                            redirect,
+                            handoffId: res.handoffId,
+                        },
                     });
-                    return;
                 }
+            } catch (err: unknown) {
                 setState({
                     error: err instanceof Error ? err.message : "เกิดข้อผิดพลาด",
-                    backHref,
                     pendingLink: null,
+                    linkedElsewhere: null,
                 });
             }
         };

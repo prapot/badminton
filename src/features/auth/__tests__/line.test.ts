@@ -2,115 +2,108 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { callTo, mockFetch, strapiError, stubLocation } from "./lineTestUtils";
 
 vi.hoisted(() => {
-    process.env.NEXT_PUBLIC_LINE_CHANNEL_ID = "2011995309";
     process.env.NEXT_PUBLIC_STRAPI_BASE_URL = "http://strapi.test";
 });
 
 import {
-    linkLineWithTicket,
-    LineNotLinkedError,
-    loginWithLine,
+    claimLineHandoff,
+    completeLineCallback,
+    hasLineHandoff,
     isLinePlaceholderEmail,
+    linkLineWithTicket,
+    publishLineHandoff,
     registerWithLine,
     startLineAuth,
-    takePendingLineAuth,
 } from "../line";
 
-const PENDING_KEY = "line_auth_pending";
+const HANDOFF_KEY = "line_auth_handoff";
+const AUTHORIZE_URL = "https://access.line.me/oauth2/v2.1/authorize?state=s1";
 
 describe("startLineAuth", () => {
     beforeEach(() => localStorage.clear());
     afterEach(() => vi.unstubAllGlobals());
 
-    it("redirects to LINE authorize with channel id, callback URL, state, nonce and PKCE", async () => {
+    it("login: asks the backend to start, remembers the handoff id, and goes to LINE", async () => {
         const location = stubLocation("https://127.0.0.1:3000");
+        const fetchMock = mockFetch({ "/api/line-auth/start": { body: { authorizeUrl: AUTHORIZE_URL, handoffId: "h1" } } });
+
         await startLineAuth("login", "/tournament/abc");
 
-        const url = new URL(location.href);
-        expect(url.origin + url.pathname).toBe("https://access.line.me/oauth2/v2.1/authorize");
-        expect(url.searchParams.get("client_id")).toBe("2011995309");
-        expect(url.searchParams.get("redirect_uri")).toBe("https://127.0.0.1:3000/auth/line/callback");
-        expect(url.searchParams.get("scope")).toBe("profile openid");
-
-        const pending = JSON.parse(localStorage.getItem(PENDING_KEY)!);
-        expect(pending).toMatchObject({ mode: "login", redirect: "/tournament/abc" });
-        expect(url.searchParams.get("state")).toBe(pending.state);
-        expect(url.searchParams.get("nonce")).toBe(pending.nonce);
-        expect(pending.state).toMatch(/^[0-9a-f]{32}$/);
-        expect(pending.nonce).not.toBe(pending.state);
-
-        // PKCE: challenge sent to LINE = base64url(sha256(verifier kept in localStorage))
-        expect(url.searchParams.get("code_challenge_method")).toBe("S256");
-        expect(pending.codeVerifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
-        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pending.codeVerifier));
-        const expected = Buffer.from(digest).toString("base64url");
-        expect(url.searchParams.get("code_challenge")).toBe(expected);
+        const [url, init] = callTo(fetchMock, "/api/line-auth/start")!;
+        expect(url).toBe("http://strapi.test/api/line-auth/start");
+        expect(JSON.parse(init.body!)).toEqual({
+            mode: "login",
+            redirect: "/tournament/abc",
+            redirectUri: "https://127.0.0.1:3000/auth/line/callback",
+        });
+        expect(init.headers!.Authorization).toBeUndefined();
+        expect(JSON.parse(localStorage.getItem(HANDOFF_KEY)!)).toMatchObject({ id: "h1" });
+        expect(location.href).toBe(AUTHORIZE_URL);
     });
 
-    it("never stores an off-site redirect", async () => {
-        stubLocation();
-        await startLineAuth("login", "https://evil.example/phish");
-        expect(JSON.parse(localStorage.getItem(PENDING_KEY)!).redirect).toBe("/");
+    it("link: sends the user's JWT and keeps no handoff", async () => {
+        const location = stubLocation();
+        const fetchMock = mockFetch({ "/api/line-auth/start": { body: { authorizeUrl: AUTHORIZE_URL, handoffId: null } } });
+
+        await startLineAuth("link", "/profile", "jwt-7");
+
+        expect(callTo(fetchMock, "/api/line-auth/start")![1].headers!.Authorization).toBe("Bearer jwt-7");
+        expect(localStorage.getItem(HANDOFF_KEY)).toBeNull();
+        expect(location.href).toBe(AUTHORIZE_URL);
     });
 
-    it("throws when the channel id is not configured", async () => {
-        vi.resetModules();
-        const saved = process.env.NEXT_PUBLIC_LINE_CHANNEL_ID;
-        delete process.env.NEXT_PUBLIC_LINE_CHANNEL_ID;
-        try {
-            const fresh = await import("../line");
-            stubLocation();
-            await expect(fresh.startLineAuth("login", "/")).rejects.toThrow("NEXT_PUBLIC_LINE_CHANNEL_ID");
-        } finally {
-            process.env.NEXT_PUBLIC_LINE_CHANNEL_ID = saved;
-        }
+    it("stays on the page and throws when the backend refuses", async () => {
+        const location = stubLocation();
+        mockFetch({ "/api/line-auth/start": strapiError(401, "กรุณาเข้าสู่ระบบก่อน") });
+        await expect(startLineAuth("link", "/profile", "expired")).rejects.toThrow("กรุณาเข้าสู่ระบบก่อน");
+        expect(location.href).toBe("http://localhost:3000/login");
     });
 });
 
-describe("takePendingLineAuth", () => {
-    const pending = { state: "s1", nonce: "n1", codeVerifier: "v1", mode: "link", redirect: "/profile", createdAt: Date.now() };
-    beforeEach(() => localStorage.setItem(PENDING_KEY, JSON.stringify(pending)));
+describe("claimLineHandoff", () => {
+    const setHandoff = (createdAt = Date.now()) =>
+        localStorage.setItem(HANDOFF_KEY, JSON.stringify({ id: "h1", createdAt }));
 
-    it("returns the pending auth when state matches, and can only be used once", () => {
-        expect(takePendingLineAuth("s1")).toEqual(pending);
-        expect(() => takePendingLineAuth("s1")).toThrow("ลิงก์ยืนยันตัวตนไม่ถูกต้อง");
+    beforeEach(() => localStorage.clear());
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("does nothing when no LINE sign-in was started here", async () => {
+        const fetchMock = mockFetch({});
+        await expect(claimLineHandoff()).resolves.toBeNull();
+        expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it.each([
-        ["a different state", "other"],
-        ["no state", null],
-    ])("rejects %s", (_, state) => {
-        expect(() => takePendingLineAuth(state)).toThrow("ลิงก์ยืนยันตัวตนไม่ถูกต้อง");
+    it("reports pending and keeps waiting while the sign-in is not finished", async () => {
+        setHandoff();
+        mockFetch({ "/api/line-auth/handoff/h1": { body: { status: "pending" } } });
+        await expect(claimLineHandoff()).resolves.toEqual({ status: "pending" });
+        expect(hasLineHandoff()).toBe(true);
     });
 
-    it("sanitizes a tampered redirect in storage", () => {
-        localStorage.setItem(PENDING_KEY, JSON.stringify({ ...pending, redirect: "//evil.example" }));
-        expect(takePendingLineAuth("s1").redirect).toBe("/");
+    it("hands over the session once it finished in another browser", async () => {
+        setHandoff();
+        const user = { id: 7, username: "kai" };
+        mockFetch({
+            "/api/line-auth/handoff/h1": { body: { status: "done", jwt: "jwt-7" } },
+            "/api/users/me": { body: user },
+        });
+        await expect(claimLineHandoff()).resolves.toEqual({ status: "done", session: { jwt: "jwt-7", user } });
+        expect(hasLineHandoff()).toBe(false);
     });
 
-    it("rejects pending auth without a PKCE verifier (started before an upgrade)", () => {
-        const { codeVerifier: _omit, ...legacy } = pending;
-        void _omit;
-        localStorage.setItem(PENDING_KEY, JSON.stringify(legacy));
-        expect(() => takePendingLineAuth("s1")).toThrow("ลิงก์ยืนยันตัวตนไม่ถูกต้อง");
+    it("forgets the handoff when the backend no longer knows it", async () => {
+        setHandoff();
+        mockFetch({ "/api/line-auth/handoff/h1": strapiError(404, "หมดอายุ") });
+        await expect(claimLineHandoff()).resolves.toBeNull();
+        expect(hasLineHandoff()).toBe(false);
     });
 
-    it("survives into a new tab (mobile: the LINE app opens the callback in a fresh tab)", () => {
-        // a new tab starts with empty sessionStorage but shares localStorage
-        sessionStorage.clear();
-        expect(takePendingLineAuth("s1").mode).toBe("link");
-    });
-
-    it("rejects pending auth older than 10 minutes", () => {
-        localStorage.setItem(PENDING_KEY, JSON.stringify({ ...pending, createdAt: Date.now() - 11 * 60 * 1000 }));
-        expect(() => takePendingLineAuth("s1")).toThrow("ลิงก์ยืนยันตัวตนไม่ถูกต้อง");
-    });
-
-    it("rejects when nothing is pending or the stored value is corrupt", () => {
-        localStorage.clear();
-        expect(() => takePendingLineAuth("s1")).toThrow("ลิงก์ยืนยันตัวตนไม่ถูกต้อง");
-        localStorage.setItem(PENDING_KEY, "{not json");
-        expect(() => takePendingLineAuth("s1")).toThrow("ลิงก์ยืนยันตัวตนไม่ถูกต้อง");
+    it("ignores a handoff older than 10 minutes without asking the backend", async () => {
+        setHandoff(Date.now() - 11 * 60 * 1000);
+        const fetchMock = mockFetch({});
+        await expect(claimLineHandoff()).resolves.toBeNull();
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(hasLineHandoff()).toBe(false);
     });
 });
 
@@ -118,46 +111,23 @@ describe("Strapi LINE API calls", () => {
     beforeEach(() => stubLocation());
     afterEach(() => vi.unstubAllGlobals());
 
-    it("loginWithLine sends code, nonce, PKCE verifier and redirect URI, then loads the user", async () => {
-        const user = { id: 7, username: "kai" };
-        const fetchMock = mockFetch({
-            "/api/line-auth/login": { body: { jwt: "jwt-7" } },
-            "/api/users/me": { body: user },
-        });
-
-        await expect(loginWithLine({ code: "code-1", nonce: "nonce-1", codeVerifier: "verifier-1" }))
-            .resolves.toEqual({ jwt: "jwt-7", user });
-
-        const [url, init] = callTo(fetchMock, "/api/line-auth/login")!;
-        expect(url).toBe("http://strapi.test/api/line-auth/login");
-        expect(JSON.parse(init.body!)).toEqual({
-            code: "code-1",
-            nonce: "nonce-1",
-            codeVerifier: "verifier-1",
-            redirectUri: "http://localhost:3000/auth/line/callback",
-        });
-        expect(callTo(fetchMock, "/api/users/me")![1].headers).toEqual({ Authorization: "Bearer jwt-7" });
+    it("completeLineCallback sends only code and state", async () => {
+        const fetchMock = mockFetch({ "/api/line-auth/callback": { body: { result: "login", jwt: "jwt-7", redirect: "/" } } });
+        await expect(completeLineCallback("code-1", "s1")).resolves.toMatchObject({ result: "login", jwt: "jwt-7" });
+        expect(JSON.parse(callTo(fetchMock, "/api/line-auth/callback")![1].body!)).toEqual({ code: "code-1", state: "s1" });
     });
 
-    it("turns LINE_NOT_LINKED into LineNotLinkedError carrying the link ticket", async () => {
-        mockFetch({
-            "/api/line-auth/login": strapiError(404, "ยังไม่ได้เชื่อมต่อ", {
-                code: "LINE_NOT_LINKED",
-                linkTicket: "ticket-1",
-                displayName: "Kai",
-            }),
-        });
-
-        const err = await loginWithLine({ code: "c", nonce: "n", codeVerifier: "v" }).catch((e) => e);
-        expect(err).toBeInstanceOf(LineNotLinkedError);
-        expect(err).toMatchObject({ linkTicket: "ticket-1", displayName: "Kai", message: "ยังไม่ได้เชื่อมต่อ" });
+    it("surfaces Strapi errors with the server message", async () => {
+        mockFetch({ "/api/line-auth/callback": strapiError(400, "การเข้าสู่ระบบด้วย LINE หมดอายุแล้ว") });
+        await expect(completeLineCallback("c", "s")).rejects.toThrow("การเข้าสู่ระบบด้วย LINE หมดอายุแล้ว");
     });
 
-    it("surfaces other Strapi errors as plain errors with the server message", async () => {
-        mockFetch({ "/api/line-auth/login": strapiError(400, "ยืนยันตัวตนกับ LINE ไม่สำเร็จ") });
-        const err = await loginWithLine({ code: "c", nonce: "n", codeVerifier: "v" }).catch((e) => e);
-        expect(err).not.toBeInstanceOf(LineNotLinkedError);
-        expect(err.message).toBe("ยืนยันตัวตนกับ LINE ไม่สำเร็จ");
+    it("publishLineHandoff posts the handoff id with the new session's JWT", async () => {
+        const fetchMock = mockFetch({ "/api/line-auth/handoff": { body: { ok: true } } });
+        await publishLineHandoff("h1", "jwt-8");
+        const [, init] = callTo(fetchMock, "/api/line-auth/handoff")!;
+        expect(init.headers!.Authorization).toBe("Bearer jwt-8");
+        expect(JSON.parse(init.body!)).toEqual({ handoffId: "h1" });
     });
 
     it("registerWithLine creates the account from the ticket and loads the user", async () => {

@@ -16,11 +16,8 @@ vi.mock("next/navigation", () => ({
 
 import { useLineCallback } from "../useLineCallback";
 
-function setPending(mode: "login" | "link", redirect: string) {
-    localStorage.setItem("line_auth_pending", JSON.stringify({ state: "s1", nonce: "n1", codeVerifier: "v1", mode, redirect, createdAt: Date.now() }));
-}
-
 const strict = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>;
+const user = { id: 7, username: "kai" };
 
 describe("useLineCallback", () => {
     beforeEach(() => {
@@ -31,79 +28,93 @@ describe("useLineCallback", () => {
     });
     afterEach(() => vi.unstubAllGlobals());
 
-    it("login: stores the session and goes back to the original page", async () => {
-        setPending("login", "/tournament/abc");
-        const user = { id: 7, username: "kai" };
-        mockFetch({
-            "/api/line-auth/login": { body: { jwt: "jwt-7" } },
+    it("works with empty browser storage (iOS: the LINE app opens the callback in its own browser)", async () => {
+        const fetchMock = mockFetch({
+            "/api/line-auth/callback": { body: { result: "login", jwt: "jwt-7", redirect: "/tournament/abc" } },
             "/api/users/me": { body: user },
         });
 
         renderHook(() => useLineCallback());
 
         await waitFor(() => expect(replace).toHaveBeenCalledWith("/tournament/abc"));
+        expect(JSON.parse(callTo(fetchMock, "/api/line-auth/callback")![1].body!)).toEqual({ code: "code-1", state: "s1" });
         expect(localStorage.getItem("jwt")).toBe("jwt-7");
         expect(JSON.parse(localStorage.getItem("user")!)).toEqual(user);
     });
 
+    it("login in the same browser clears the pending handoff so the login page doesn't claim it again", async () => {
+        localStorage.setItem("line_auth_handoff", JSON.stringify({ id: "h1", createdAt: Date.now() }));
+        mockFetch({
+            "/api/line-auth/callback": { body: { result: "login", jwt: "jwt-7", redirect: "/" } },
+            "/api/users/me": { body: user },
+        });
+
+        renderHook(() => useLineCallback());
+
+        await waitFor(() => expect(replace).toHaveBeenCalledWith("/"));
+        expect(localStorage.getItem("line_auth_handoff")).toBeNull();
+    });
+
+    it("never follows an off-site redirect from the response", async () => {
+        mockFetch({
+            "/api/line-auth/callback": { body: { result: "login", jwt: "jwt-7", redirect: "//evil.example" } },
+            "/api/users/me": { body: user },
+        });
+        renderHook(() => useLineCallback());
+        await waitFor(() => expect(replace).toHaveBeenCalledWith("/"));
+    });
+
     it("exchanges the one-time code only once under StrictMode", async () => {
-        setPending("login", "/");
         const fetchMock = mockFetch({
-            "/api/line-auth/login": { body: { jwt: "jwt-7" } },
-            "/api/users/me": { body: { id: 7 } },
+            "/api/line-auth/callback": { body: { result: "login", jwt: "jwt-7", redirect: "/" } },
+            "/api/users/me": { body: user },
         });
 
         renderHook(() => useLineCallback(), { wrapper: strict });
 
         await waitFor(() => expect(replace).toHaveBeenCalled());
-        expect(fetchMock.mock.calls.filter(([url]) => url.includes("/line-auth/login"))).toHaveLength(1);
+        expect(fetchMock.mock.calls.filter(([url]) => url.includes("/line-auth/callback"))).toHaveLength(1);
     });
 
-    it("login with an unlinked LINE account: offers linking instead of an error", async () => {
-        setPending("login", "/tournament/abc");
+    it("unlinked LINE account: offers new account / existing account, with the handoff id", async () => {
         mockFetch({
-            "/api/line-auth/login": strapiError(404, "ยังไม่ได้เชื่อมต่อ", {
-                code: "LINE_NOT_LINKED",
-                linkTicket: "ticket-1",
-                displayName: "Kai",
-            }),
+            "/api/line-auth/callback": {
+                body: { result: "not_linked", linkTicket: "ticket-1", displayName: "Kai", redirect: "/tournament/abc", handoffId: "h1" },
+            },
         });
 
         const { result } = renderHook(() => useLineCallback());
 
         await waitFor(() => expect(result.current.pendingLink).not.toBeNull());
-        expect(result.current.pendingLink).toEqual({ linkTicket: "ticket-1", displayName: "Kai", redirect: "/tournament/abc" });
-        expect(result.current.error).toBeNull();
+        expect(result.current.pendingLink).toEqual({
+            linkTicket: "ticket-1",
+            displayName: "Kai",
+            redirect: "/tournament/abc",
+            handoffId: "h1",
+        });
         expect(replace).not.toHaveBeenCalled();
         expect(localStorage.getItem("jwt")).toBeNull();
     });
 
-    it("link: links with the stored JWT and returns to the profile", async () => {
-        setPending("link", "/profile");
+    it("link finished in the browser that is signed in: back to the profile", async () => {
         localStorage.setItem("jwt", "jwt-7");
-        const fetchMock = mockFetch({ "/api/line-auth/link": { body: { linked: true, displayName: "Kai" } } });
+        mockFetch({ "/api/line-auth/callback": { body: { result: "linked", displayName: "Kai", redirect: "/profile" } } });
 
         renderHook(() => useLineCallback());
 
         await waitFor(() => expect(replace).toHaveBeenCalledWith("/profile"));
-        const [, init] = callTo(fetchMock, "/api/line-auth/link")!;
-        expect(init.headers!.Authorization).toBe("Bearer jwt-7");
-        expect(JSON.parse(init.body!)).toMatchObject({ code: "code-1", nonce: "n1", codeVerifier: "v1" });
     });
 
-    it("link without being signed in: shows an error and links back to the profile", async () => {
-        setPending("link", "/profile");
-        const fetchMock = mockFetch({});
+    it("link finished in another browser (not signed in here): says to go back to the original page", async () => {
+        mockFetch({ "/api/line-auth/callback": { body: { result: "linked", displayName: "Kai", redirect: "/profile" } } });
 
         const { result } = renderHook(() => useLineCallback());
 
-        await waitFor(() => expect(result.current.error).toBe("กรุณาเข้าสู่ระบบก่อนเชื่อมต่อ LINE"));
-        expect(result.current.backHref).toBe("/profile");
-        expect(fetchMock).not.toHaveBeenCalled();
+        await waitFor(() => expect(result.current.linkedElsewhere).toBe("Kai"));
+        expect(replace).not.toHaveBeenCalled();
     });
 
     it("user cancelled on LINE: shows a cancel message without calling the backend", async () => {
-        setPending("login", "/");
         searchParams = new URLSearchParams({ error: "access_denied", state: "s1" });
         const fetchMock = mockFetch({});
 
@@ -113,15 +124,12 @@ describe("useLineCallback", () => {
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it("rejects a callback whose state does not match (CSRF)", async () => {
-        setPending("login", "/");
-        searchParams = new URLSearchParams({ code: "code-1", state: "forged" });
-        const fetchMock = mockFetch({});
+    it("unknown/expired/forged state: shows the backend's message", async () => {
+        mockFetch({ "/api/line-auth/callback": strapiError(400, "การเข้าสู่ระบบด้วย LINE หมดอายุแล้ว") });
 
         const { result } = renderHook(() => useLineCallback());
 
-        await waitFor(() => expect(result.current.error).toMatch("ลิงก์ยืนยันตัวตนไม่ถูกต้อง"));
-        expect(fetchMock).not.toHaveBeenCalled();
-        expect(result.current.backHref).toBe("/login");
+        await waitFor(() => expect(result.current.error).toBe("การเข้าสู่ระบบด้วย LINE หมดอายุแล้ว"));
+        expect(localStorage.getItem("jwt")).toBeNull();
     });
 });

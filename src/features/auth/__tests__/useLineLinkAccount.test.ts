@@ -14,7 +14,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ replace }) }));
 
 import { useLineLinkAccount } from "../useLineLinkAccount";
 
-const pendingLink = { linkTicket: "ticket-1", displayName: "Kai", redirect: "/tournament/abc" };
+const pendingLink = { linkTicket: "ticket-1", displayName: "Kai", redirect: "/tournament/abc", handoffId: "h1" };
 const user = { id: 7, username: "kai" };
 
 describe("useLineLinkAccount", () => {
@@ -30,10 +30,16 @@ describe("useLineLinkAccount", () => {
             "/api/auth/local": { body: { jwt: "jwt-7", user } },
             "/api/users/me": { body: user },
             "/api/line-auth/link-ticket": { body: { linked: true, displayName: "Kai" } },
+            "/api/line-auth/handoff": { body: { ok: true } },
         });
         const { result } = renderHook(() => useLineLinkAccount(pendingLink));
 
         await act(() => result.current.loginAndLink("kai@example.com", "secret1"));
+
+        // the tab that started the LINE sign-in (maybe another browser) gets this session too
+        const [, handoffInit] = callTo(fetchMock, "/api/line-auth/handoff")!;
+        expect(handoffInit.headers!.Authorization).toBe("Bearer jwt-7");
+        expect(JSON.parse(handoffInit.body!)).toEqual({ handoffId: "h1" });
 
         const [, linkInit] = callTo(fetchMock, "/api/line-auth/link-ticket")!;
         expect(linkInit.headers!.Authorization).toBe("Bearer jwt-7");
@@ -62,10 +68,13 @@ describe("useLineLinkAccount", () => {
         const fetchMock = mockFetch({
             "/api/line-auth/register": { body: { jwt: "jwt-8" } },
             "/api/users/me": { body: { id: 8, username: "Kai" } },
+            "/api/line-auth/handoff": { body: { ok: true } },
         });
         const { result } = renderHook(() => useLineLinkAccount(pendingLink));
 
         await act(() => result.current.register());
+
+        expect(callTo(fetchMock, "/api/line-auth/handoff")![1].headers!.Authorization).toBe("Bearer jwt-8");
 
         expect(JSON.parse(callTo(fetchMock, "/api/line-auth/register")![1].body!)).toEqual({ linkTicket: "ticket-1" });
         expect(callTo(fetchMock, "/api/line-auth/link-ticket")).toBeUndefined();
@@ -92,6 +101,8 @@ describe("useLineLinkAccount", () => {
             "/api/auth/local": { body: { jwt: "jwt-7", user } },
             "/api/users/me": { body: user },
             "/api/line-auth/link-ticket": strapiError(400, "การยืนยันตัวตนกับ LINE หมดอายุแล้ว"),
+            // handoff failing must not block the user either
+            "/api/line-auth/handoff": strapiError(400, "หมดอายุ"),
         });
         const { result } = renderHook(() => useLineLinkAccount(pendingLink));
 

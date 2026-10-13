@@ -4,11 +4,12 @@ import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { registerWithStrapi } from "@/features/auth/auth";
+import { safeRedirectPath } from "@/features/auth/safeRedirect";
 
 function RegisterForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const redirectPath = searchParams.get("redirect") || "/";
+    const redirectPath = safeRedirectPath(searchParams.get("redirect"));
 
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");

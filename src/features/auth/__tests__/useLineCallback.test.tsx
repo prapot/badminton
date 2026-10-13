@@ -17,7 +17,7 @@ vi.mock("next/navigation", () => ({
 import { useLineCallback } from "../useLineCallback";
 
 function setPending(mode: "login" | "link", redirect: string) {
-    sessionStorage.setItem("line_auth_pending", JSON.stringify({ state: "s1", nonce: "n1", mode, redirect }));
+    sessionStorage.setItem("line_auth_pending", JSON.stringify({ state: "s1", nonce: "n1", codeVerifier: "v1", mode, redirect }));
 }
 
 const strict = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>;
@@ -89,7 +89,7 @@ describe("useLineCallback", () => {
         await waitFor(() => expect(replace).toHaveBeenCalledWith("/profile"));
         const [, init] = callTo(fetchMock, "/api/line-auth/link")!;
         expect(init.headers!.Authorization).toBe("Bearer jwt-7");
-        expect(JSON.parse(init.body!)).toMatchObject({ code: "code-1", nonce: "n1" });
+        expect(JSON.parse(init.body!)).toMatchObject({ code: "code-1", nonce: "n1", codeVerifier: "v1" });
     });
 
     it("link without being signed in: shows an error and links back to the profile", async () => {

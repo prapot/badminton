@@ -1,4 +1,5 @@
 import { fetchCurrentUser, LoginResponse } from "@/features/auth/auth";
+import { safeRedirectPath } from "@/features/auth/safeRedirect";
 
 const STRAPI_BASE_URL =
     process.env.NEXT_PUBLIC_STRAPI_BASE_URL ||
@@ -13,9 +14,14 @@ export type LineAuthMode = "login" | "link";
 interface PendingLineAuth {
     state: string;
     nonce: string;
+    /** PKCE — ส่งให้ backend ตอนแลก code */
+    codeVerifier: string;
     mode: LineAuthMode;
     redirect: string;
 }
+
+/** ของที่ backend ต้องใช้แลก code จาก LINE */
+export type LineCodeGrant = Pick<PendingLineAuth, "nonce" | "codeVerifier"> & { code: string };
 
 export interface LineLinkStatus {
     linked: boolean;
@@ -34,17 +40,35 @@ function randomToken(): string {
     return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function base64url(bytes: Uint8Array): string {
+    return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** PKCE (RFC 7636, S256): verifier 43 ตัวอักษร, challenge = base64url(sha256(verifier)) */
+export async function createPkcePair(): Promise<{ codeVerifier: string; codeChallenge: string }> {
+    const codeVerifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(codeVerifier));
+    return { codeVerifier, codeChallenge: base64url(new Uint8Array(digest)) };
+}
+
 // ต้องตรงกับ Callback URL ที่ลงทะเบียนไว้ใน LINE Developers Console
 function getRedirectUri(): string {
     return `${window.location.origin}/auth/line/callback`;
 }
 
 /** ไปหน้า LINE เพื่อ login หรือเชื่อมต่อบัญชี แล้ว LINE จะส่งกลับมาที่ /auth/line/callback */
-export function startLineAuth(mode: LineAuthMode, redirect: string) {
+export async function startLineAuth(mode: LineAuthMode, redirect: string) {
     if (!LINE_CHANNEL_ID) {
         throw new Error("ยังไม่ได้ตั้งค่า NEXT_PUBLIC_LINE_CHANNEL_ID");
     }
-    const pending: PendingLineAuth = { state: randomToken(), nonce: randomToken(), mode, redirect };
+    const { codeVerifier, codeChallenge } = await createPkcePair();
+    const pending: PendingLineAuth = {
+        state: randomToken(),
+        nonce: randomToken(),
+        codeVerifier,
+        mode,
+        redirect: safeRedirectPath(redirect),
+    };
     sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
 
     const params = new URLSearchParams({
@@ -53,6 +77,8 @@ export function startLineAuth(mode: LineAuthMode, redirect: string) {
         redirect_uri: getRedirectUri(),
         state: pending.state,
         nonce: pending.nonce,
+        code_challenge: codeChallenge,
+        code_challenge_method: "S256",
         scope: "profile openid",
     });
     window.location.href = `https://access.line.me/oauth2/v2.1/authorize?${params}`;
@@ -68,10 +94,10 @@ export function takePendingLineAuth(returnedState: string | null): PendingLineAu
     } catch {
         // ข้อมูลเสีย — ถือว่าไม่มี
     }
-    if (!pending || !returnedState || pending.state !== returnedState) {
+    if (!pending || !returnedState || pending.state !== returnedState || !pending.codeVerifier) {
         throw new Error("ลิงก์ยืนยันตัวตนไม่ถูกต้องหรือหมดอายุ กรุณาลองใหม่อีกครั้ง");
     }
-    return pending;
+    return { ...pending, redirect: safeRedirectPath(pending.redirect) };
 }
 
 async function lineAuthRequest<T>(path: string, init: RequestInit, jwt?: string | null): Promise<T> {
@@ -94,19 +120,19 @@ async function lineAuthRequest<T>(path: string, init: RequestInit, jwt?: string 
     return data as T;
 }
 
-function codeBody(code: string, nonce: string) {
-    return JSON.stringify({ code, nonce, redirectUri: getRedirectUri() });
+function codeBody({ code, nonce, codeVerifier }: LineCodeGrant) {
+    return JSON.stringify({ code, nonce, codeVerifier, redirectUri: getRedirectUri() });
 }
 
-export async function loginWithLine(code: string, nonce: string): Promise<LoginResponse> {
-    const { jwt } = await lineAuthRequest<{ jwt: string }>("/login", { method: "POST", body: codeBody(code, nonce) });
+export async function loginWithLine(grant: LineCodeGrant): Promise<LoginResponse> {
+    const { jwt } = await lineAuthRequest<{ jwt: string }>("/login", { method: "POST", body: codeBody(grant) });
     const user = await fetchCurrentUser(jwt);
     if (!user) throw new Error("โหลดข้อมูลผู้ใช้ไม่สำเร็จ");
     return { jwt, user };
 }
 
-export function linkLine(code: string, nonce: string, jwt: string) {
-    return lineAuthRequest<LineLinkStatus>("/link", { method: "POST", body: codeBody(code, nonce) }, jwt);
+export function linkLine(grant: LineCodeGrant, jwt: string) {
+    return lineAuthRequest<LineLinkStatus>("/link", { method: "POST", body: codeBody(grant) }, jwt);
 }
 
 /** บัญชีที่สมัครด้วย LINE ได้อีเมลชั่วคราว (backend: PLACEHOLDER_EMAIL_DOMAIN) จนกว่าจะตั้งเองในโปรไฟล์ */

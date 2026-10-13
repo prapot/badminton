@@ -17,7 +17,7 @@ vi.mock("next/navigation", () => ({
 import { useLineCallback } from "../useLineCallback";
 
 function setPending(mode: "login" | "link", redirect: string) {
-    sessionStorage.setItem("line_auth_pending", JSON.stringify({ state: "s1", nonce: "n1", codeVerifier: "v1", mode, redirect }));
+    localStorage.setItem("line_auth_pending", JSON.stringify({ state: "s1", nonce: "n1", codeVerifier: "v1", mode, redirect, createdAt: Date.now() }));
 }
 
 const strict = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>;
@@ -25,7 +25,6 @@ const strict = ({ children }: { children: ReactNode }) => <StrictMode>{children}
 describe("useLineCallback", () => {
     beforeEach(() => {
         replace.mockReset();
-        sessionStorage.clear();
         localStorage.clear();
         stubLocation();
         searchParams = new URLSearchParams({ code: "code-1", state: "s1" });

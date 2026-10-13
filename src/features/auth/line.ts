@@ -8,6 +8,7 @@ const STRAPI_BASE_URL =
 
 const LINE_CHANNEL_ID = process.env.NEXT_PUBLIC_LINE_CHANNEL_ID || "";
 const PENDING_KEY = "line_auth_pending";
+const PENDING_TTL_MS = 10 * 60 * 1000;
 
 export type LineAuthMode = "login" | "link";
 
@@ -18,6 +19,7 @@ interface PendingLineAuth {
     codeVerifier: string;
     mode: LineAuthMode;
     redirect: string;
+    createdAt: number;
 }
 
 /** ของที่ backend ต้องใช้แลก code จาก LINE */
@@ -68,8 +70,11 @@ export async function startLineAuth(mode: LineAuthMode, redirect: string) {
         codeVerifier,
         mode,
         redirect: safeRedirectPath(redirect),
+        createdAt: Date.now(),
     };
-    sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+    // localStorage ไม่ใช่ sessionStorage: บนมือถือ แอป LINE เปิด callback กลับมาเป็นแท็บใหม่
+    // ซึ่งไม่เห็น sessionStorage ของแท็บเดิม (แท็บในเบราว์เซอร์เดียวกันใช้ localStorage ร่วมกัน)
+    localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
 
     const params = new URLSearchParams({
         response_type: "code",
@@ -86,15 +91,16 @@ export async function startLineAuth(mode: LineAuthMode, redirect: string) {
 
 /** อ่าน + ลบ pending state (ใช้ได้ครั้งเดียว) และตรวจว่า state ตรงกับที่ LINE ส่งกลับมา */
 export function takePendingLineAuth(returnedState: string | null): PendingLineAuth {
-    const raw = sessionStorage.getItem(PENDING_KEY);
-    sessionStorage.removeItem(PENDING_KEY);
+    const raw = localStorage.getItem(PENDING_KEY);
+    localStorage.removeItem(PENDING_KEY);
     let pending: PendingLineAuth | null = null;
     try {
         pending = raw ? JSON.parse(raw) : null;
     } catch {
         // ข้อมูลเสีย — ถือว่าไม่มี
     }
-    if (!pending || !returnedState || pending.state !== returnedState || !pending.codeVerifier) {
+    const expired = !pending?.createdAt || Date.now() - pending.createdAt > PENDING_TTL_MS;
+    if (!pending || expired || !returnedState || pending.state !== returnedState || !pending.codeVerifier) {
         throw new Error("ลิงก์ยืนยันตัวตนไม่ถูกต้องหรือหมดอายุ กรุณาลองใหม่อีกครั้ง");
     }
     return { ...pending, redirect: safeRedirectPath(pending.redirect) };

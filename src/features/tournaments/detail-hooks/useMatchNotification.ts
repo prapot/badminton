@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import Swal from "sweetalert2";
-import Pusher from 'pusher-js';
+import { getPusher } from "@/shared/realtime/pusherClient";
 import { ApiMatch, User } from "@/features/tournaments/types";
 
 export function useMatchNotification(apiMatches: ApiMatch[], user: User | null) {
@@ -109,12 +109,9 @@ export function useMatchNotification(apiMatches: ApiMatch[], user: User | null) 
     useEffect(() => {
         if (!user || !user.id) return;
 
-        // Initialize Pusher Client
-        const pusher = new Pusher("e1bc413c18f44323e541", {
-            cluster: "ap1"
-        });
+        const pusher = getPusher();
+        if (!pusher) return;
 
-        // We also subscribe to their email if available to cover both bases, but ID is the primary.
         const channelId = `user-${user.id}`;
         const channel = pusher.subscribe(channelId);
         
@@ -200,22 +197,9 @@ export function useMatchNotification(apiMatches: ApiMatch[], user: User | null) 
 
         channel.bind('match-alert', handleMatchAlert);
 
-        // Also bind to email if available, just in case
-        let emailChannel: any = null;
-        if (user.email) {
-            const safeEmail = user.email.replace(/[^a-zA-Z0-9]/g, '_');
-            emailChannel = pusher.subscribe(`user-${safeEmail}`);
-            emailChannel.bind('match-alert', handleMatchAlert);
-        }
-
         return () => {
-            channel.unbind_all();
-            channel.unsubscribe();
-            if (emailChannel) {
-                emailChannel.unbind_all();
-                emailChannel.unsubscribe();
-            }
-            pusher.disconnect();
+            channel.unbind('match-alert', handleMatchAlert);
+            pusher.unsubscribe(channelId);
         };
     }, [user]);
 }

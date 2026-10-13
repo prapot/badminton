@@ -598,20 +598,6 @@ export function useEndlessModeManager({
             const json = await res.json();
             if (!res.ok) throw new Error(json.error?.message || "Error creating match");
 
-            // Trigger Pusher notification (Fire and forget, do not await)
-            fetch('/api/pusher/trigger', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    playerIds: [...previewMatch.teamA.map(p => p.id), ...previewMatch.teamB.map(p => p.id)],
-                    matchData: {
-                        matchId: json.data?.id || json.id || 0,
-                        teamA: previewMatch.teamA.map(p => ({ id: p.id, name: p.username || p.guest_name })),
-                        teamB: previewMatch.teamB.map(p => ({ id: p.id, name: p.username || p.guest_name }))
-                    }
-                })
-            }).catch(console.error);
-
             // Optimistically mark players as busy to prevent duplicate draws
             setOptimisticBusy(prev => {
                 const newSet = new Set(prev);
@@ -656,20 +642,6 @@ export function useEndlessModeManager({
             });
             const json = await res.json();
             if (!res.ok) throw new Error(json.error?.message || "Error creating match");
-
-            // Trigger Pusher notification (Fire and forget)
-            fetch('/api/pusher/trigger', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    playerIds: [...manualTeamA.map(p => p.id), ...manualTeamB.map(p => p.id)],
-                    matchData: {
-                        matchId: json.data?.id || json.id || 0,
-                        teamA: manualTeamA.map(p => ({ id: p.id, name: p.username || p.guest_name })),
-                        teamB: manualTeamB.map(p => ({ id: p.id, name: p.username || p.guest_name }))
-                    }
-                })
-            }).catch(console.error);
 
             // Optimistically mark players as busy
             setOptimisticBusy(prev => {

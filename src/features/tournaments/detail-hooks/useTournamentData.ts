@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { TournamentInfo, ApiMatch, RegisteredPlayer } from "@/features/tournaments/types";
+import { getPusher } from "@/shared/realtime/pusherClient";
 
 const STRAPI_BASE_URL = process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
 
@@ -60,20 +61,73 @@ export function useTournamentData(id: string, jwt: string | null) {
             .catch(() => { /* silent */ });
     }, [jwt, id]);
 
+    // Keep the latest refreshInfo for the realtime/polling callbacks below
+    const refreshInfoRef = useRef<() => Promise<void>>(() => Promise.resolve());
+
+    // Realtime: backend pushes `tournament-<id>:changed` on every match/player/tournament change.
+    // While connected, polling is only a slow safety net; without Pusher it falls back to fast polling.
+    const [realtimeConnected, setRealtimeConnected] = useState(false);
+    useEffect(() => {
+        const pusher = getPusher();
+        if (!pusher || !id) return;
+
+        const channelName = `tournament-${id}`;
+        const channel = pusher.subscribe(channelName);
+        // Small random delay so every viewer doesn't hit Strapi in the same instant
+        let jitterTimer: ReturnType<typeof setTimeout> | undefined;
+        const onChanged = () => {
+            clearTimeout(jitterTimer);
+            jitterTimer = setTimeout(() => refreshInfoRef.current(), Math.random() * 800);
+        };
+        channel.bind("changed", onChanged);
+
+        // On reconnect, catch up on anything missed while the socket was down
+        let wasConnected = pusher.connection.state === "connected";
+        const onStateChange = ({ current }: { current: string }) => {
+            const connected = current === "connected";
+            if (connected && !wasConnected) refreshInfoRef.current();
+            wasConnected = connected;
+            setRealtimeConnected(connected);
+        };
+        pusher.connection.bind("state_change", onStateChange);
+        setRealtimeConnected(wasConnected);
+
+        return () => {
+            clearTimeout(jitterTimer);
+            channel.unbind("changed", onChanged);
+            pusher.unsubscribe(channelName);
+            pusher.connection.unbind("state_change", onStateChange);
+        };
+    }, [id]);
+
     // Auto-fetch matches and tournament data when tournament is ongoing/completed
     useEffect(() => {
-        let interval: NodeJS.Timeout;
         if (tournamentInfo?.tournament_status === 'ongoing' || tournamentInfo?.tournament_status === 'completed') {
             fetchMatches();
-            interval = setInterval(() => {
-                refreshInfo();
-            }, 7000);
         }
-        return () => {
-            if (interval) clearInterval(interval);
-        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tournamentInfo?.tournament_status]);
+
+    // Polling: fast without realtime, slow safety net with it; paused while the tab is hidden
+    useEffect(() => {
+        if (tournamentInfo?.tournament_status !== 'ongoing' && tournamentInfo?.tournament_status !== 'completed') return;
+
+        const pollMs = realtimeConnected ? 60_000 : 7_000;
+        const interval = setInterval(() => {
+            if (document.visibilityState === "visible") refreshInfoRef.current();
+        }, pollMs);
+
+        // Refresh right away when the user comes back to the tab
+        const onVisible = () => {
+            if (document.visibilityState === "visible") refreshInfoRef.current();
+        };
+        document.addEventListener("visibilitychange", onVisible);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener("visibilitychange", onVisible);
+        };
+    }, [tournamentInfo?.tournament_status, realtimeConnected]);
 
     const refreshInfo = () => {
         if (!jwt || !id) return Promise.resolve();
@@ -112,6 +166,10 @@ export function useTournamentData(id: string, jwt: string | null) {
             })
             .catch(() => { /* silent */ });
     };
+
+    useEffect(() => {
+        refreshInfoRef.current = refreshInfo;
+    });
 
     // Sync paused state from DB
     useEffect(() => {

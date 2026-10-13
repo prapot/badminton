@@ -19,7 +19,7 @@ import {
 const PENDING_KEY = "line_auth_pending";
 
 describe("startLineAuth", () => {
-    beforeEach(() => sessionStorage.clear());
+    beforeEach(() => localStorage.clear());
     afterEach(() => vi.unstubAllGlobals());
 
     it("redirects to LINE authorize with channel id, callback URL, state, nonce and PKCE", async () => {
@@ -32,14 +32,14 @@ describe("startLineAuth", () => {
         expect(url.searchParams.get("redirect_uri")).toBe("https://127.0.0.1:3000/auth/line/callback");
         expect(url.searchParams.get("scope")).toBe("profile openid");
 
-        const pending = JSON.parse(sessionStorage.getItem(PENDING_KEY)!);
+        const pending = JSON.parse(localStorage.getItem(PENDING_KEY)!);
         expect(pending).toMatchObject({ mode: "login", redirect: "/tournament/abc" });
         expect(url.searchParams.get("state")).toBe(pending.state);
         expect(url.searchParams.get("nonce")).toBe(pending.nonce);
         expect(pending.state).toMatch(/^[0-9a-f]{32}$/);
         expect(pending.nonce).not.toBe(pending.state);
 
-        // PKCE: challenge sent to LINE = base64url(sha256(verifier kept in sessionStorage))
+        // PKCE: challenge sent to LINE = base64url(sha256(verifier kept in localStorage))
         expect(url.searchParams.get("code_challenge_method")).toBe("S256");
         expect(pending.codeVerifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
         const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pending.codeVerifier));
@@ -50,7 +50,7 @@ describe("startLineAuth", () => {
     it("never stores an off-site redirect", async () => {
         stubLocation();
         await startLineAuth("login", "https://evil.example/phish");
-        expect(JSON.parse(sessionStorage.getItem(PENDING_KEY)!).redirect).toBe("/");
+        expect(JSON.parse(localStorage.getItem(PENDING_KEY)!).redirect).toBe("/");
     });
 
     it("throws when the channel id is not configured", async () => {
@@ -68,8 +68,8 @@ describe("startLineAuth", () => {
 });
 
 describe("takePendingLineAuth", () => {
-    const pending = { state: "s1", nonce: "n1", codeVerifier: "v1", mode: "link", redirect: "/profile" };
-    beforeEach(() => sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending)));
+    const pending = { state: "s1", nonce: "n1", codeVerifier: "v1", mode: "link", redirect: "/profile", createdAt: Date.now() };
+    beforeEach(() => localStorage.setItem(PENDING_KEY, JSON.stringify(pending)));
 
     it("returns the pending auth when state matches, and can only be used once", () => {
         expect(takePendingLineAuth("s1")).toEqual(pending);
@@ -84,21 +84,32 @@ describe("takePendingLineAuth", () => {
     });
 
     it("sanitizes a tampered redirect in storage", () => {
-        sessionStorage.setItem(PENDING_KEY, JSON.stringify({ ...pending, redirect: "//evil.example" }));
+        localStorage.setItem(PENDING_KEY, JSON.stringify({ ...pending, redirect: "//evil.example" }));
         expect(takePendingLineAuth("s1").redirect).toBe("/");
     });
 
     it("rejects pending auth without a PKCE verifier (started before an upgrade)", () => {
         const { codeVerifier: _omit, ...legacy } = pending;
         void _omit;
-        sessionStorage.setItem(PENDING_KEY, JSON.stringify(legacy));
+        localStorage.setItem(PENDING_KEY, JSON.stringify(legacy));
+        expect(() => takePendingLineAuth("s1")).toThrow("ลิงก์ยืนยันตัวตนไม่ถูกต้อง");
+    });
+
+    it("survives into a new tab (mobile: the LINE app opens the callback in a fresh tab)", () => {
+        // a new tab starts with empty sessionStorage but shares localStorage
+        sessionStorage.clear();
+        expect(takePendingLineAuth("s1").mode).toBe("link");
+    });
+
+    it("rejects pending auth older than 10 minutes", () => {
+        localStorage.setItem(PENDING_KEY, JSON.stringify({ ...pending, createdAt: Date.now() - 11 * 60 * 1000 }));
         expect(() => takePendingLineAuth("s1")).toThrow("ลิงก์ยืนยันตัวตนไม่ถูกต้อง");
     });
 
     it("rejects when nothing is pending or the stored value is corrupt", () => {
-        sessionStorage.clear();
+        localStorage.clear();
         expect(() => takePendingLineAuth("s1")).toThrow("ลิงก์ยืนยันตัวตนไม่ถูกต้อง");
-        sessionStorage.setItem(PENDING_KEY, "{not json");
+        localStorage.setItem(PENDING_KEY, "{not json");
         expect(() => takePendingLineAuth("s1")).toThrow("ลิงก์ยืนยันตัวตนไม่ถูกต้อง");
     });
 });

@@ -16,7 +16,7 @@ echo "📁 Directory: $APP_DIR"
 cd "$APP_DIR"
 
 echo "📥 Pulling latest code..."
-git pull origin main
+git pull origin develop
 
 echo "📦 Installing dependencies..."
 npm install --omit=dev

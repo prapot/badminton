@@ -12,8 +12,10 @@ npm run build        # production build (output: "standalone")
 npm run lint         # eslint (flat config, next core-web-vitals + typescript)
 npm test             # vitest (watch mode) — use `npx vitest run` for a single run
 npx tsc --noEmit     # type check
-npm run deploy:prod  # scripts/deploy.sh: build locally → rsync → pm2 reload on the server
+npm run deploy:prod  # scripts/deploy.sh: build locally → rsync → pm2 reload on the server (refuses to run outside branch develop)
 ```
+
+Deploy only from the `develop` branch (both repos' `scripts/deploy.sh` enforce this). Work on feature branches, then merge into `develop`.
 
 ## Stack
 

@@ -9,8 +9,15 @@ export function useTournamentData(id: string, jwt: string | null) {
     const [apiMatches, setApiMatches] = useState<ApiMatch[]>([]);
     const [pausedPlayerIds, setPausedPlayerIds] = useState<Set<number>>(new Set());
 
+    // Polling, realtime events and actions (e.g. creating a match) fetch concurrently, and a slow
+    // older response must not overwrite a newer one — otherwise players who were just sent to court
+    // show up as free again. Only the latest request of each kind may apply its result.
+    const matchesRequestSeq = useRef(0);
+    const infoRequestSeq = useRef(0);
+
     const fetchMatches = (token = jwt, formatArg?: string) => {
         if (!token || !id) return Promise.resolve();
+        const seq = ++matchesRequestSeq.current;
         const fmt = formatArg || tournamentInfo?.format;
         const sortOrder = fmt === "endless_mode" ? "desc" : "asc";
         return fetch(
@@ -18,7 +25,10 @@ export function useTournamentData(id: string, jwt: string | null) {
             { headers: { Authorization: `Bearer ${token}` } }
         )
             .then((r) => r.json())
-            .then((json) => setApiMatches(json.data ?? []))
+            .then((json) => {
+                if (seq !== matchesRequestSeq.current) return;
+                setApiMatches(json.data ?? []);
+            })
             .catch(() => { /* silent */ });
     };
 
@@ -163,12 +173,15 @@ export function useTournamentData(id: string, jwt: string | null) {
 
     const refreshInfo = () => {
         if (!jwt || !id) return Promise.resolve();
+        const seq = ++infoRequestSeq.current;
         return fetch(
             `${STRAPI_BASE_URL}/api/tournaments/${id}?populate[tournament_players][populate][user][populate][picture][fields][0]=url&populate[tournament_players][populate][user][populate][rankings][filters][season][is_active][$eq]=true&populate[user_created][populate][picture][fields][0]=url&populate[user_created][populate][rankings][filters][season][is_active][$eq]=true`,
             { headers: { Authorization: `Bearer ${jwt}` } }
         )
             .then((r) => r.json())
             .then((json) => {
+                // A newer refresh is in flight; it will update the info and the matches
+                if (seq !== infoRequestSeq.current) return;
                 const data = json.data ?? json;
                 const tpArr: Array<{ documentId?: string; id?: number | string; is_paused?: boolean; match_offset?: number; guest_name?: string; skill_level?: string; user?: Omit<RegisteredPlayer, "tpDocumentId" | "is_paused" | "match_offset" | "skill_level"> }> = data.tournament_players ?? [];
                 setTournamentInfo((prev) => prev ? {

@@ -8,7 +8,7 @@ export const TournamentStatusBadge = ({ status }: { status: string }) => {
   };
   const s = cfg[status] ?? cfg.upcoming;
   return (
-    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${s.cls}`}>
+    <span className={`shrink-0 whitespace-nowrap text-[11px] font-bold px-2 py-0.5 rounded-full border ${s.cls}`}>
       {s.label}
     </span>
   );

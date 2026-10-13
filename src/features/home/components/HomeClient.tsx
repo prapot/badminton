@@ -19,16 +19,11 @@ export function HomeClient() {
     <div className="min-h-screen bg-[#0f1923] text-white">
       <Navbar />
 
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+      <main className="max-w-6xl mx-auto px-4 py-5 sm:py-8 space-y-5 sm:space-y-8">
         <HeroBanner username={user.username} />
-        
-        <StatsCards 
-          membersCount={membersCount} 
-          todayCount={todayTournaments.length} 
-          loading={loading} 
-        />
 
-        <div className="grid lg:grid-cols-2 gap-6">
+        {/* Today's tournaments come first — it's what people open the app for on match day */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
           <TodayTournaments 
             tournaments={todayTournaments} 
             loading={loading} 
@@ -40,6 +35,12 @@ export function HomeClient() {
             baseUrl={STRAPI_BASE_URL} 
           />
         </div>
+
+        <StatsCards
+          membersCount={membersCount}
+          todayCount={todayTournaments.length}
+          loading={loading}
+        />
 
         <NewsSection />
 

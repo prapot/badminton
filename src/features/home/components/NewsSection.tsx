@@ -7,7 +7,7 @@ const news = [
 ];
 
 export const NewsSection = () => (
-  <div className="bg-white/5 border border-white/10 rounded-3xl p-6 shadow-xl">
+  <div className="bg-white/5 border border-white/10 rounded-3xl p-4 sm:p-6 shadow-xl">
     <h3 className="font-semibold text-white mb-6 flex items-center gap-2">
       <span className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-sm">📢</span>
       ข่าวสารและประกาศ
@@ -24,7 +24,7 @@ export const NewsSection = () => (
               {n.date}
             </p>
           </div>
-          <span className="shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase tracking-tight">
+          <span className="shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase tracking-tight">
             {n.tag}
           </span>
         </div>

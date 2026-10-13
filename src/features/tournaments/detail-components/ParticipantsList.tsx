@@ -14,9 +14,7 @@ interface ParticipantsListProps {
     user: User | null;
     jwt: string | null;
     isJoined: boolean;
-    joining: boolean;
     leaving: boolean;
-    handleJoin: () => void;
     handleLeave: () => void;
     drawnPairs: any[] | null;
     playerMatchCounts: Record<number, number>;
@@ -35,9 +33,7 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
     user,
     jwt,
     isJoined,
-    joining,
     leaving,
-    handleJoin,
     handleLeave,
     drawnPairs,
     playerMatchCounts,
@@ -213,8 +209,8 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                         </div>
                     )}
 
-                    {canJoinLeave && (
-                        isJoined ? (
+                    {/* Joining is offered by JoinTournamentCard above the tabs */}
+                    {canJoinLeave && isJoined && (
                             <div className="flex items-center gap-2 flex-wrap">
                                 {/* Block partner preference (only visible to joined player) */}
                                 <button
@@ -248,17 +244,6 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                                     {leaving ? spinnerSvg : "🚶"} ออก
                                 </button>
                             </div>
-                        ) : (
-                            <button
-                                onClick={handleJoin}
-                                disabled={joining}
-                                className="min-h-11 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/20 text-blue-400 text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
-                            >
-                                {joining ? spinnerSvg
-                                    : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>}
-                                เข้าร่วม
-                            </button>
-                        )
                     )}
                 </div>
             </div>

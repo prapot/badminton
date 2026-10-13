@@ -1,5 +1,6 @@
 import React from "react";
 import { ProfileFormState } from "../types";
+import { isLinePlaceholderEmail } from "@/features/auth/line";
 
 interface Props {
     form: ProfileFormState;
@@ -48,6 +49,11 @@ export function ProfileAccountForm({ form, setForm }: Props) {
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
                     className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-green-500/50 focus:bg-white/8 transition-all"
                 />
+                {isLinePlaceholderEmail(form.email) && (
+                    <p className="mt-1.5 text-xs text-amber-400">
+                        ⚠️ ยังไม่ได้ตั้งอีเมล (สมัครด้วย LINE) — ใส่อีเมลจริงแทนได้เลย
+                    </p>
+                )}
             </div>
         </div>
     );

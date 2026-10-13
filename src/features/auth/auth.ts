@@ -25,6 +25,14 @@ export interface RegisterResponse {
     };
 }
 
+// Fetch populated user data, specifically for the picture field
+export async function fetchCurrentUser(jwt: string): Promise<LoginResponse["user"] | null> {
+    const res = await fetch(`${STRAPI_BASE_URL}/api/users/me?populate=picture`, {
+        headers: { Authorization: `Bearer ${jwt}` }
+    });
+    return res.ok ? res.json() : null;
+}
+
 export async function loginWithStrapi(
     identifier: string,
     password: string
@@ -41,16 +49,7 @@ export async function loginWithStrapi(
     }
 
     const data = await res.json();
-
-    // Fetch populated user data, specifically for the picture field
-    const userRes = await fetch(`${STRAPI_BASE_URL}/api/users/me?populate=picture`, {
-        headers: { Authorization: `Bearer ${data.jwt}` }
-    });
-
-    if (userRes.ok) {
-        data.user = await userRes.json();
-    }
-
+    data.user = (await fetchCurrentUser(data.jwt)) ?? data.user;
     return data;
 }
 
@@ -71,15 +70,6 @@ export async function registerWithStrapi(
     }
 
     const data = await res.json();
-
-    // Fetch populated user data, specifically for the picture field
-    const userRes = await fetch(`${STRAPI_BASE_URL}/api/users/me?populate=picture`, {
-        headers: { Authorization: `Bearer ${data.jwt}` }
-    });
-
-    if (userRes.ok) {
-        data.user = await userRes.json();
-    }
-
+    data.user = (await fetchCurrentUser(data.jwt)) ?? data.user;
     return data;
 }

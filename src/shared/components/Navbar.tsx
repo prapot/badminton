@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { isLinePlaceholderEmail } from "@/features/auth/line";
 
 interface User {
     id: number;
@@ -190,7 +191,7 @@ export default function Navbar() {
                             <div className="min-w-0 flex flex-col justify-center">
                                 <p className="text-sm font-semibold text-white truncate">{user.username}</p>
                                 {user.nickname && <p className="text-[10px] text-slate-300 font-medium truncate mt-0.5">{user.nickname}</p>}
-                                <p className="text-[11px] text-slate-400/80 truncate mt-0.5">{user.email}</p>
+                                <p className="text-[11px] text-slate-400/80 truncate mt-0.5">{isLinePlaceholderEmail(user.email) ? "เข้าสู่ระบบด้วย LINE" : user.email}</p>
                             </div>
                         </div>
                     </div>

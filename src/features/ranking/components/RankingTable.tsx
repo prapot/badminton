@@ -40,7 +40,7 @@ export function RankingTable({
                         ตารางอันดับสะสม
                     </h3>
                     <div className="flex items-center gap-4">
-                        <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-black/20 px-3 py-1.5 rounded-full border border-white/5">
+                        <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-widest bg-black/20 px-3 py-1.5 rounded-full border border-white/5">
                             Season: {seasons.find(s => s.documentId === selectedSeason)?.name || "Current"}
                         </span>
                         <span className="text-xs font-bold text-green-400 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
@@ -52,7 +52,7 @@ export function RankingTable({
                 <div className="overflow-x-auto">
                     <table className="w-full border-collapse">
                         <thead>
-                            <tr className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] border-b border-white/5 bg-black/20">
+                            <tr className="text-[11px] sm:text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] border-b border-white/5 bg-black/20">
                                 <th className="px-6 py-4 text-left w-16">Rank</th>
                                 <th className="px-6 py-4 text-left">Player</th>
                                 <th className="px-6 py-4 text-center">Tier</th>
@@ -69,6 +69,7 @@ export function RankingTable({
                                 return (
                                     <tr
                                         key={p.userId}
+                                        id={`rank-row-${p.userId}`}
                                         onClick={() => router.push(`/history/${p.userId}`)}
                                         className={`group hover:bg-white/[0.04] transition-all cursor-pointer ${rank <= 3 && p.hasRanking ? "bg-white/[0.02]" : ""} ${p.userId === user?.id ? "bg-green-500/5 border-l-4 border-l-green-500/50" : ""}`}
                                     >
@@ -97,19 +98,19 @@ export function RankingTable({
                                                         <span className="text-sm sm:text-base font-bold text-white group-hover:text-green-400 transition-colors truncate">
                                                             {p.username || "Unknown"}
                                                             {p.userId === user?.id && (
-                                                                <span className="ml-2 text-[8px] px-1.5 py-0.5 rounded-md bg-green-500/20 text-green-400 border border-green-500/30 uppercase tracking-tighter">
+                                                                <span className="ml-2 text-[11px] px-1.5 py-0.5 rounded-md bg-green-500/20 text-green-400 border border-green-500/30 uppercase tracking-tighter">
                                                                     ฉัน
                                                                 </span>
                                                             )}
                                                             {!p.hasRanking && (
-                                                                <span className="ml-2 text-[8px] px-1.5 py-0.5 rounded-md bg-slate-500/20 text-slate-400 border border-slate-500/30 uppercase tracking-tighter">
+                                                                <span className="ml-2 text-[11px] px-1.5 py-0.5 rounded-md bg-slate-500/20 text-slate-400 border border-slate-500/30 uppercase tracking-tighter">
                                                                     ยังไม่มีคะแนน
                                                                 </span>
                                                             )}
                                                         </span>
                                                         {p.nickname && <span className="text-[11px] text-slate-400 truncate">{p.nickname}</span>}
                                                     </div>
-                                                    <span className="text-[10px] text-slate-500 truncate">{p.email}</span>
+                                                    <span className="text-[11px] text-slate-500 truncate">{p.email}</span>
                                                 </div>
                                             </div>
                                         </td>
@@ -117,7 +118,7 @@ export function RankingTable({
                                             {p.hasRanking ? (
                                                 <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} size="sm" />
                                             ) : (
-                                                <span className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">-</span>
+                                                <span className="text-[11px] text-slate-600 font-bold uppercase tracking-widest">-</span>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-center">
@@ -126,7 +127,7 @@ export function RankingTable({
                                         <td className="px-6 py-4 text-center">
                                             <div className="flex items-center justify-center gap-2">
                                                 <span className="text-green-400 font-black text-xs sm:text-sm">{p.win}</span>
-                                                <span className="text-slate-600 text-[10px]">/</span>
+                                                <span className="text-slate-600 text-[11px]">/</span>
                                                 <span className="text-red-400 font-black text-xs sm:text-sm">{p.lose}</span>
                                             </div>
                                         </td>

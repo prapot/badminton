@@ -13,7 +13,7 @@ export function LeaderboardHeader({ totalPlayers }: Props) {
             </div>
             <div className="absolute -top-4 -right-4 sm:top-4 sm:right-8 text-7xl sm:text-9xl opacity-10 select-none animate-pulse">🏆</div>
             <div className="relative z-10">
-                <div className="inline-flex items-center gap-2 text-[10px] sm:text-xs font-bold text-yellow-400 bg-yellow-400/10 px-3 py-1 rounded-full border border-yellow-400/20 mb-3 uppercase tracking-widest">
+                <div className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-bold text-yellow-400 bg-yellow-400/10 px-3 py-1 rounded-full border border-yellow-400/20 mb-3 uppercase tracking-widest">
                     <span>🏅</span> ตารางอันดับผู้เล่น
                 </div>
                 <h1 className="text-3xl sm:text-5xl font-black text-white mb-2 tracking-tight">Leaderboard</h1>

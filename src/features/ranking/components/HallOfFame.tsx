@@ -34,9 +34,9 @@ export function HallOfFame({ seasons, selectedSeason, allPlayers }: Props) {
                             <div>
                                 <div className="flex flex-col mb-1">
                                     <p className="font-black text-white text-base leading-none">{p.username}</p>
-                                    {p.nickname && <p className="text-[10px] text-slate-400 font-medium leading-none mt-1">{p.nickname}</p>}
+                                    {p.nickname && <p className="text-[11px] text-slate-400 font-medium leading-none mt-1">{p.nickname}</p>}
                                 </div>
-                                <p className="text-[10px] font-black text-yellow-500/80 uppercase tracking-widest">{p.ranking_points} RP</p>
+                                <p className="text-[11px] font-black text-yellow-500/80 uppercase tracking-widest">{p.ranking_points} RP</p>
                             </div>
                         </div>
                     ))}

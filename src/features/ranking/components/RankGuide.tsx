@@ -27,14 +27,14 @@ export function RankGuide() {
                                 </div>
                                 <div className="text-right">
                                     <h3 className="text-xl font-black text-white uppercase tracking-tighter">{r.name}</h3>
-                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{r.desc}</p>
+                                    <p className="text-[11px] text-slate-500 font-bold uppercase tracking-widest">{r.desc}</p>
                                 </div>
                             </div>
 
                             <div className="space-y-4 flex-1">
                                 <div className="bg-black/20 rounded-2xl p-4 border border-white/5">
                                     <div className="flex justify-between items-center mb-2">
-                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Divisions</span>
+                                        <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Divisions</span>
                                         <span className="text-xs font-bold text-white">{r.divs}</span>
                                     </div>
                                     <div className="flex gap-1">
@@ -52,17 +52,17 @@ export function RankGuide() {
 
                                 <div className="bg-black/20 rounded-2xl p-4 border border-white/5">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Requirement</span>
+                                        <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Requirement</span>
                                         <div className="flex items-center gap-1.5">
                                             <span className="text-lg font-black text-white">{r.stars === '∞' ? 'Unlimited' : `${r.stars}`}</span>
                                             <span className="text-yellow-500">⭐</span>
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1"></span>
+                                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest ml-1"></span>
                                         </div>
                                     </div>
                                 </div>
 
                                 {r.noStarLoss && (
-                                    <div className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-black uppercase tracking-wider">
+                                    <div className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] font-black uppercase tracking-wider">
                                         <span>🔰</span> ปลอดภัย: แพ้ไม่ลดดาว
                                     </div>
                                 )}

@@ -46,13 +46,13 @@ export function Podium({ top3, user }: Props) {
 
                             <div className="text-center relative z-10 min-w-0 w-full">
                                 <p className="font-black text-white text-xs sm:text-base leading-tight truncate px-1">{p.username}</p>
-                                {p.nickname && <p className="text-[10px] sm:text-xs text-slate-300 font-medium truncate px-1 mt-0.5">{p.nickname}</p>}
+                                {p.nickname && <p className="text-[11px] sm:text-xs text-slate-300 font-medium truncate px-1 mt-0.5">{p.nickname}</p>}
                             </div>
 
                             <div className="text-xl sm:text-3xl relative z-10 filter drop-shadow-md">{c.icon}</div>
                             <div className="flex flex-col items-center gap-1.5 relative z-10">
                                 <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} size="sm" />
-                                <div className="flex gap-2 sm:gap-4 text-[9px] sm:text-xs text-slate-400 font-bold">
+                                <div className="flex gap-2 sm:gap-4 text-[11px] sm:text-xs text-slate-400 font-bold">
                                     <span className="text-green-400">{p.win}W</span>
                                     <span className="text-red-400">{p.lose}L</span>
                                 </div>

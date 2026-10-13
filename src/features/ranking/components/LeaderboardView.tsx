@@ -29,6 +29,17 @@ export function LeaderboardView({
     const pageCount = Math.max(1, Math.ceil(filteredPlayers.length / 10));
     const currentPagePlayers = filteredPlayers.slice((page - 1) * 10, page * 10);
 
+    // "Find me": jump to the page holding the current user's row, then scroll to it once rendered
+    const myIndex = allPlayers.findIndex(p => p.userId === user?.id);
+    const goToMe = () => {
+        if (myIndex < 0) return;
+        setSearch("");
+        setPage(Math.floor(myIndex / 10) + 1);
+        setTimeout(() => {
+            document.getElementById(`rank-row-${user?.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 50);
+    };
+
     const top3 = page === 1 && !searchLower ? allPlayers.filter(p => p.hasRanking).slice(0, 3) : [];
 
     return (
@@ -68,6 +79,15 @@ export function LeaderboardView({
                         ))}
                     </select>
                 </div>
+
+                {!loading && myIndex >= 0 && (
+                    <button
+                        onClick={goToMe}
+                        className="w-full md:w-auto md:ml-auto min-h-11 px-4 flex items-center justify-center gap-2 rounded-xl sm:rounded-2xl bg-green-500/10 border border-green-500/30 text-green-400 text-sm font-bold active:scale-[0.98] transition-all"
+                    >
+                        📍 ดูอันดับของฉัน <span className="text-green-300/80 font-black">#{myIndex + 1}</span>
+                    </button>
+                )}
 
                 {loading && (
                     <div className="flex items-center gap-2 text-xs text-slate-500 animate-pulse ml-auto">

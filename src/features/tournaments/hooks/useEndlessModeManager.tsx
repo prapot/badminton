@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import Swal from "sweetalert2";
 
 import { RegisteredPlayer, ApiMatch } from "../types";
+import { buildHistory, pickNextMatch, skillScore, Entity } from "../utils/endlessMatchmaking";
 
 export type PairingMode = "auto" | "manual" | "team";
 
@@ -175,20 +176,6 @@ export function useEndlessModeManager({
         return counts;
     }, [permanentTeams, apiMatches]);
 
-    const getFaceoffCount = (pids1: number[], pids2: number[]) => {
-        const key1 = [...pids1].sort((a, b) => a - b).join(",");
-        const key2 = [...pids2].sort((a, b) => a - b).join(",");
-
-        let count = 0;
-        apiMatches.forEach(m => {
-            if (m.match_status === "cancelled") return;
-            const mA = m.team_a_id?.team_players.map(getUnifiedPlayerId).filter(Boolean).sort((a, b) => a! - b!).join(",");
-            const mB = m.team_b_id?.team_players.map(getUnifiedPlayerId).filter(Boolean).sort((a, b) => a! - b!).join(",");
-            if ((mA === key1 && mB === key2) || (mA === key2 && mB === key1)) count++;
-        });
-        return count;
-    };
-
     const blockedPairsSet = useMemo(() => {
         const set = new Set<string>();
         (blockedPartnersData || []).forEach(bp => {
@@ -216,37 +203,6 @@ export function useEndlessModeManager({
         }
     }, [blockedPairsSet, previewMatch, tournamentType]);
 
-
-    const getPartnerHistory = (p1Id: number, p2Id: number) => {
-        let count = 0;
-        apiMatches.forEach(m => {
-            if (m.match_status === "cancelled") return;
-            [m.team_a_id, m.team_b_id].forEach(t => {
-                if (!t) return;
-                const ids = t.team_players.map(getUnifiedPlayerId).filter(Boolean);
-                if (ids.length === 2 && ids.includes(p1Id) && ids.includes(p2Id)) count++;
-            });
-        });
-        return count;
-    };
-
-    const getIndividualOpponentHistory = (pidsA: number[], pidsB: number[]) => {
-        let count = 0;
-        apiMatches.forEach(m => {
-            if (m.match_status === "cancelled") return;
-            const aids = m.team_a_id?.team_players.map(getUnifiedPlayerId).filter(Boolean) as number[] || [];
-            const bids = m.team_b_id?.team_players.map(getUnifiedPlayerId).filter(Boolean) as number[] || [];
-
-            pidsA.forEach(pA => {
-                pidsB.forEach(pB => {
-                    if ((aids.includes(pA) && bids.includes(pB)) || (aids.includes(pB) && bids.includes(pA))) {
-                        count++;
-                    }
-                });
-            });
-        });
-        return count;
-    };
 
     const handleTogglePause = async (player: RegisteredPlayer) => {
         if (!player.tpDocumentId) {
@@ -360,20 +316,7 @@ export function useEndlessModeManager({
         await saveTeamsToDB(filtered);
     };
 
-    // ── Rank-based skill score (used for team balancing) ──────────────────
-    // Converts rank+stars into a linear numeric score:
-    // Bronze(0-3) → Silver(4-7) → Gold(8-12) → Platinum(13-18) → Diamond(19-24) → Master(25+)
-    const getSkillScore = (p: RegisteredPlayer): number => {
-        const skill = p.skill_level || '';
-        switch (skill) {
-            case 'หน้าบ้าน': return 1;
-            case 'BG': return 2;
-            case 'N': return 3;
-            case 'S': return 4;
-            case 'P': return 5;
-            default: return 1; // Default to lowest if not specified
-        }
-    };
+    const getSkillScore = skillScore;
 
     // ── FRONTEND MATCHMAKING (Maximum Fairness Engine) ──────────────────────
     const calculateNextMatch = () => {
@@ -383,14 +326,14 @@ export function useEndlessModeManager({
             return;
         }
 
-        // 1. Build available entities (Fixed Pairs and Solos)
-        type Entity = { type: "team" | "solo", players: RegisteredPlayer[], matchCount: number };
+        // 1. Build available entities (fixed pairs and solos)
         const availableEntities: Entity[] = [];
         const usedInTeam = new Set<number>();
 
         if (tournamentType === "double") {
             permanentTeams.forEach(team => {
-                const isAvailable = team.players.every(p => !busyPlayerIds.has(p.id) && !pausedPlayerIds.has(p.id));
+                // optimisticBusy too: a team that was just sent to court must not be drawn again before the refresh
+                const isAvailable = team.players.every(p => !busyPlayerIds.has(p.id) && !pausedPlayerIds.has(p.id) && !optimisticBusy.has(p.id));
                 if (isAvailable && team.players.length === 2) {
                     const maxCount = Math.max(...team.players.map(p => effectivePlayerCounts.get(p.id) || 0));
                     availableEntities.push({ type: "team", players: team.players, matchCount: maxCount });
@@ -400,179 +343,40 @@ export function useEndlessModeManager({
         }
 
         availablePlayers.forEach(p => {
-            if (tournamentType === "double" && assignedPlayerIds.has(p.id) && !usedInTeam.has(p.id)) {
-                return; 
-            }
+            if (tournamentType === "double" && assignedPlayerIds.has(p.id) && !usedInTeam.has(p.id)) return;
             if (!usedInTeam.has(p.id)) {
                 availableEntities.push({ type: "solo", players: [p], matchCount: effectivePlayerCounts.get(p.id) || 0 });
             }
         });
 
-        const eligiblePlayersCount = availableEntities.reduce((sum, e) => sum + e.players.length, 0);
-        if (eligiblePlayersCount < requiredCount) {
-            showToast(`ผู้เล่นที่พร้อมจับคู่ไม่พอ (คู่หูบางคนอาจกำลังแข่งหรือพักอยู่)`, "error");
-            return;
-        }
-
-        // 2. HARD CONSTRAINTS: Find candidate sets of entities that sum exactly to requiredCount
-        // Shuffle first to ensure fairness among players with the same matchCount (since JS sort is stable)
-        const shuffledEntities = [...availableEntities].sort(() => Math.random() - 0.5);
-        // Sort entities by effective matchCount ascending to prioritize players with fewest games
-        const sortedEntities = shuffledEntities.sort((a, b) => a.matchCount - b.matchCount);
-        // Take a sufficient slice of lowest-count entities (up to 16) to guarantee fast exhaustive search
-        const pool = sortedEntities.slice(0, Math.min(16, sortedEntities.length));
-
-        type CandidateSet = { entities: Entity[], maxCount: number, sumCount: number };
-        const validSets: CandidateSet[] = [];
-
-        // Recursive helper to generate entity subsets summing to requiredCount players
-        const findSubsets = (startIdx: number, current: Entity[], currentPlayers: number) => {
-            if (currentPlayers === requiredCount) {
-                const allPlayers = current.flatMap(e => e.players);
-                const maxCount = Math.max(...allPlayers.map(p => effectivePlayerCounts.get(p.id) || 0));
-                const sumCount = allPlayers.reduce((sum, p) => sum + (effectivePlayerCounts.get(p.id) || 0), 0);
-                validSets.push({ entities: [...current], maxCount, sumCount });
-                return;
-            }
-            if (currentPlayers > requiredCount) return;
-
-            for (let i = startIdx; i < pool.length; i++) {
-                if (currentPlayers + pool[i].players.length <= requiredCount) {
-                    current.push(pool[i]);
-                    findSubsets(i + 1, current, currentPlayers + pool[i].players.length);
-                    current.pop();
-                }
-            }
-        };
-
-        findSubsets(0, [], 0);
-
-        if (validSets.length === 0) {
-            showToast("ไม่สามารถจับคู่ได้ (จำนวนคนและรูปแบบทีมถาวรไม่ลงตัว)", "error");
-            return;
-        }
-
-        // 3. EXHAUSTIVE COMBINATIONS: Evaluate possible matchups across candidate entity sets
-        // Sort candidate sets by fairness (min maxCount, then min sumCount)
-        const sortedCandidateSets = [...validSets].sort((a, b) => {
-            if (a.maxCount !== b.maxCount) return a.maxCount - b.maxCount;
-            return a.sumCount - b.sumCount;
+        // 2. Pick: lowest play-count tier, then "meet new people" + "close game" (see endlessMatchmaking.ts)
+        const history = buildHistory(
+            apiMatches
+                .filter(m => m.match_status !== "cancelled")
+                .map(m => ({
+                    teamA: (m.team_a_id?.team_players.map(getUnifiedPlayerId).filter(Boolean) || []) as number[],
+                    teamB: (m.team_b_id?.team_players.map(getUnifiedPlayerId).filter(Boolean) || []) as number[],
+                    matchNo: m.match_no,
+                }))
+        );
+        const result = pickNextMatch({
+            type: tournamentType,
+            entities: availableEntities,
+            history,
+            gamesOf: id => effectivePlayerCounts.get(id) || 0,
+            isBlockedPair: isBlockedTeammates,
         });
 
-        type MatchupCandidate = { teamA: RegisteredPlayer[], teamB: RegisteredPlayer[], penaltyScore: number, isBlocked: boolean };
-        const evaluatedMatchups: MatchupCandidate[] = [];
-
-        // Evaluate top candidates (up to 20 sets) to guarantee diverse unblocked pairings
-        const candidateSetsToEvaluate = sortedCandidateSets.slice(0, Math.min(20, sortedCandidateSets.length));
-
-        candidateSetsToEvaluate.forEach(candidate => {
-            const teams = candidate.entities.filter(e => e.type === "team").map(e => e.players);
-            const solos = candidate.entities.filter(e => e.type === "solo").map(e => e.players[0]);
-
-            const pairings: Array<{ teamA: RegisteredPlayer[], teamB: RegisteredPlayer[] }> = [];
-
-            if (tournamentType === "double") {
-                if (teams.length === 2) {
-                    // 2 Fixed Teams -> only 1 valid pairing
-                    pairings.push({ teamA: teams[0], teamB: teams[1] });
-                } else if (teams.length === 1 && solos.length === 2) {
-                    // 1 Fixed Team + 2 Solos -> Fixed team vs 2 Solos paired together
-                    pairings.push({ teamA: teams[0], teamB: [solos[0], solos[1]] });
-                } else if (solos.length === 4) {
-                    // 4 Solos -> exactly 3 possible Team A vs Team B splits
-                    pairings.push({ teamA: [solos[0], solos[1]], teamB: [solos[2], solos[3]] });
-                    pairings.push({ teamA: [solos[0], solos[2]], teamB: [solos[1], solos[3]] });
-                    pairings.push({ teamA: [solos[0], solos[3]], teamB: [solos[1], solos[2]] });
-                }
-            } else {
-                // Singles (1v1) -> only 1 valid pairing
-                if (solos.length === 2) {
-                    pairings.push({ teamA: [solos[0]], teamB: [solos[1]] });
-                }
-            }
-
-            // Calculate Weighted Penalty Score for each generated pairing
-            pairings.forEach(({ teamA, teamB }) => {
-                let penaltyScore = 0;
-
-                // Candidate fairness weight: prioritize players with fewer matches
-                penaltyScore += candidate.maxCount * 2_000_000 + candidate.sumCount * 200_000;
-
-                // Add a penalty for players who played recently to prevent back-to-back games
-                const maxMatchNo = Math.max(...apiMatches.map(m => m.match_no), 0);
-                let recentPlayPenalty = 0;
-                [...teamA, ...teamB].forEach(p => {
-                    const last = lastMatchPlayed.get(p.id) || -1;
-                    if (last > 0 && maxMatchNo > 0) {
-                        // If they played very recently, penalty is high
-                        const matchesAgo = maxMatchNo - last;
-                        if (matchesAgo === 0) recentPlayPenalty += 5000; // Just finished the LAST match
-                        else if (matchesAgo === 1) recentPlayPenalty += 2000;
-                        else if (matchesAgo === 2) recentPlayPenalty += 500;
-                    }
-                });
-                penaltyScore += recentPlayPenalty;
-
-                let isBlocked = false;
-                if (tournamentType === "double") {
-                    // Blocked Partner check (Anti-Teammate constraint)
-                    const isBlockedA = isBlockedTeammates(teamA[0].id, teamA[1].id);
-                    const isBlockedB = isBlockedTeammates(teamB[0].id, teamB[1].id);
-                    isBlocked = isBlockedA || isBlockedB;
-                    if (isBlocked) {
-                        penaltyScore += 100_000_000_000;
-                    }
-
-                    // Partner Rotation (× 100,000) - Strongly avoid same partners
-                    const isFixedA = permanentTeams.some(t => t.players.some(p => p.id === teamA[0].id) && t.players.some(p => p.id === teamA[1].id));
-                    const isFixedB = permanentTeams.some(t => t.players.some(p => p.id === teamB[0].id) && t.players.some(p => p.id === teamB[1].id));
-
-                    const partnerHistA = isFixedA ? 0 : getPartnerHistory(teamA[0].id, teamA[1].id);
-                    const partnerHistB = isFixedB ? 0 : getPartnerHistory(teamB[0].id, teamB[1].id);
-                    penaltyScore += (partnerHistA + partnerHistB) * 100000;
-
-                    // Team Matchup Rotation (× 20,000) - Avoid same 2v2 exactly
-                    const teamMatchupCount = getFaceoffCount(teamA.map(p => p.id), teamB.map(p => p.id));
-                    penaltyScore += teamMatchupCount * 20000;
-
-                    // Opponent Rotation (× 10,000) - Avoid playing against the same person
-                    const individualOpponentCount = getIndividualOpponentHistory(teamA.map(p => p.id), teamB.map(p => p.id));
-                    penaltyScore += individualOpponentCount * 10000;
-
-                    // Skill Balance (× 500,000) - Most important: must be perfectly balanced
-                    const avgSkillA = teamA.reduce((s, p) => s + getSkillScore(p), 0) / teamA.length;
-                    const avgSkillB = teamB.reduce((s, p) => s + getSkillScore(p), 0) / teamB.length;
-                    const skillDiff = Math.abs(avgSkillA - avgSkillB);
-                    penaltyScore += skillDiff * 500000;
-                } else {
-                    // Single match (1v1)
-                    const opponentCount = getFaceoffCount([teamA[0].id], [teamB[0].id]);
-                    penaltyScore += opponentCount * 20000;
-                    
-                    const skillDiff = Math.abs(getSkillScore(teamA[0]) - getSkillScore(teamB[0]));
-                    penaltyScore += skillDiff * 500000;
-                }
-
-                evaluatedMatchups.push({ teamA, teamB, penaltyScore, isBlocked });
-            });
-        });
-
-        if (evaluatedMatchups.length === 0) {
-            showToast("ไม่สามารถสร้างชุดการจับคู่ได้ (รูปแบบทีมหรือผู้เล่นไม่รองรับ)", "error");
+        if ("error" in result) {
+            showToast(
+                result.error === "not-enough-players"
+                    ? "ผู้เล่นที่พร้อมจับคู่ไม่พอ (คู่หูบางคนอาจกำลังแข่งหรือพักอยู่)"
+                    : "ไม่สามารถจับคู่ได้ (จำนวนคนและรูปแบบทีมถาวรไม่ลงตัว)",
+                "error"
+            );
             return;
         }
-
-        // 4. HARD FILTER: Discard any pairing with blocked teammates whenever unblocked pairings exist
-        const unblocked = tournamentType === "double"
-            ? evaluatedMatchups.filter(m => !m.isBlocked)
-            : evaluatedMatchups;
-
-        const candidatePool = unblocked.length > 0 ? unblocked : evaluatedMatchups;
-
-        // 5. TIE BREAKING: Select from combinations with lowest Penalty Score (use random ONLY for tied fairest combinations)
-        const minPenalty = Math.min(...candidatePool.map(m => m.penaltyScore));
-        const bestCandidates = candidatePool.filter(m => Math.abs(m.penaltyScore - minPenalty) < 1e-4);
-        const bestPairing = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
+        const bestPairing = result;
 
         setPreviewMatch({ teamA: bestPairing.teamA, teamB: bestPairing.teamB });
         setTimeout(() => {

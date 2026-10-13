@@ -6,9 +6,11 @@ interface RankBadgeProps {
     stars?: number;
     showName?: boolean;
     size?: 'sm' | 'md' | 'lg';
+    /** Hide the star row when the stars are shown elsewhere */
+    showStars?: boolean;
 }
 
-const RankBadge: React.FC<RankBadgeProps> = ({ rank: initialRank, stars = 0, showName = true, size = 'md' }) => {
+const RankBadge: React.FC<RankBadgeProps> = ({ rank: initialRank, stars = 0, showName = true, size = 'md', showStars = true }) => {
     let rank = initialRank || "Bronze V";
     
     // Normalize rank string (e.g., Bronze 5 -> Bronze V)
@@ -130,7 +132,7 @@ const RankBadge: React.FC<RankBadgeProps> = ({ rank: initialRank, stars = 0, sho
             </div>
 
             {/* Stars Section */}
-            {rank !== 'Unranked' && rank !== 'None' && (
+            {showStars && rank !== 'Unranked' && rank !== 'None' && (
                 <div className="flex items-center justify-center min-h-[14px]">
                     {isMaster ? (
                         <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-950/60 border border-red-500/40 backdrop-blur-sm shadow-[0_0_10px_rgba(239,68,68,0.2)]">

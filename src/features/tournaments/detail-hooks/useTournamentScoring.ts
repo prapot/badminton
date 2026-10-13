@@ -26,8 +26,8 @@ export function useTournamentScoring({
         if (!jwt || !scoreEditing || savingScore) return;
 
         const result = await Swal.fire({
-            title: "ยืนยันการยกเลิกแมตซ์?",
-            text: "หากยกเลิกแล้ว แมตซ์นี้จะไม่ถูกนำมาคำนวณคะแนนและไม่สามารถกู้คืนได้ (ต้องสุ่มใหม่)",
+            title: "ยืนยันการยกเลิกแมตช์?",
+            text: "หากยกเลิกแล้ว แมตช์นี้จะไม่ถูกนำมาคำนวณคะแนนและไม่สามารถกู้คืนได้ (ต้องสุ่มใหม่)",
             icon: "warning",
             showCancelButton: true,
             confirmButtonText: "🚫 ยืนยันยกเลิก",
@@ -51,9 +51,9 @@ export function useTournamentScoring({
                     }
                 }),
             });
-            if (!res.ok) throw new Error("ยกเลิกแมตซ์ไม่สำเร็จ");
+            if (!res.ok) throw new Error("ยกเลิกแมตช์ไม่สำเร็จ");
 
-            showToast("ยกเลิกแมตซ์เรียบร้อย 🚫", "success");
+            showToast("ยกเลิกแมตช์เรียบร้อย 🚫", "success");
             setScoreEditing(null);
             refreshInfo();
         } catch (e: unknown) {

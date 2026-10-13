@@ -93,7 +93,7 @@ export function useTournamentActions({
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err?.error?.message || `HTTP ${res.status}`);
             }
-            showToast(matchOffset > 0 ? `เข้าร่วมสำเร็จ! เริ่มที่ ${matchOffset} แมตซ์ 🏸` : "เข้าร่วมสำเร็จ! 🏈", "success");
+            showToast(matchOffset > 0 ? `เข้าร่วมสำเร็จ! เริ่มที่ ${matchOffset} แมตช์ 🏸` : "เข้าร่วมสำเร็จ! 🏈", "success");
             refreshInfo();
         } catch (e: unknown) {
             showToast(e instanceof Error ? e.message : "เข้าร่วมไม่สำเร็จ", "error");
@@ -154,7 +154,7 @@ export function useTournamentActions({
 
         const result = await Swal.fire({
             title: "ยืนยันจบการแข่งขัน?",
-            html: `สถานะทัวร์นาเมนต์จะเปลี่ยนเป็น <b>จบการแข่งขัน</b>${unfinishedMatches.length > 0 ? `<br/><span style="color:#ef4444;font-size:12px">ตรวจพบ ${unfinishedMatches.length} แมตซ์ที่ยังไม่เสร็จ ซึ่งจะถูกยกเลิกทั้งหมด</span>` : ""}`,
+            html: `สถานะทัวร์นาเมนต์จะเปลี่ยนเป็น <b>จบการแข่งขัน</b>${unfinishedMatches.length > 0 ? `<br/><span style="color:#ef4444;font-size:12px">ตรวจพบ ${unfinishedMatches.length} แมตช์ที่ยังไม่เสร็จ ซึ่งจะถูกยกเลิกทั้งหมด</span>` : ""}`,
             icon: "warning",
             showCancelButton: true,
             confirmButtonText: "🏁 จบการแข่งขัน",

@@ -57,38 +57,38 @@ export default function TournamentHeader({
                         <h1 className="text-base sm:text-xl font-black text-white leading-tight">
                             {tournamentInfo.name}
                         </h1>
-                        <span className={`text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full border ${s.cls}`}>
+                        <span className={`text-[11px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full border ${s.cls}`}>
                             {s.label}
                         </span>
                     </div>
 
                     {/* Detail chips — wrap on mobile */}
                     <div className="flex flex-wrap gap-1.5 mt-2">
-                        <span className="text-[10px] sm:text-xs px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-[#2ecc71] font-bold">
+                        <span className="text-[11px] sm:text-xs px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-[#2ecc71] font-bold">
                             📅 {tournamentInfo.startDate
                                 ? new Date(tournamentInfo.startDate).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })
                                 : "ไม่ระบุวันที่"}
                         </span>
-                        <span className={`text-[10px] sm:text-xs px-2 py-1 rounded-lg border font-bold ${tournamentInfo.mode === "ranking"
+                        <span className={`text-[11px] sm:text-xs px-2 py-1 rounded-lg border font-bold ${tournamentInfo.mode === "ranking"
                             ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400"
                             : tournamentInfo.mode === "party"
                                 ? "bg-fuchsia-500/10 border-fuchsia-500/20 text-fuchsia-400"
                                 : "bg-blue-500/10 border-blue-500/20 text-blue-400"}`}>
                             {tournamentInfo.mode === "ranking" ? "🏆 Ranking" : tournamentInfo.mode === "party" ? "🎉 Party" : "🎮 Casual"}
                         </span>
-                        <span className="text-[10px] sm:text-xs px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300">
+                        <span className="text-[11px] sm:text-xs px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300">
                             {tournamentInfo.type === "single" ? "🏸 เดี่ยว" : "👥 คู่"}
                         </span>
-                        <span className="text-[10px] sm:text-xs px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300">
+                        <span className="text-[11px] sm:text-xs px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300">
                             {tournamentInfo.format === "round_robin" ? "🔄 พบกันหมด"
                                 : tournamentInfo.format === "knockout" ? "⚡ แพ้คัดออก"
                                     : tournamentInfo.format === "americano" ? "🌀 อเมริกาโน" : "♾️ ไร้สิ้นสุด"}
                         </span>
-                        <span className="text-[10px] sm:text-xs px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300">
+                        <span className="text-[11px] sm:text-xs px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300">
                             👥 {tournamentInfo.players.length} คน
                         </span>
                         {tournamentInfo.user_created?.username && (
-                            <span className="text-[10px] sm:text-xs px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-400">
+                            <span className="text-[11px] sm:text-xs px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-400">
                                 👤 {tournamentInfo.user_created.username}
                                 {tournamentInfo.user_created.nickname && ` (${tournamentInfo.user_created.nickname})`}
                             </span>
@@ -96,12 +96,12 @@ export default function TournamentHeader({
                         {/* Invite button */}
                         <button
                             onClick={() => setShowQR(true)}
-                            className="text-[10px] sm:text-xs px-2 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 active:scale-95 border border-blue-500/20 text-blue-400 font-bold transition-all flex items-center gap-1"
+                            className="text-[11px] sm:text-xs px-2 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 active:scale-95 border border-blue-500/20 text-blue-400 font-bold transition-all flex items-center gap-1"
                         >
                             🔗 เชิญเพื่อน
                         </button>
                         {/* ID — hidden on very small screens */}
-                        <span className="hidden xs:inline-flex text-[10px] px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-600">
+                        <span className="hidden xs:inline-flex text-[11px] px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-600">
                             🆔 {id}
                         </span>
                     </div>
@@ -116,8 +116,8 @@ export default function TournamentHeader({
                                 />
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="text-[10px] text-slate-500">
-                                    {done}/{total} แมตซ์ ({pct}%)
+                                <span className="text-[11px] text-slate-500">
+                                    {done}/{total} แมตช์ ({pct}%)
                                     {cancelled > 0 && <span className="ml-2 text-red-500/60">ยกเลิก {cancelled}</span>}
                                 </span>
                             </div>

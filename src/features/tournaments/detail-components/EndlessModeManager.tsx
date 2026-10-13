@@ -87,12 +87,12 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                         </div>
                         <div>
                             <h2 className="text-sm font-black text-white leading-tight">โหมดไร้สิ้นสุด</h2>
-                            <p className="text-[10px] text-slate-500 leading-tight">เน้นคนเล่นน้อยได้ลงก่อน</p>
+                            <p className="text-[11px] text-slate-500 leading-tight">เน้นคนเล่นน้อยได้ลงก่อน</p>
                         </div>
                     </div>
                     {/* Available count pill */}
                     <div className="flex flex-col items-end">
-                        <span className="text-[9px] text-slate-600 uppercase tracking-widest">พร้อมเล่น</span>
+                        <span className="text-[11px] text-slate-600 uppercase tracking-widest">พร้อมเล่น</span>
                         <span className="text-base font-black leading-tight">
                             <span className={availableCount === 0 ? "text-red-400" : "text-green-400"}>{availableCount}</span>
                             <span className="text-slate-600 text-xs font-normal">/{totalCount}</span>
@@ -129,13 +129,13 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                         <div className="mb-4 animate-in fade-in slide-in-from-top-4 duration-300">
                             <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-2xl overflow-hidden shadow-lg shadow-indigo-500/10">
                                 <div className="px-4 py-2.5 bg-indigo-500/20 border-b border-indigo-500/20 flex justify-between items-center">
-                                    <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">🏸 คู่แข่งขันถัดไป <span className="text-[9px] font-normal text-indigo-400 ml-2">(แตะ 2 ครั้งเพื่อสลับตัว)</span></span>
+                                    <span className="text-[11px] font-black text-indigo-300 uppercase tracking-widest">🏸 คู่แข่งขันถัดไป <span className="text-[11px] font-normal text-indigo-400 ml-2">(แตะ 2 ครั้งเพื่อสลับตัว)</span></span>
                                     <button onClick={() => { setPreviewMatch(null); setSelectedSwapPlayer(null); }} className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all active:scale-90">✕</button>
                                 </div>
                                 <div className="p-3 space-y-3">
                                     {/* Team A */}
                                     <div>
-                                        <div className="text-[9px] text-indigo-400 uppercase font-black mb-2 tracking-[0.2em] px-1">ทีม A</div>
+                                        <div className="text-[11px] text-indigo-400 uppercase font-black mb-2 tracking-[0.2em] px-1">ทีม A</div>
                                         <div className="space-y-2">
                                             {previewMatch.teamA.map(p => (
                                                 <div
@@ -178,8 +178,8 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                                                 <span className="text-sm font-bold text-white truncate">{p.username}</span>
                                                                 {p.skill_level && <SkillBadge skillLevel={p.skill_level} showLabel={false} />}
                                                             </div>
-                                                            {p.nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{p.nickname}</span>}
-                                                            <span className="text-[10px] text-slate-500 font-bold shrink-0">{actualPlayerCounts.get(p.id) || 0} แมตซ์</span>
+                                                            {p.nickname && <span className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{p.nickname}</span>}
+                                                            <span className="text-[11px] text-slate-500 font-bold shrink-0">{actualPlayerCounts.get(p.id) || 0} แมตช์</span>
                                                         </div>
                                                         <div className="mt-1 flex items-center gap-2">
                                                             {tournamentMode === 'ranking' && <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />}
@@ -202,7 +202,7 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
 
                                     {/* Team B */}
                                     <div>
-                                        <div className="text-[9px] text-indigo-400 uppercase font-black mb-2 tracking-[0.2em] px-1">ทีม B</div>
+                                        <div className="text-[11px] text-indigo-400 uppercase font-black mb-2 tracking-[0.2em] px-1">ทีม B</div>
                                         <div className="space-y-2">
                                             {previewMatch.teamB.map(p => (
                                                 <div
@@ -245,8 +245,8 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                                                 <span className="text-sm font-bold text-white truncate">{p.username}</span>
                                                                 {p.skill_level && <SkillBadge skillLevel={p.skill_level} showLabel={false} />}
                                                             </div>
-                                                            {p.nickname && <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{p.nickname}</span>}
-                                                            <span className="text-[10px] text-slate-500 font-bold shrink-0">{actualPlayerCounts.get(p.id) || 0} แมตซ์</span>
+                                                            {p.nickname && <span className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{p.nickname}</span>}
+                                                            <span className="text-[11px] text-slate-500 font-bold shrink-0">{actualPlayerCounts.get(p.id) || 0} แมตช์</span>
                                                         </div>
                                                         <div className="mt-1 flex items-center gap-2">
                                                             {tournamentMode === 'ranking' && <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} showName={true} size="sm" />}
@@ -288,10 +288,10 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                 className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-slate-400 hover:text-slate-200 transition-all active:scale-[0.98]"
                             >
                                 <span className="flex items-center gap-2">
-                                    <span className="text-[10px]">👥</span>
+                                    <span className="text-[11px]">👥</span>
                                     <span className="font-medium">ผู้เล่น {availablePlayers.length}/{players.length} ว่าง</span>
                                     {pausedPlayerIds.size > 0 && (
-                                        <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-yellow-500/20 text-yellow-400 font-bold">{pausedPlayerIds.size} พัก</span>
+                                        <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-yellow-500/20 text-yellow-400 font-bold">{pausedPlayerIds.size} พัก</span>
                                     )}
                                 </span>
                                 <span className={`transition-transform duration-200 ${showPlayerList ? "rotate-180" : ""}`}>▾</span>
@@ -324,13 +324,13 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                                                 <span>{p.username}</span>
                                                                 {p.skill_level && <SkillBadge skillLevel={p.skill_level} showLabel={false} />}
                                                             </div>
-                                                            {p.nickname && <span className="text-[9px] text-slate-400 font-medium truncate mt-0.5 leading-tight">{p.nickname}</span>}
+                                                            {p.nickname && <span className="text-[11px] text-slate-400 font-medium truncate mt-0.5 leading-tight">{p.nickname}</span>}
                                                         </div>
                                                     </span>
                                                     {tournamentMode === 'ranking' && <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} size="sm" showName={false} />}
-                                                    {isBusy && <span className="text-[9px] text-orange-400 font-bold shrink-0">แข่งอยู่</span>}
-                                                    {isPaused && !isBusy && <span className="text-[9px] text-yellow-500 font-bold shrink-0">พัก</span>}
-                                                    <span className="text-[10px] text-slate-600 shrink-0">{actualPlayerCounts.get(p.id) || 0}แมตซ์</span>
+                                                    {isBusy && <span className="text-[11px] text-orange-400 font-bold shrink-0">แข่งอยู่</span>}
+                                                    {isPaused && !isBusy && <span className="text-[11px] text-yellow-500 font-bold shrink-0">พัก</span>}
+                                                    <span className="text-[11px] text-slate-600 shrink-0">{actualPlayerCounts.get(p.id) || 0}แมตช์</span>
                                                     {!isBusy && (
                                                         <button
                                                             onClick={() => handleTogglePause(p as RegisteredPlayer)}
@@ -361,7 +361,7 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                             {drawing ? <>{spinnerSvg}<span>กำลังสุ่ม...</span></>
                                 : !jwt ? <span>🔒 เข้าสู่ระบบเพื่อสุ่ม</span>
                                     : availablePlayers.length < (tournamentType === "double" ? 4 : 2) ? <span>⏳ รอผู้เล่นว่าง...</span>
-                                        : <><span>🎲 สุ่มแมตซ์ถัดไป</span></>}
+                                        : <><span>🎲 สุ่มแมตช์ถัดไป</span></>}
                         </button>
                     )}
 
@@ -376,8 +376,8 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                     className={`p-3 sm:p-4 rounded-2xl border-2 transition-all cursor-pointer ${activeManualTeam === "A" ? "bg-indigo-500/10 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.2)]" : "bg-black/20 border-white/5 hover:border-white/10 hover:bg-white/[0.02]"}`}
                                 >
                                     <div className="flex justify-between items-center mb-3">
-                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${activeManualTeam === "A" ? "bg-indigo-500/20 text-indigo-400" : "bg-white/5 text-slate-500"}`}>ทีม A</span>
-                                        <span className={`text-[10px] font-bold ${manualTeamA.length === playersPerTeam ? "text-indigo-400" : "text-slate-500"}`}>{manualTeamA.length}/{playersPerTeam}</span>
+                                        <span className={`text-[11px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${activeManualTeam === "A" ? "bg-indigo-500/20 text-indigo-400" : "bg-white/5 text-slate-500"}`}>ทีม A</span>
+                                        <span className={`text-[11px] font-bold ${manualTeamA.length === playersPerTeam ? "text-indigo-400" : "text-slate-500"}`}>{manualTeamA.length}/{playersPerTeam}</span>
                                     </div>
                                     <div className="grid grid-cols-1 gap-2">
                                         {Array.from({ length: playersPerTeam }).map((_, i) => {
@@ -387,14 +387,14 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                                     {p ? (
                                                         <div className="flex items-center gap-2 min-w-0">
                                                             <div className="hidden sm:flex w-6 h-6 rounded-full bg-slate-800 border border-indigo-500/30 items-center justify-center shrink-0">
-                                                                <span className="text-[9px] font-bold text-indigo-400">{p.username.charAt(0).toUpperCase()}</span>
+                                                                <span className="text-[11px] font-bold text-indigo-400">{p.username.charAt(0).toUpperCase()}</span>
                                                             </div>
                                                             <div className="flex flex-col min-w-0">
                                                                 <span className="font-bold text-indigo-300 text-xs sm:text-sm truncate block">{p.username}</span>
                                                             </div>
                                                         </div>
                                                     ) : (
-                                                        <span className="text-[9px] uppercase tracking-wider text-slate-500">เลือกคนที่ {i+1}</span>
+                                                        <span className="text-[11px] uppercase tracking-wider text-slate-500">เลือกคนที่ {i+1}</span>
                                                     )}
                                                     {p && <button onClick={(e) => { e.stopPropagation(); setManualTeamA(manualTeamA.filter(x => x.id !== p.id)); }} className="w-6 h-6 rounded-full hover:bg-red-500/20 text-red-400/50 hover:text-red-400 flex items-center justify-center text-xs transition-colors shrink-0">✕</button>}
                                                 </div>
@@ -405,7 +405,7 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
 
                                 {/* VS Divider for Desktop (Hidden on mobile) */}
                                 <div className="hidden sm:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-900 border border-white/10 items-center justify-center z-10 shadow-lg shadow-black/50">
-                                    <span className="text-[9px] font-black text-slate-500 italic">VS</span>
+                                    <span className="text-[11px] font-black text-slate-500 italic">VS</span>
                                 </div>
 
                                 {/* Team B */}
@@ -414,8 +414,8 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                     className={`p-3 sm:p-4 rounded-2xl border-2 transition-all cursor-pointer ${activeManualTeam === "B" ? "bg-rose-500/10 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]" : "bg-black/20 border-white/5 hover:border-white/10 hover:bg-white/[0.02]"}`}
                                 >
                                     <div className="flex justify-between items-center mb-3">
-                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${activeManualTeam === "B" ? "bg-rose-500/20 text-rose-400" : "bg-white/5 text-slate-500"}`}>ทีม B</span>
-                                        <span className={`text-[10px] font-bold ${manualTeamB.length === playersPerTeam ? "text-rose-400" : "text-slate-500"}`}>{manualTeamB.length}/{playersPerTeam}</span>
+                                        <span className={`text-[11px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${activeManualTeam === "B" ? "bg-rose-500/20 text-rose-400" : "bg-white/5 text-slate-500"}`}>ทีม B</span>
+                                        <span className={`text-[11px] font-bold ${manualTeamB.length === playersPerTeam ? "text-rose-400" : "text-slate-500"}`}>{manualTeamB.length}/{playersPerTeam}</span>
                                     </div>
                                     <div className="grid grid-cols-1 gap-2">
                                         {Array.from({ length: playersPerTeam }).map((_, i) => {
@@ -425,14 +425,14 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                                     {p ? (
                                                         <div className="flex items-center gap-2 min-w-0">
                                                             <div className="hidden sm:flex w-6 h-6 rounded-full bg-slate-800 border border-rose-500/30 items-center justify-center shrink-0">
-                                                                <span className="text-[9px] font-bold text-rose-400">{p.username.charAt(0).toUpperCase()}</span>
+                                                                <span className="text-[11px] font-bold text-rose-400">{p.username.charAt(0).toUpperCase()}</span>
                                                             </div>
                                                             <div className="flex flex-col min-w-0">
                                                                 <span className="font-bold text-rose-300 text-xs sm:text-sm truncate block">{p.username}</span>
                                                             </div>
                                                         </div>
                                                     ) : (
-                                                        <span className="text-[9px] uppercase tracking-wider text-slate-500">เลือกคนที่ {i+1}</span>
+                                                        <span className="text-[11px] uppercase tracking-wider text-slate-500">เลือกคนที่ {i+1}</span>
                                                     )}
                                                     {p && <button onClick={(e) => { e.stopPropagation(); setManualTeamB(manualTeamB.filter(x => x.id !== p.id)); }} className="w-6 h-6 rounded-full hover:bg-red-500/20 text-red-400/50 hover:text-red-400 flex items-center justify-center text-xs transition-colors shrink-0">✕</button>}
                                                 </div>
@@ -460,7 +460,7 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                         <span className="text-lg">👥</span>
                                         <span>เลือกผู้เล่นเข้า {activeManualTeam === "A" ? <span className="text-indigo-400 bg-indigo-500/20 px-1.5 py-0.5 rounded">ทีม A</span> : <span className="text-rose-400 bg-rose-500/20 px-1.5 py-0.5 rounded">ทีม B</span>}</span>
                                     </div>
-                                    <span className="text-slate-500 text-[10px] font-normal px-2 py-1 bg-white/5 rounded-lg">{availablePlayers.length} ว่าง</span>
+                                    <span className="text-slate-500 text-[11px] font-normal px-2 py-1 bg-white/5 rounded-lg">{availablePlayers.length} ว่าง</span>
                                 </div>
                                 <div className="space-y-2 sm:space-y-0 sm:grid sm:grid-cols-2 gap-2 max-h-[250px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                                     {[...availablePlayers]
@@ -487,15 +487,15 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                                             {p.skill_level && <div className="shrink-0"><SkillBadge skillLevel={p.skill_level} showLabel={false} /></div>}
                                                         </div>
                                                         <div className="flex items-center gap-2 mt-1">
-                                                            <div className="text-[10px] text-slate-500 bg-white/5 px-1.5 py-0.5 rounded flex items-center gap-1"><span className="text-[8px]">⚔️</span> {actualPlayerCounts.get(p.id) || 0}</div>
-                                                            {p.nickname && <div className="text-[9px] text-slate-400 font-medium truncate">{p.nickname}</div>}
+                                                            <div className="text-[11px] text-slate-500 bg-white/5 px-1.5 py-0.5 rounded flex items-center gap-1"><span className="text-[11px]">⚔️</span> {actualPlayerCounts.get(p.id) || 0}</div>
+                                                            {p.nickname && <div className="text-[11px] text-slate-400 font-medium truncate">{p.nickname}</div>}
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
                                                         {tournamentMode === 'ranking' && <RankBadge rank={p.rankings?.[0]?.rank} stars={p.rankings?.[0]?.stars} size="sm" showName={false} />}
-                                                        {isSelected && <span className={`text-[9px] font-black px-2 py-1 rounded-lg ${isInTeamA ? "text-indigo-300 bg-indigo-500/20" : "text-rose-300 bg-rose-500/20"}`}>{isInTeamA ? "ทีม A" : "ทีม B"}</span>}
+                                                        {isSelected && <span className={`text-[11px] font-black px-2 py-1 rounded-lg ${isInTeamA ? "text-indigo-300 bg-indigo-500/20" : "text-rose-300 bg-rose-500/20"}`}>{isInTeamA ? "ทีม A" : "ทีม B"}</span>}
                                                         {!isSelected && <div className="w-5 h-5 rounded-full border border-white/10 flex items-center justify-center text-slate-500 group-hover:text-white group-hover:border-white/30 transition-colors">
-                                                            <span className="text-[10px]">➕</span>
+                                                            <span className="text-[11px]">➕</span>
                                                         </div>}
                                                     </div>
                                                 </button>
@@ -515,8 +515,8 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                     {permanentTeams.length > 0 && (
                         <div className="px-4 pt-2 pb-3">
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">ทีมถาวร</span>
-                                <span className="text-[10px] text-slate-600">{permanentTeams.length} ทีม</span>
+                                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">ทีมถาวร</span>
+                                <span className="text-[11px] text-slate-600">{permanentTeams.length} ทีม</span>
                             </div>
                             <div className="space-y-1.5">
                                 {[...permanentTeams]
@@ -539,14 +539,14 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
 
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <span className={`text-[10px] font-bold ${isEditing ? "text-amber-400" : color.text}`}>
+                                                        <span className={`text-[11px] font-bold ${isEditing ? "text-amber-400" : color.text}`}>
                                                             {team.label}
                                                         </span>
                                                         {isBusy && (
-                                                            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-orange-500/20 text-orange-400 font-bold">แข่งอยู่</span>
+                                                            <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-orange-500/20 text-orange-400 font-bold">แข่งอยู่</span>
                                                         )}
                                                         {isEditing && (
-                                                            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold">กำลังแก้ไข</span>
+                                                            <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold">กำลังแก้ไข</span>
                                                         )}
                                                     </div>
                                                     <div className="mt-2 space-y-1.5">
@@ -557,13 +557,13 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                                                     <span className="text-[11px] font-bold text-white truncate">{p.username}</span>
                                                                     {p.skill_level && <SkillBadge skillLevel={p.skill_level} showLabel={false} />}
                                                                 </div>
-                                                                {p.nickname && <span className="text-[9px] text-slate-400 font-medium truncate mt-0.5">{p.nickname}</span>}
+                                                                {p.nickname && <span className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{p.nickname}</span>}
                                                             </div>
                                                         ))}
                                                     </div>
                                                 </div>
 
-                                                <span className="text-[10px] text-slate-600 shrink-0">{matchCount}แมตซ์</span>
+                                                <span className="text-[11px] text-slate-600 shrink-0">{matchCount}แมตช์</span>
 
                                                 <div className="flex gap-0.5 shrink-0">
                                                     <button
@@ -628,19 +628,19 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                         {p ? (
                                             <div className="flex items-center gap-2 min-w-0">
                                                 <div className="hidden sm:flex w-7 h-7 rounded-full bg-slate-800 border border-amber-500/30 items-center justify-center shrink-0">
-                                                    <span className="text-[10px] font-bold text-amber-400">{p.username.charAt(0).toUpperCase()}</span>
+                                                    <span className="text-[11px] font-bold text-amber-400">{p.username.charAt(0).toUpperCase()}</span>
                                                 </div>
                                                 <div className="flex flex-col min-w-0">
                                                     <span className="font-bold text-amber-300 text-xs sm:text-sm truncate block">{p.username}</span>
-                                                    {p.skill_level && <span className="text-[9px] text-amber-500/80">{p.skill_level}</span>}
+                                                    {p.skill_level && <span className="text-[11px] text-amber-500/80">{p.skill_level}</span>}
                                                 </div>
                                             </div>
                                         ) : (
                                             <div className="flex items-center gap-2">
                                                 <div className="hidden sm:flex w-7 h-7 rounded-full bg-white/5 border border-dashed border-white/10 items-center justify-center">
-                                                    <span className="text-[10px] text-slate-600">?</span>
+                                                    <span className="text-[11px] text-slate-600">?</span>
                                                 </div>
-                                                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500">เลือกคนที่ {i+1}</span>
+                                                <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-500">เลือกคนที่ {i+1}</span>
                                             </div>
                                         )}
                                         {p && (
@@ -687,15 +687,15 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                                 ? "border-slate-600 bg-slate-800"
                                                 : "border-slate-500 group-hover:border-slate-400"
                                             }`}>
-                                            {isSelected && <span className="text-[10px] text-black font-black leading-none">✓</span>}
-                                            {isAssigned && <span className="text-[8px] text-slate-500 leading-none">🔒</span>}
+                                            {isSelected && <span className="text-[11px] text-black font-black leading-none">✓</span>}
+                                            {isAssigned && <span className="text-[11px] text-slate-500 leading-none">🔒</span>}
                                         </div>
 
                                         <div className="flex-1 flex flex-col items-start min-w-0">
                                             <div className="flex items-center gap-1.5 min-w-0 w-full">
                                                 <span className={`text-xs sm:text-sm font-bold truncate ${isSelected ? 'text-amber-300' : 'text-slate-200'}`}>{p.username}</span>
                                                 {p.skill_level && <div className="shrink-0"><SkillBadge skillLevel={p.skill_level} showLabel={false} /></div>}
-                                                {isBusy && <span className="text-[8px] font-black uppercase bg-orange-500/20 text-orange-400 px-1 rounded shrink-0">แข่งอยู่</span>}
+                                                {isBusy && <span className="text-[11px] font-black uppercase bg-orange-500/20 text-orange-400 px-1 rounded shrink-0">แข่งอยู่</span>}
                                             </div>
                                         </div>
 
@@ -707,7 +707,7 @@ export default function EndlessModeManager(props: UseEndlessModeManagerProps) {
                                                 }
                                             }}
                                             role="button"
-                                            className={`text-[10px] font-bold px-2 py-1 rounded-lg shrink-0 cursor-pointer flex items-center gap-1 ${canManage ? "bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20" : "bg-white/5 text-slate-500"}`}
+                                            className={`text-[11px] font-bold px-2 py-1 rounded-lg shrink-0 cursor-pointer flex items-center gap-1 ${canManage ? "bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20" : "bg-white/5 text-slate-500"}`}
                                             title={canManage ? "ปรับจำนวนแมตช์" : undefined}
                                         >
                                             {actualPlayerCounts.get(p.id) || 0} ⚔️

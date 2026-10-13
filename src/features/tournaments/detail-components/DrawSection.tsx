@@ -152,7 +152,7 @@ const DrawSection: React.FC<DrawSectionProps> = ({
                                     const minRounds = lcm(pCount, pPerMatch) / pCount;
                                     const totalRounds = minRounds * roundsPerPlayer;
                                     const totalMatches = (pCount * totalRounds) / pPerMatch;
-                                    return `ผู้เล่น ${pCount} คน x คนละ ${totalRounds} รอบ → รวม ${totalMatches} แมตซ์`;
+                                    return `ผู้เล่น ${pCount} คน x คนละ ${totalRounds} รอบ → รวม ${totalMatches} แมตช์`;
                                 })()}
                             </p>
                         </div>
@@ -275,7 +275,7 @@ const DrawSection: React.FC<DrawSectionProps> = ({
                     <div className="w-full bg-indigo-500/5 border border-indigo-500/10 rounded-2xl p-6 text-center">
                         <div className="w-12 h-12 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">♾️</div>
                         <h3 className="text-white font-bold mb-1">ยินดีต้อนรับสู่โหมดไร้สิ้นสุด</h3>
-                        <p className="text-xs text-slate-400 mb-6">โหมดนี้จะเริ่มการแข่งโดยไม่ต้องสุ่มคู่ล่วงหน้าทั้งรายการ<br />ระบบจะสุ่มแมตซ์แรกให้ และคุณสามารถจัดคู่ถัดไปได้เรื่อยๆ</p>
+                        <p className="text-xs text-slate-400 mb-6">โหมดนี้จะเริ่มการแข่งโดยไม่ต้องสุ่มคู่ล่วงหน้าทั้งรายการ<br />ระบบจะสุ่มแมตช์แรกให้ และคุณสามารถจัดคู่ถัดไปได้เรื่อยๆ</p>
                         <button
                             onClick={handleStartTournament}
                             disabled={starting}

@@ -660,7 +660,7 @@ export function useEndlessModeManager({
             }, 300);
         } catch (e: any) {
             await Swal.fire({
-                title: "ไม่สามารถสร้างแมตซ์ได้",
+                title: "ไม่สามารถสร้างแมตช์ได้",
                 text: e.message || "เกิดข้อผิดพลาด",
                 icon: "warning",
                 confirmButtonColor: "#6366f1"

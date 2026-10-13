@@ -119,7 +119,7 @@ export default function EndlessStatsBoard({
                         </div>
                         <div>
                             <h2 className="text-sm font-black text-white leading-tight">สถิติประจำวัน</h2>
-                            <p className="text-[10px] text-slate-500 leading-tight">จัดอันดับตามจำนวนชนะและเปอร์เซ็นต์ชนะ</p>
+                            <p className="text-[11px] text-slate-500 leading-tight">จัดอันดับตามจำนวนชนะและเปอร์เซ็นต์ชนะ</p>
                         </div>
                     </div>
                 </div>
@@ -128,7 +128,7 @@ export default function EndlessStatsBoard({
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-white/5 text-[10px] text-slate-400 uppercase tracking-wider">
+                            <tr className="bg-white/5 text-[11px] text-slate-400 uppercase tracking-wider">
                                 <th className="px-4 py-2 font-black">อันดับ</th>
                                 <th className="px-4 py-2 font-black">ผู้เล่น</th>
                                 <th className="px-4 py-2 text-center font-black">แข่ง</th>
@@ -162,7 +162,7 @@ export default function EndlessStatsBoard({
                                                     <span className={`font-bold truncate max-w-[120px] sm:max-w-[150px] ${isTop3 ? 'text-white' : 'text-slate-300'}`}>{s.username}</span>
                                                     {s.skill_level && <div className="shrink-0"><SkillBadge skillLevel={s.skill_level} showLabel={false} /></div>}
                                                 </div>
-                                                {s.nickname && <span className="text-[10px] text-slate-500 truncate max-w-[150px]">{s.nickname}</span>}
+                                                {s.nickname && <span className="text-[11px] text-slate-500 truncate max-w-[150px]">{s.nickname}</span>}
                                                 {tournamentMode === 'ranking' && s.rank && <RankBadge rank={s.rank} stars={s.stars} showName={true} size="sm" />}
                                             </div>
                                         </td>

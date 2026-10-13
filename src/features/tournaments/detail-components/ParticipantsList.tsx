@@ -200,26 +200,26 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
     return (
         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
             {/* Header row */}
-            <div className="px-4 py-3 border-b border-white/8 flex items-center justify-between gap-2">
-                <h2 className="font-semibold text-white flex items-center gap-1.5 text-sm">
+            <div className="px-4 py-3 border-b border-white/8 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <h2 className="font-semibold text-white flex items-center gap-1.5 text-base whitespace-nowrap">
                     <span>👥</span> ผู้เข้าร่วม
-                    <span className="text-xs text-slate-400 font-normal">{tournamentInfo.players.length} คน</span>
+                    <span className="text-sm text-slate-400 font-normal">{tournamentInfo.players.length} คน</span>
                 </h2>
 
-                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                <div className="flex items-center gap-2 flex-wrap sm:justify-end">
                     {drawnPairs && tournamentInfo.tournament_status === 'upcoming' && (
-                        <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-bold">
-                            🎾 {drawnPairs.length} แมตซ์
+                        <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[11px] font-bold">
+                            🎾 {drawnPairs.length} แมตช์
                         </div>
                     )}
 
                     {canJoinLeave && (
                         isJoined ? (
-                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 {/* Block partner preference (only visible to joined player) */}
                                 <button
                                     onClick={() => setShowBlockedModal(true)}
-                                    className={`min-h-[36px] flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all active:scale-95 ${
+                                    className={`min-h-11 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all active:scale-95 ${
                                         blockedPartner
                                             ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
                                             : 'bg-white/5 border-white/10 text-slate-300 hover:text-white hover:bg-white/10'
@@ -234,7 +234,7 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                                 {/* Pause self */}
                                 <button
                                     onClick={() => myPlayerEntry && handleTogglePause(myPlayerEntry)}
-                                    className={`min-h-[36px] px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all active:scale-95 ${pausedPlayerIds.has(myPlayerEntry?.id || 0)
+                                    className={`min-h-11 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all active:scale-95 ${pausedPlayerIds.has(myPlayerEntry?.id || 0)
                                         ? 'bg-green-500/10 border-green-500/20 text-green-400'
                                         : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'}`}
                                 >
@@ -243,7 +243,7 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                                 <button
                                     onClick={handleLeave}
                                     disabled={leaving}
-                                    className="min-h-[36px] flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
+                                    className="min-h-11 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
                                 >
                                     {leaving ? spinnerSvg : "🚶"} ออก
                                 </button>
@@ -252,7 +252,7 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                             <button
                                 onClick={handleJoin}
                                 disabled={joining}
-                                className="min-h-[36px] flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/20 text-blue-400 text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
+                                className="min-h-11 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/20 text-blue-400 text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
                             >
                                 {joining ? spinnerSvg
                                     : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>}
@@ -278,7 +278,7 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                         <button
                             type="submit"
                             disabled={addingGuest || !guestName.trim()}
-                            className="min-h-[36px] px-4 py-1.5 rounded-lg bg-fuchsia-500/20 border border-fuchsia-500/30 text-fuchsia-300 text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+                            className="min-h-11 px-4 py-1.5 rounded-lg bg-fuchsia-500/20 border border-fuchsia-500/30 text-fuchsia-300 text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
                         >
                             {addingGuest ? spinnerSvg : "เพิ่มชื่อ"}
                         </button>
@@ -334,7 +334,7 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                         return (
                             <li key={player.id} className={`flex items-center gap-3 px-4 py-3 ${isPaused ? "opacity-60" : ""}`}>
                                 {/* Index */}
-                                <span className="w-5 text-center text-[10px] text-slate-600 shrink-0">{idx + 1}</span>
+                                <span className="hidden sm:block w-5 text-center text-[11px] text-slate-600 shrink-0">{idx + 1}</span>
 
                                 {/* Avatar */}
                                 <div
@@ -353,10 +353,10 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                                     onClick={() => router.push(`/history/${player.id}`)}
                                     className="flex-1 min-w-0 cursor-pointer"
                                 >
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                        <div className="flex flex-col">
-                                            <div className="flex items-center">
-                                                <p className="text-sm font-bold text-white truncate">{player.username}</p>
+                                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                        <div className="flex flex-col min-w-0 max-w-full">
+                                            <div className="flex items-center flex-wrap gap-y-1 min-w-0">
+                                                <p className="text-sm font-bold text-white truncate max-w-full">{player.username}</p>
                                                 {player.skill_level ? (
                                                     <div 
                                                         onClick={(e) => { e.stopPropagation(); if (canManagePlayer) handleChangeSkill(player); }}
@@ -368,19 +368,19 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                                                 ) : canManagePlayer ? (
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleChangeSkill(player); }}
-                                                        className="ml-2 px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[9px] font-bold hover:bg-blue-500/20 transition-colors"
+                                                        className="ml-2 whitespace-nowrap px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[11px] font-bold hover:bg-blue-500/20 transition-colors"
                                                     >
                                                         + ระดับมือ
                                                     </button>
                                                 ) : null}
                                             </div>
-                                            {player.nickname && <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{player.nickname}</p>}
+                                            {player.nickname && <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{player.nickname}</p>}
                                         </div>
                                         {isPaused && (
-                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 font-bold shrink-0">⏸ พัก</span>
+                                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 font-bold shrink-0">⏸ พัก</span>
                                         )}
                                         {matchCount > 0 && (
-                                            <span className={`text-[9px] px-1.5 py-0.5 rounded border font-bold shrink-0 ${tournamentInfo.tournament_status === 'upcoming'
+                                            <span className={`text-[11px] px-1.5 py-0.5 rounded border font-bold shrink-0 ${tournamentInfo.tournament_status === 'upcoming'
                                                 ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'
                                                 : 'bg-blue-500/10 border-blue-500/20 text-blue-400'}`}>
                                                 🏸 {matchCount}
@@ -397,7 +397,7 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                                                 size="sm"
                                             />
                                             <div className="flex flex-col">
-                                                <div className="flex items-center gap-1 text-[8px] text-slate-400 font-medium">
+                                                <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
                                                     <span className="text-green-400">W{player.rankings?.[0]?.win ?? 0}</span>
                                                     <span className="text-red-400">L{player.rankings?.[0]?.lose ?? 0}</span>
                                                     {(player.rankings?.[0]?.win_streak ?? 0) > 0 && (
@@ -409,8 +409,8 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                                     )}
                                     {tournamentInfo.mode === "party" && (
                                         <div className="flex items-center gap-2 mt-1.5">
-                                            <span className="px-2 py-0.5 rounded bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-400 text-[10px] font-bold">🎉 Party</span>
-                                            <div className="flex items-center gap-1 text-[8px] text-slate-400 font-medium">
+                                            <span className="px-2 py-0.5 rounded bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-400 text-[11px] font-bold">🎉 Party</span>
+                                            <div className="flex items-center gap-1 text-[11px] text-slate-400 font-medium">
                                                 <span className="text-green-400">W{localStats[player.id]?.win ?? 0}</span>
                                                 <span className="text-red-400">L{localStats[player.id]?.lose ?? 0}</span>
                                             </div>
@@ -420,10 +420,11 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
 
                                 {/* Action buttons */}
                                 {canManagePlayer && (
-                                    <div className="flex items-center gap-1 shrink-0">
+                                    <div className="flex items-center gap-2.5 shrink-0">
                                         <button
                                             onClick={() => handleTogglePause(player)}
-                                            className={`w-8 h-8 rounded-lg border text-xs font-bold transition-all active:scale-90 flex items-center justify-center ${isPaused
+                                            aria-label={isPaused ? `ให้ ${player.username} เล่นต่อ` : `พัก ${player.username}`}
+                                            className={`w-11 h-11 rounded-xl border text-sm font-bold transition-all active:scale-90 flex items-center justify-center ${isPaused
                                                 ? 'bg-green-500/10 border-green-500/20 text-green-400'
                                                 : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'}`}
                                         >
@@ -457,7 +458,8 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                                                         }
                                                     }
                                                 }}
-                                                className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs transition-all active:scale-90 flex items-center justify-center"
+                                                aria-label={`ลบ ${player.username} ออกจากทัวร์นาเมนต์`}
+                                                className="w-11 h-11 rounded-xl bg-transparent border border-red-500/20 text-red-400/80 text-sm transition-all active:scale-90 flex items-center justify-center"
                                             >
                                                 ✕
                                             </button>
@@ -465,7 +467,8 @@ const ParticipantsList: React.FC<ParticipantsListProps> = ({
                                             <button
                                                 onClick={handleLeave}
                                                 disabled={leaving}
-                                                className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs transition-all active:scale-90 flex items-center justify-center disabled:opacity-50"
+                                                aria-label="ออกจากทัวร์นาเมนต์"
+                                                className="w-11 h-11 rounded-xl bg-transparent border border-red-500/20 text-red-400/80 text-sm transition-all active:scale-90 flex items-center justify-center disabled:opacity-50"
                                             >
                                                 🚶
                                             </button>

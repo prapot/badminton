@@ -250,7 +250,7 @@ export function useTournamentDraw({
             title: isEndless ? "เริ่มโหมดไร้สิ้นสุด?" : "ยืนยันเริ่มการแข่งขัน?",
             html: isEndless
                 ? `จะเริ่มรายการและเปลี่ยนสถานะเป็น <b>กำลังแข่ง</b><br/><span style="color:#6366f1;font-size:12px">คุณสามารถเริ่มจัดคู่แข่งขันได้จากเมนูจัดการคิว</span>`
-                : `จะสร้าง <b>${matchesToCreate.length} แมตซ์</b> และเปลี่ยนสถานะเป็น <b>กำลังแข่ง</b><br/><span style="color:#ef4444;font-size:12px">ไม่สามารถย้อนกลับได้</span>`,
+                : `จะสร้าง <b>${matchesToCreate.length} แมตช์</b> และเปลี่ยนสถานะเป็น <b>กำลังแข่ง</b><br/><span style="color:#ef4444;font-size:12px">ไม่สามารถย้อนกลับได้</span>`,
             icon: "warning",
             showCancelButton: true,
             confirmButtonText: "🏆 เริ่มเลย!",
@@ -266,7 +266,7 @@ export function useTournamentDraw({
         const randTeamNo = () => Math.random().toString(36).substring(2, 10).toUpperCase();
 
         try {
-            setStartStep("เตรียมทีมและแมตซ์...");
+            setStartStep("เตรียมทีมและแมตช์...");
             const teamIds: { teamA: string; teamB: string | null }[] = [];
             const batchSize = 10;
 

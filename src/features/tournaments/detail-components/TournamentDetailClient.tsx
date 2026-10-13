@@ -46,7 +46,8 @@ export function TournamentDetailClient({ id }: { id: string }) {
     const router = useRouter();
     const { user, jwt } = useAuth();
     const [showQR, setShowQR] = useState(false);
-    const [showEndlessStats, setShowEndlessStats] = useState(false);
+    // Once play starts, the page is split into tabs so the matches aren't buried under the player list
+    const [tab, setTab] = useState<"matches" | "players" | "stats">("matches");
 
     // --- Hooks ---
     const { toast, showToast } = useTournamentToast();
@@ -105,6 +106,14 @@ export function TournamentDetailClient({ id }: { id: string }) {
     const cancelled = apiMatches.filter(m => m.match_status === "cancelled").length;
 
     const isOwner = !!user?.id && Number(tournamentInfo?.user_created?.id) === Number(user?.id);
+    const useTabs = !!tournamentInfo && tournamentInfo.tournament_status !== "upcoming";
+    const hasStatsTab = tournamentInfo?.format === "endless_mode";
+    const activeTab = !useTabs ? null : (tab === "stats" && !hasStatsTab ? "matches" : tab);
+    const show = (t: "matches" | "players" | "stats") => !useTabs || activeTab === t;
+    const myLiveMatches = apiMatches.filter(m =>
+        m.match_status !== "done" && m.match_status !== "cancelled" &&
+        [m.team_a_id, m.team_b_id].some(t => t?.team_players?.some(tp => tp.user_id?.id === user?.id))
+    ).length;
 
     return (
         <div className="min-h-screen bg-[#0f1923] text-slate-100 font-sans selection:bg-[#2ecc71]/30">
@@ -206,9 +215,47 @@ export function TournamentDetailClient({ id }: { id: string }) {
                             cancelled={cancelled}
                         />
 
+                        {useTabs && (
+                            <div className="sticky top-16 z-40 -mx-3 sm:mx-0 px-3 sm:px-0 py-2 bg-[#0f1923]/90 backdrop-blur-xl">
+                                <div role="tablist" className="grid grid-flow-col auto-cols-fr gap-1 p-1 rounded-2xl bg-white/5 border border-white/10">
+                                    {([
+                                        { key: "matches", label: "🏸 แมตช์", badge: myLiveMatches > 0 ? "ถึงคิวคุณ" : String(total) },
+                                        { key: "players", label: "👥 ผู้เล่น", badge: String(tournamentInfo.players.length) },
+                                        ...(hasStatsTab ? [{ key: "stats", label: "🏆 สถิติ", badge: "" }] : []),
+                                    ] as const).map(t => (
+                                        <button
+                                            key={t.key}
+                                            role="tab"
+                                            aria-selected={activeTab === t.key}
+                                            onClick={() => {
+                                                setTab(t.key as typeof tab);
+                                                // "ถึงคิวคุณ" → jump straight to my match card once the tab has rendered
+                                                if (t.key === "matches" && myLiveMatches > 0) {
+                                                    setTimeout(() => document.getElementById("my-live-match")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                                                } else {
+                                                    window.scrollTo({ top: 0, behavior: "smooth" });
+                                                }
+                                            }}
+                                            className={`min-h-11 px-2 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${activeTab === t.key
+                                                ? "bg-white/10 text-white shadow-inner"
+                                                : "text-slate-400 hover:text-white"
+                                                }`}
+                                        >
+                                            <span className="whitespace-nowrap">{t.label}</span>
+                                            {t.badge && (
+                                                <span className={`text-[11px] px-1.5 py-px rounded-full whitespace-nowrap ${t.badge === "ถึงคิวคุณ" ? "bg-amber-500/20 text-amber-300" : "bg-white/10 text-slate-300"}`}>
+                                                    {t.badge}
+                                                </span>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {tournamentInfo && (
                             <>
-                                <ParticipantsList
+                                {show("players") && <ParticipantsList
                                     tournamentId={id as string}
                                     tournamentInfo={tournamentInfo}
                                     user={user}
@@ -227,9 +274,9 @@ export function TournamentDetailClient({ id }: { id: string }) {
                                     router={router}
                                     pausedPlayerIds={pausedPlayerIds}
                                     setPausedPlayerIds={setPausedPlayerIds}
-                                />
+                                />}
 
-                                {tournamentInfo.format !== "knockout" && (
+                                {show("matches") && tournamentInfo.format !== "knockout" && (
                                     <DrawSection
                                         tournamentInfo={tournamentInfo}
                                         user={user}
@@ -253,33 +300,15 @@ export function TournamentDetailClient({ id }: { id: string }) {
                             </>
                         )}
 
-                        {tournamentInfo?.tournament_status !== "upcoming" &&
-                            tournamentInfo?.format === "endless_mode" && (
-                                <div className="mb-4">
-                                    <button
-                                        onClick={() => setShowEndlessStats(!showEndlessStats)}
-                                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 text-purple-400 font-bold transition-all active:scale-[0.98]"
-                                    >
-                                        <span>🏆</span>
-                                        <span>{showEndlessStats ? "ซ่อนสถิติประจำวัน" : "เปิดดูสถิติประจำวัน"}</span>
-                                        <span className="text-xs opacity-70">
-                                            {showEndlessStats ? "▲" : "▼"}
-                                        </span>
-                                    </button>
+                        {activeTab === "stats" && hasStatsTab && (
+                            <EndlessStatsBoard
+                                players={tournamentInfo.players}
+                                apiMatches={apiMatches}
+                                tournamentMode={tournamentInfo.mode}
+                            />
+                        )}
 
-                                    {showEndlessStats && (
-                                        <div className="mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                                            <EndlessStatsBoard
-                                                players={tournamentInfo.players}
-                                                apiMatches={apiMatches}
-                                                tournamentMode={tournamentInfo.mode}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                        {tournamentInfo?.tournament_status === "ongoing" &&
+                        {show("matches") && tournamentInfo?.tournament_status === "ongoing" &&
                             tournamentInfo?.format === "endless_mode" && (
                                 <EndlessModeManager
                                     tournamentId={id as string}
@@ -301,7 +330,7 @@ export function TournamentDetailClient({ id }: { id: string }) {
                                 />
                             )}
 
-                        {tournamentInfo?.format === "knockout" && (
+                        {show("matches") && tournamentInfo?.format === "knockout" && (
                             <KnockoutManager
                                 tournamentId={id as string}
                                 tournamentInfo={tournamentInfo}
@@ -317,7 +346,7 @@ export function TournamentDetailClient({ id }: { id: string }) {
                             />
                         )}
 
-                        {tournamentInfo && tournamentInfo.format !== "knockout" && (
+                        {show("matches") && tournamentInfo && tournamentInfo.format !== "knockout" && (
                             <MatchSchedule
                                 tournamentInfo={tournamentInfo}
                                 user={user}

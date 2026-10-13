@@ -70,7 +70,7 @@ export default function FullScoreEditorModal({
                         {isCompleted ? "แก้ไขผลการแข่งขัน" : "บันทึกผลการแข่งขัน"}
                     </h3>
                     <div className="inline-flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-1.5 rounded-full backdrop-blur-md">
-                        <span className="text-xs font-black tracking-widest text-[#3498db]">แมตซ์ #{match.match_no}</span>
+                        <span className="text-xs font-black tracking-widest text-[#3498db]">แมตช์ #{match.match_no}</span>
                     </div>
                 </div>
 
@@ -232,7 +232,7 @@ export default function FullScoreEditorModal({
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                         </svg>
-                        ยกเลิกแมตซ์การแข่งขันนี้ (Cancel Match)
+                        ยกเลิกแมตช์การแข่งขันนี้ (Cancel Match)
                     </button>
                 </div>
             </div>

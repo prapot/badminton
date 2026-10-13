@@ -1,110 +1,27 @@
 import { fetchCurrentUser, LoginResponse } from "@/features/auth/auth";
-import { safeRedirectPath } from "@/features/auth/safeRedirect";
 
 const STRAPI_BASE_URL =
     process.env.NEXT_PUBLIC_STRAPI_BASE_URL ||
     process.env.STRAPI_BASE_URL ||
     "http://localhost:1337";
 
-const LINE_CHANNEL_ID = process.env.NEXT_PUBLIC_LINE_CHANNEL_ID || "";
-const PENDING_KEY = "line_auth_pending";
-const PENDING_TTL_MS = 10 * 60 * 1000;
+const HANDOFF_KEY = "line_auth_handoff";
+const HANDOFF_TTL_MS = 10 * 60 * 1000;
 
 export type LineAuthMode = "login" | "link";
-
-interface PendingLineAuth {
-    state: string;
-    nonce: string;
-    /** PKCE — ส่งให้ backend ตอนแลก code */
-    codeVerifier: string;
-    mode: LineAuthMode;
-    redirect: string;
-    createdAt: number;
-}
-
-/** ของที่ backend ต้องใช้แลก code จาก LINE */
-export type LineCodeGrant = Pick<PendingLineAuth, "nonce" | "codeVerifier"> & { code: string };
 
 export interface LineLinkStatus {
     linked: boolean;
     displayName: string | null;
 }
 
-/** LINE ยืนยันตัวตนแล้วแต่ยังไม่ผูกกับบัญชีไหน — ใช้ linkTicket ผูกหลัง login/สมัครด้วยอีเมล */
-export class LineNotLinkedError extends Error {
-    constructor(message: string, readonly linkTicket: string, readonly displayName: string) {
-        super(message);
-    }
-}
+/** ผลจาก backend เมื่อ LINE ส่งกลับมาที่ /auth/line/callback */
+export type LineCallbackResult =
+    | { result: "login"; jwt: string; redirect: string }
+    | { result: "linked"; displayName: string; redirect: string }
+    | { result: "not_linked"; linkTicket: string; displayName: string; redirect: string; handoffId: string };
 
-function randomToken(): string {
-    const bytes = crypto.getRandomValues(new Uint8Array(16));
-    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function base64url(bytes: Uint8Array): string {
-    return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-/** PKCE (RFC 7636, S256): verifier 43 ตัวอักษร, challenge = base64url(sha256(verifier)) */
-export async function createPkcePair(): Promise<{ codeVerifier: string; codeChallenge: string }> {
-    const codeVerifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
-    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(codeVerifier));
-    return { codeVerifier, codeChallenge: base64url(new Uint8Array(digest)) };
-}
-
-// ต้องตรงกับ Callback URL ที่ลงทะเบียนไว้ใน LINE Developers Console
-function getRedirectUri(): string {
-    return `${window.location.origin}/auth/line/callback`;
-}
-
-/** ไปหน้า LINE เพื่อ login หรือเชื่อมต่อบัญชี แล้ว LINE จะส่งกลับมาที่ /auth/line/callback */
-export async function startLineAuth(mode: LineAuthMode, redirect: string) {
-    if (!LINE_CHANNEL_ID) {
-        throw new Error("ยังไม่ได้ตั้งค่า NEXT_PUBLIC_LINE_CHANNEL_ID");
-    }
-    const { codeVerifier, codeChallenge } = await createPkcePair();
-    const pending: PendingLineAuth = {
-        state: randomToken(),
-        nonce: randomToken(),
-        codeVerifier,
-        mode,
-        redirect: safeRedirectPath(redirect),
-        createdAt: Date.now(),
-    };
-    // localStorage ไม่ใช่ sessionStorage: บนมือถือ แอป LINE เปิด callback กลับมาเป็นแท็บใหม่
-    // ซึ่งไม่เห็น sessionStorage ของแท็บเดิม (แท็บในเบราว์เซอร์เดียวกันใช้ localStorage ร่วมกัน)
-    localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
-
-    const params = new URLSearchParams({
-        response_type: "code",
-        client_id: LINE_CHANNEL_ID,
-        redirect_uri: getRedirectUri(),
-        state: pending.state,
-        nonce: pending.nonce,
-        code_challenge: codeChallenge,
-        code_challenge_method: "S256",
-        scope: "profile openid",
-    });
-    window.location.href = `https://access.line.me/oauth2/v2.1/authorize?${params}`;
-}
-
-/** อ่าน + ลบ pending state (ใช้ได้ครั้งเดียว) และตรวจว่า state ตรงกับที่ LINE ส่งกลับมา */
-export function takePendingLineAuth(returnedState: string | null): PendingLineAuth {
-    const raw = localStorage.getItem(PENDING_KEY);
-    localStorage.removeItem(PENDING_KEY);
-    let pending: PendingLineAuth | null = null;
-    try {
-        pending = raw ? JSON.parse(raw) : null;
-    } catch {
-        // ข้อมูลเสีย — ถือว่าไม่มี
-    }
-    const expired = !pending?.createdAt || Date.now() - pending.createdAt > PENDING_TTL_MS;
-    if (!pending || expired || !returnedState || pending.state !== returnedState || !pending.codeVerifier) {
-        throw new Error("ลิงก์ยืนยันตัวตนไม่ถูกต้องหรือหมดอายุ กรุณาลองใหม่อีกครั้ง");
-    }
-    return { ...pending, redirect: safeRedirectPath(pending.redirect) };
-}
+export type HandoffClaim = { status: "pending" } | { status: "done"; session: LoginResponse };
 
 async function lineAuthRequest<T>(path: string, init: RequestInit, jwt?: string | null): Promise<T> {
     const res = await fetch(`${STRAPI_BASE_URL}/api/line-auth${path}`, {
@@ -116,29 +33,84 @@ async function lineAuthRequest<T>(path: string, init: RequestInit, jwt?: string 
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-        const message = data?.error?.message || "เกิดข้อผิดพลาด";
-        const details = data?.error?.details;
-        if (details?.code === "LINE_NOT_LINKED") {
-            throw new LineNotLinkedError(message, details.linkTicket, details.displayName || "");
-        }
-        throw new Error(message);
+        throw new Error(data?.error?.message || "เกิดข้อผิดพลาด");
     }
     return data as T;
 }
 
-function codeBody({ code, nonce, codeVerifier }: LineCodeGrant) {
-    return JSON.stringify({ code, nonce, codeVerifier, redirectUri: getRedirectUri() });
-}
-
-export async function loginWithLine(grant: LineCodeGrant): Promise<LoginResponse> {
-    const { jwt } = await lineAuthRequest<{ jwt: string }>("/login", { method: "POST", body: codeBody(grant) });
+export async function sessionFromJwt(jwt: string): Promise<LoginResponse> {
     const user = await fetchCurrentUser(jwt);
     if (!user) throw new Error("โหลดข้อมูลผู้ใช้ไม่สำเร็จ");
     return { jwt, user };
 }
 
-export function linkLine(grant: LineCodeGrant, jwt: string) {
-    return lineAuthRequest<LineLinkStatus>("/link", { method: "POST", body: codeBody(grant) }, jwt);
+// ต้องตรงกับ Callback URL ที่ลงทะเบียนไว้ใน LINE Developers Console
+function getRedirectUri(): string {
+    return `${window.location.origin}/auth/line/callback`;
+}
+
+/**
+ * ไปหน้า LINE เพื่อ login หรือเชื่อมต่อบัญชี — state/nonce/PKCE เก็บที่ backend ไม่ใช่ในเบราว์เซอร์
+ * เพราะบนมือถือแอป LINE เปิด callback เองในเบราว์เซอร์อื่น (iOS: เบราว์เซอร์ในแอป LINE) ที่ไม่เห็น storage ของแท็บนี้
+ */
+export async function startLineAuth(mode: LineAuthMode, redirect: string, jwt?: string | null) {
+    const { authorizeUrl, handoffId } = await lineAuthRequest<{ authorizeUrl: string; handoffId: string | null }>(
+        "/start",
+        { method: "POST", body: JSON.stringify({ mode, redirect, redirectUri: getRedirectUri() }) },
+        jwt
+    );
+    // login: ถ้า login ไปเสร็จในเบราว์เซอร์อื่น แท็บนี้มารับ session ทีหลังได้ (claimLineHandoff)
+    if (handoffId) {
+        localStorage.setItem(HANDOFF_KEY, JSON.stringify({ id: handoffId, createdAt: Date.now() }));
+    }
+    window.location.href = authorizeUrl;
+}
+
+export function completeLineCallback(code: string, state: string) {
+    return lineAuthRequest<LineCallbackResult>("/callback", { method: "POST", body: JSON.stringify({ code, state }) });
+}
+
+function readHandoffId(): string | null {
+    try {
+        const { id, createdAt } = JSON.parse(localStorage.getItem(HANDOFF_KEY) || "null") ?? {};
+        if (typeof id === "string" && Date.now() - createdAt <= HANDOFF_TTL_MS) return id;
+    } catch {
+        // ข้อมูลเสีย — ถือว่าไม่มี
+    }
+    clearLineHandoff();
+    return null;
+}
+
+export function clearLineHandoff() {
+    localStorage.removeItem(HANDOFF_KEY);
+}
+
+export function hasLineHandoff(): boolean {
+    return readHandoffId() !== null;
+}
+
+/**
+ * แท็บที่เริ่ม login ด้วย LINE ถามว่า login เสร็จที่อื่นแล้วหรือยัง — ได้ session ครั้งเดียว
+ * คืน null เมื่อไม่มีอะไรรอ (ไม่เคยเริ่ม, หมดอายุ, หรือรับไปแล้ว)
+ */
+export async function claimLineHandoff(): Promise<HandoffClaim | null> {
+    const id = readHandoffId();
+    if (!id) return null;
+    let claim: { status: "pending" } | { status: "done"; jwt: string };
+    try {
+        claim = await lineAuthRequest(`/handoff/${encodeURIComponent(id)}`, { method: "GET" });
+    } catch {
+        clearLineHandoff();
+        return null;
+    }
+    if (claim.status === "pending") return claim;
+    clearLineHandoff();
+    return { status: "done", session: await sessionFromJwt(claim.jwt) };
+}
+
+/** หลังเลือกบัญชี/สมัครในหน้า callback: ส่ง session ไปให้แท็บที่เริ่ม login ด้วย */
+export function publishLineHandoff(handoffId: string, jwt: string) {
+    return lineAuthRequest<{ ok: true }>("/handoff", { method: "POST", body: JSON.stringify({ handoffId }) }, jwt);
 }
 
 /** บัญชีที่สมัครด้วย LINE ได้อีเมลชั่วคราว (backend: PLACEHOLDER_EMAIL_DOMAIN) จนกว่าจะตั้งเองในโปรไฟล์ */
@@ -149,9 +121,7 @@ export function isLinePlaceholderEmail(email?: string | null): boolean {
 /** สมัครบัญชีใหม่จาก LINE: ชื่อ LINE เป็น username, อีเมลชั่วคราว, รหัสผ่านสุ่ม */
 export async function registerWithLine(linkTicket: string): Promise<LoginResponse> {
     const { jwt } = await lineAuthRequest<{ jwt: string }>("/register", { method: "POST", body: JSON.stringify({ linkTicket }) });
-    const user = await fetchCurrentUser(jwt);
-    if (!user) throw new Error("โหลดข้อมูลผู้ใช้ไม่สำเร็จ");
-    return { jwt, user };
+    return sessionFromJwt(jwt);
 }
 
 export function linkLineWithTicket(linkTicket: string, jwt: string) {

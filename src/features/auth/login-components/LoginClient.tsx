@@ -6,6 +6,7 @@ import Link from "next/link";
 import { loginWithStrapi } from "@/features/auth/auth";
 import { startLineAuth } from "@/features/auth/line";
 import { safeRedirectPath } from "@/features/auth/safeRedirect";
+import { useLineHandoff } from "@/features/auth/useLineHandoff";
 import { LineIcon } from "@/features/auth/line-components/LineIcon";
 import Swal from "sweetalert2";
 
@@ -36,6 +37,8 @@ function LoginForm() {
             setIsLoading(false);
         }
     };
+
+    const lineHandoff = useLineHandoff(redirectPath);
 
     const handleLineLogin = async () => {
         try {
@@ -95,6 +98,16 @@ function LoginForm() {
 
                 {/* Glass card */}
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl shadow-black/40">
+                    {/* LINE login ที่ไปเสร็จในเบราว์เซอร์อื่น (iOS) — รอรับ session */}
+                    {lineHandoff.waiting && (
+                        <div className="mb-4 px-4 py-3 rounded-xl bg-[#06C755]/10 border border-[#06C755]/30 text-sm text-green-300 flex items-center justify-between gap-3">
+                            <span>กำลังรอการยืนยันจาก LINE…</span>
+                            <button type="button" onClick={lineHandoff.cancel} className="text-xs text-slate-400 hover:text-white">
+                                ยกเลิก
+                            </button>
+                        </div>
+                    )}
+
                     {/* Error */}
                     {error && (
                         <div className="mb-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">

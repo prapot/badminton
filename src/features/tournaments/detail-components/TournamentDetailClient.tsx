@@ -21,6 +21,7 @@ import QRInviteModal from "./QRInviteModal";
 import KnockoutManager from "./KnockoutManager";
 import EndlessModeManager from "./EndlessModeManager";
 import EndlessStatsBoard from "./EndlessStatsBoard";
+import JoinTournamentCard from "./JoinTournamentCard";
 
 const STRAPI_BASE_URL = process.env.NEXT_PUBLIC_STRAPI_BASE_URL || "http://localhost:1337";
 
@@ -110,6 +111,9 @@ export function TournamentDetailClient({ id }: { id: string }) {
     const hasStatsTab = tournamentInfo?.format === "endless_mode";
     const activeTab = !useTabs ? null : (tab === "stats" && !hasStatsTab ? "matches" : tab);
     const show = (t: "matches" | "players" | "stats") => !useTabs || activeTab === t;
+    // Same rule as handleJoin: before the start, or any time during an endless tournament (not party mode)
+    const canJoin = !!tournamentInfo && tournamentInfo.mode !== "party" && (tournamentInfo.tournament_status === "upcoming" ||
+        (tournamentInfo.format === "endless_mode" && tournamentInfo.tournament_status === "ongoing"));
     const myLiveMatches = apiMatches.filter(m =>
         m.match_status !== "done" && m.match_status !== "cancelled" &&
         [m.team_a_id, m.team_b_id].some(t => t?.team_players?.some(tp => tp.user_id?.id === user?.id))
@@ -215,6 +219,15 @@ export function TournamentDetailClient({ id }: { id: string }) {
                             cancelled={cancelled}
                         />
 
+                        {canJoin && !isJoined && (
+                            <JoinTournamentCard
+                                isOngoing={tournamentInfo.tournament_status === "ongoing"}
+                                playerCount={tournamentInfo.players.length}
+                                joining={joining}
+                                onJoin={handleJoin}
+                            />
+                        )}
+
                         {useTabs && (
                             <div className="sticky top-16 z-40 -mx-3 sm:mx-0 px-3 sm:px-0 py-2 bg-[#0f1923]/90 backdrop-blur-xl">
                                 <div role="tablist" className="grid grid-flow-col auto-cols-fr gap-1 p-1 rounded-2xl bg-white/5 border border-white/10">
@@ -261,9 +274,7 @@ export function TournamentDetailClient({ id }: { id: string }) {
                                     user={user}
                                     jwt={jwt!}
                                     isJoined={isJoined}
-                                    joining={joining}
                                     leaving={leaving}
-                                    handleJoin={handleJoin}
                                     handleLeave={handleLeave}
                                     drawnPairs={drawnPairs}
                                     playerMatchCounts={playerMatchCounts}

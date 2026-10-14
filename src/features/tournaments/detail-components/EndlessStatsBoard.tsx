@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { ApiMatch, RegisteredPlayer } from "../types";
 import SkillBadge from "../components/SkillBadge";
 import RankBadge from "../components/RankBadge";
+import { computeEndlessStats } from "../utils/endlessStats";
 
 interface EndlessStatsBoardProps {
     players: RegisteredPlayer[];
@@ -17,90 +18,7 @@ export default function EndlessStatsBoard({
     tournamentMode
 }: EndlessStatsBoardProps) {
 
-    const stats = useMemo(() => {
-        const playerStats = new Map<number, {
-            id: number;
-            username: string;
-            nickname?: string;
-            skill_level?: string;
-            rank?: string;
-            stars?: number;
-            played: number;
-            wins: number;
-            losses: number;
-            pointsFor: number;
-            pointsAgainst: number;
-        }>();
-
-        players.forEach(p => {
-            playerStats.set(p.id, {
-                id: p.id,
-                username: p.username || p.guest_name || "Unknown",
-                nickname: p.nickname,
-                skill_level: p.skill_level,
-                rank: p.rankings?.[0]?.rank,
-                stars: p.rankings?.[0]?.stars,
-                played: 0,
-                wins: 0,
-                losses: 0,
-                pointsFor: 0,
-                pointsAgainst: 0
-            });
-        });
-
-        apiMatches.forEach(m => {
-            if (m.match_status !== "done") return;
-            
-            const scoreA = m.score_a || 0;
-            const scoreB = m.score_b || 0;
-            
-            const teamAIds = m.team_a_id?.team_players.map(tp => tp.user_id?.id).filter(Boolean) || [];
-            const teamBIds = m.team_b_id?.team_players.map(tp => tp.user_id?.id).filter(Boolean) || [];
-
-            // A win if scoreA > scoreB
-            const aWon = scoreA > scoreB;
-            const bWon = scoreB > scoreA;
-
-            teamAIds.forEach(id => {
-                if (id && playerStats.has(id)) {
-                    const s = playerStats.get(id)!;
-                    s.played += 1;
-                    if (aWon) s.wins += 1;
-                    else if (bWon) s.losses += 1;
-                    s.pointsFor += scoreA;
-                    s.pointsAgainst += scoreB;
-                }
-            });
-
-            teamBIds.forEach(id => {
-                if (id && playerStats.has(id)) {
-                    const s = playerStats.get(id)!;
-                    s.played += 1;
-                    if (bWon) s.wins += 1;
-                    else if (aWon) s.losses += 1;
-                    s.pointsFor += scoreB;
-                    s.pointsAgainst += scoreA;
-                }
-            });
-        });
-
-        const sortedStats = Array.from(playerStats.values())
-            .filter(s => s.played > 0)
-            .sort((a, b) => {
-                // Sort by Wins desc
-                if (b.wins !== a.wins) return b.wins - a.wins;
-                // Then Win Rate desc
-                const wrA = a.played > 0 ? a.wins / a.played : 0;
-                const wrB = b.played > 0 ? b.wins / b.played : 0;
-                if (wrB !== wrA) return wrB - wrA;
-                // Then PD desc
-                const pdA = a.pointsFor - a.pointsAgainst;
-                const pdB = b.pointsFor - b.pointsAgainst;
-                return pdB - pdA;
-            });
-
-        return sortedStats;
-    }, [players, apiMatches]);
+    const stats = useMemo(() => computeEndlessStats(players, apiMatches), [players, apiMatches]);
 
     if (stats.length === 0) {
         return null; // Don't show if no matches are done yet
@@ -145,7 +63,7 @@ export default function EndlessStatsBoard({
                                 const isTop3 = idx < 3;
 
                                 return (
-                                    <tr key={s.id} className="hover:bg-white/[0.02] transition-colors">
+                                    <tr key={s.key} className="hover:bg-white/[0.02] transition-colors">
                                         <td className="px-4 py-3">
                                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${
                                                 idx === 0 ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30" :
@@ -161,6 +79,11 @@ export default function EndlessStatsBoard({
                                                 <div className="flex items-center gap-1.5 min-w-0">
                                                     <span className={`font-bold truncate max-w-[120px] sm:max-w-[150px] ${isTop3 ? 'text-white' : 'text-slate-300'}`}>{s.username}</span>
                                                     {s.skill_level && <div className="shrink-0"><SkillBadge skillLevel={s.skill_level} showLabel={false} /></div>}
+                                                    {s.hasLeft && (
+                                                        <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-slate-500/15 border border-slate-500/30 text-[10px] font-bold text-slate-400 whitespace-nowrap">
+                                                            ออกจากเกม
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 {s.nickname && <span className="text-[11px] text-slate-500 truncate max-w-[150px]">{s.nickname}</span>}
                                                 {tournamentMode === 'ranking' && s.rank && <RankBadge rank={s.rank} stars={s.stars} showName={true} size="sm" />}

@@ -1,6 +1,8 @@
-import type { NextConfig } from "next";
+// .mjs (not .ts): prod runs `npm install --omit=dev`, and loading next.config.ts needs `typescript`
+// (a devDependency) — without it `next start` crash-looped on every deploy.
 
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   output: "standalone",
   env: {
     NEXT_PUBLIC_STRAPI_BASE_URL:

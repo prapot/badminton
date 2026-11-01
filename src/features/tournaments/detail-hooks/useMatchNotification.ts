@@ -1,7 +1,12 @@
 import { useEffect } from "react";
 import Swal from "sweetalert2";
-import { getPusher } from "@/shared/realtime/pusherClient";
+import { acquireChannel } from "@/shared/realtime/pusherClient";
 import { ApiMatch, User } from "@/features/tournaments/types";
+
+// ชื่อผู้เล่นมาจากผู้ใช้ → ต้อง escape ก่อนใส่ใน html ของ Swal
+function escapeHtml(value: string | undefined): string {
+    return String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+}
 
 export function useMatchNotification(apiMatches: ApiMatch[], user: User | null) {
     useEffect(() => {
@@ -77,7 +82,7 @@ export function useMatchNotification(apiMatches: ApiMatch[], user: User | null) 
                             <div class="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-xl shrink-0 mt-0.5">🤝</div>
                             <div class="min-w-0 flex-1">
                                 <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">คู่ของคุณ</p>
-                                <p class="text-white font-bold text-sm sm:text-base leading-snug break-words">${myPartner}</p>
+                                <p class="text-white font-bold text-sm sm:text-base leading-snug break-words">${escapeHtml(myPartner)}</p>
                             </div>
                         </div>
                         <div class="h-px w-full bg-white/10 my-2"></div>
@@ -85,7 +90,7 @@ export function useMatchNotification(apiMatches: ApiMatch[], user: User | null) 
                             <div class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-xl shrink-0 mt-0.5">⚔️</div>
                             <div class="min-w-0 flex-1">
                                 <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">พบกับ</p>
-                                <p class="text-white font-bold text-sm sm:text-base leading-snug break-words">${opponents}</p>
+                                <p class="text-white font-bold text-sm sm:text-base leading-snug break-words">${escapeHtml(opponents)}</p>
                             </div>
                         </div>
                     </div>
@@ -109,11 +114,9 @@ export function useMatchNotification(apiMatches: ApiMatch[], user: User | null) 
     useEffect(() => {
         if (!user || !user.id) return;
 
-        const pusher = getPusher();
-        if (!pusher) return;
-
-        const channelId = `user-${user.id}`;
-        const channel = pusher.subscribe(channelId);
+        const sub = acquireChannel(`user-${user.id}`);
+        if (!sub) return;
+        const { channel, release } = sub;
         
         const handleMatchAlert = (data: any) => {
             // Deduplicate: If we already notified about this match, skip
@@ -168,7 +171,7 @@ export function useMatchNotification(apiMatches: ApiMatch[], user: User | null) 
                             <div class="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-xl shrink-0 mt-0.5">🤝</div>
                             <div class="min-w-0 flex-1">
                                 <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">คู่ของคุณ</p>
-                                <p class="text-white font-bold text-sm sm:text-base leading-snug break-words">${myPartner}</p>
+                                <p class="text-white font-bold text-sm sm:text-base leading-snug break-words">${escapeHtml(myPartner)}</p>
                             </div>
                         </div>
                         <div class="h-px w-full bg-white/10 my-2"></div>
@@ -176,7 +179,7 @@ export function useMatchNotification(apiMatches: ApiMatch[], user: User | null) 
                             <div class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-xl shrink-0 mt-0.5">⚔️</div>
                             <div class="min-w-0 flex-1">
                                 <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">พบกับ</p>
-                                <p class="text-white font-bold text-sm sm:text-base leading-snug break-words">${opponents}</p>
+                                <p class="text-white font-bold text-sm sm:text-base leading-snug break-words">${escapeHtml(opponents)}</p>
                             </div>
                         </div>
                     </div>
@@ -199,7 +202,7 @@ export function useMatchNotification(apiMatches: ApiMatch[], user: User | null) 
 
         return () => {
             channel.unbind('match-alert', handleMatchAlert);
-            pusher.unsubscribe(channelId);
+            release();
         };
     }, [user]);
 }

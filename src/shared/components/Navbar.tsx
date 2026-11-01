@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { isLinePlaceholderEmail } from "@/features/auth/line";
+import RankResultToast from "@/features/ranking/components/RankResultToast";
 
 interface User {
     id: number;
@@ -234,6 +235,9 @@ export default function Navbar() {
                     </button>
                 </div>
             </aside>
+
+            {/* ผลดาว/แรงค์หลังจบแมตช์ ranking (Pusher user-<id> rank-result) */}
+            <RankResultToast userId={user?.id} />
         </>
     );
 }

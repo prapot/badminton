@@ -102,7 +102,7 @@ export function RankGuide() {
                                 Win Streak <span className="text-orange-500">Bonus</span>
                             </h3>
                             <p className="text-slate-400 text-xs leading-relaxed">
-                                ชนะติดต่อกันครบ <span className="text-white font-bold">3 แมตช์ขึ้นไป</span> รับแต้มกล้าหาญเพิ่มขึ้น! ช่วยเร่งให้แต้มผู้กล้าเต็มเพื่อรับดาวโบนัสได้เร็วขึ้น
+                                ชนะติดต่อกันตั้งแต่ <span className="text-white font-bold">2 แมตช์ขึ้นไป</span> รับแต้มกล้าหาญเพิ่มขึ้น (สูงสุด 70 แต้มเมื่อชนะติด 5 นัด) ช่วยเร่งให้แต้มผู้กล้าเต็มเพื่อรับดาวโบนัสได้เร็วขึ้น
                             </p>
                         </div>
                     </div>
@@ -119,7 +119,7 @@ export function RankGuide() {
                                 Brave Points & <span className="text-blue-400">Protection</span>
                             </h3>
                             <p className="text-slate-400 text-xs leading-relaxed">
-                                สำหรับระดับ <span className="text-white font-bold">Silver ขึ้นไป</span> สะสมแต้มกล้าหาญครบ 100 แต้ม รับ <span className="text-yellow-400 font-bold">ดาวโบนัส +1</span> หรือใช้ <span className="text-emerald-400 font-bold">ป้องกันดาวลดเมื่อแพ้</span> ได้ทันที
+                                แต้มกล้าหาญเต็ม 100 แต้มตอนชนะ รับ <span className="text-yellow-400 font-bold">ดาวโบนัส +1</span> ถ้าเต็มตอนแพ้ในระดับ <span className="text-white font-bold">Silver ขึ้นไป</span> จะใช้ <span className="text-emerald-400 font-bold">ป้องกันดาวลด</span> ให้อัตโนมัติ — ระดับ <span className="text-white font-bold">Master</span> ไม่มีแต้มกล้าหาญ ชนะ +1 แพ้ −1 ดาวเสมอ
                             </p>
                         </div>
                     </div>

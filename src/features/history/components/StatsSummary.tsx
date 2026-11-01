@@ -2,6 +2,7 @@ import React from "react";
 import RankBadge from "@/features/tournaments/components/RankBadge";
 import { getMaxStarsForRank } from "@/features/tournaments/utils/TournamentUtils";
 import { ApiSeason, RankingStats } from "../types";
+import { cn } from "@/shared/utils/utils";
 
 interface Props {
     loading: boolean;
@@ -15,9 +16,9 @@ interface Props {
 const BRAVE_POINTS_CAP = 100;
 
 /** Every card uses the same rows (label / value / caption) so they line up; `footer` hugs the bottom edge */
-function StatCard({ label, children, caption, footer }: { label: string; children: React.ReactNode; caption: React.ReactNode; footer?: React.ReactNode }) {
+function StatCard({ label, children, caption, footer, className }: { label: string; children: React.ReactNode; caption: React.ReactNode; footer?: React.ReactNode; className?: string }) {
     return (
-        <div className="relative overflow-hidden bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md px-4 pt-4 pb-5 flex flex-col items-center text-center">
+        <div className={cn("relative overflow-hidden bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md px-4 pt-4 pb-5 flex flex-col items-center text-center", className)}>
             <p className="text-xs text-slate-400 font-bold">{label}</p>
             <div className="h-14 flex items-center justify-center">{children}</div>
             <p className="text-xs text-slate-400">{caption}</p>
@@ -26,8 +27,16 @@ function StatCard({ label, children, caption, footer }: { label: string; childre
     );
 }
 
+// ต้องตรงกับ badminton-service/src/api/ranking/utils/rankingMath.ts
+// Master ไม่มีแต้มกล้าหาญ → ซ่อนการ์ดและคำอธิบาย
+function braveHint(rank?: string): string {
+    if (!rank || rank.startsWith("Bronze")) return "ชนะได้ดาวโบนัส +1⭐";
+    return "ชนะได้ดาวโบนัส +1⭐ หรือแพ้แล้วไม่เสียดาว";
+}
+
 export function StatsSummary({ loading, rankingStats, seasons, selectedSeason, setSelectedSeason, setPage }: Props) {
     const bravePoints = rankingStats?.brave_points || 0;
+    const isMaster = /master/i.test(rankingStats?.rank || "");
     const played = rankingStats?.match_played || 0;
     const winRate = played ? Math.round(((rankingStats?.win || 0) / played) * 100) : 0;
 
@@ -59,10 +68,10 @@ export function StatsSummary({ loading, rankingStats, seasons, selectedSeason, s
                     {[0, 1, 2, 3].map(i => <div key={i} className="h-[122px] rounded-2xl bg-white/5 animate-pulse" />)}
                 </div>
             ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                <div className={cn("grid grid-cols-2 gap-3 sm:gap-4", isMaster ? "sm:grid-cols-3" : "sm:grid-cols-4")}>
                     <StatCard
                         label="แรงค์"
-                        caption={/master/i.test(rankingStats.rank || "")
+                        caption={isMaster
                             ? `⭐ x${rankingStats.stars || 0}`
                             : `⭐ ${rankingStats.stars || 0} / ${getMaxStarsForRank(rankingStats.rank || "Bronze V")} ดาว`}
                     >
@@ -73,7 +82,7 @@ export function StatsSummary({ loading, rankingStats, seasons, selectedSeason, s
                         <span className="text-3xl font-black text-white tabular-nums">{played}</span>
                     </StatCard>
 
-                    <StatCard label="ชนะ / แพ้" caption={`อัตราชนะ ${winRate}%`}>
+                    <StatCard label="ชนะ / แพ้" caption={`อัตราชนะ ${winRate}%`} className={isMaster ? "col-span-2 sm:col-span-1" : undefined}>
                         <span className="text-3xl font-black tabular-nums">
                             <span className="text-green-400">{rankingStats.win || 0}</span>
                             <span className="text-slate-600 mx-1.5">/</span>
@@ -81,7 +90,7 @@ export function StatsSummary({ loading, rankingStats, seasons, selectedSeason, s
                         </span>
                     </StatCard>
 
-                    <StatCard
+                    {!isMaster && <StatCard
                         label="แต้มกล้าหาญ"
                         caption={bravePoints >= BRAVE_POINTS_CAP ? "พร้อมใช้โบนัสแล้ว!" : `อีก ${BRAVE_POINTS_CAP - bravePoints} แต้มได้โบนัส`}
                         footer={
@@ -93,13 +102,15 @@ export function StatsSummary({ loading, rankingStats, seasons, selectedSeason, s
                         <span className="text-3xl font-black text-purple-400 tabular-nums">
                             {bravePoints}<span className="text-base text-slate-500 font-bold">/{BRAVE_POINTS_CAP}</span>
                         </span>
-                    </StatCard>
+                    </StatCard>}
                 </div>
             )}
 
-            <p className="mt-2 text-xs text-slate-500">
-                💜 แต้มกล้าหาญครบ 100 → ชนะได้ดาวโบนัส +1⭐ หรือแพ้แล้วไม่เสียดาว
-            </p>
+            {!isMaster && (
+                <p className="mt-2 text-xs text-slate-500">
+                    💜 แต้มกล้าหาญครบ 100 → {braveHint(rankingStats?.rank)}
+                </p>
+            )}
         </section>
     );
 }

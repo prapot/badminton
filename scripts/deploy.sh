@@ -29,6 +29,7 @@ rsync -avz --progress \
   --exclude='.git' \
   --exclude='node_modules' \
   --exclude='.next/cache' \
+  --exclude='.next/dev' \
   --exclude='.env*' \
   ./ "$SERVER_USER@$SERVER_IP:$SERVER_PATH/"
 
@@ -44,6 +45,9 @@ ssh "$SERVER_USER@$SERVER_IP" << 'ENDSSH'
   fi
 
   cd /root/www/badminton
+  # next.config.ts ถูกแทนด้วย .mjs (rsync ไม่ลบไฟล์เก่า) และ .next/dev เป็น cache ของ next dev ที่ prod ไม่ใช้
+  rm -f next.config.ts
+  rm -rf .next/dev
   npm install --omit=dev
   $PM2 reload badminton || $PM2 start ecosystem.config.js
   $PM2 save
